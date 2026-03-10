@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 
 /* ═══════════════════════════════════════════════════════════════
-   FLEET PRO v4.0 — Sistema Integral de Gestión de Flota
+   FLEET PRO v6.0 — Sistema Integral de Gestión de Flota
    Con módulo de logística externa, evidencias fotográficas,
    consolidados financieros y reportes avanzados
 ═══════════════════════════════════════════════════════════════ */
@@ -683,7 +683,7 @@ function UnitModal({ unit, drivers, onSave, onClose }) {
 }
 
 // ──────────────────────────────────────────────────────────────
-// DRIVER MODAL ACTUALIZADO (v5)
+// DRIVER MODAL ACTUALIZADO (v6)
 // CAMBIOS: porcentajeViaje en lugar de salarioSemanal
 // ──────────────────────────────────────────────────────────────
 
@@ -823,7 +823,7 @@ function DriverModal({ driver, units, onSave, onClose }) {
 }
 
 // ──────────────────────────────────────────────────────────────
-// FUEL MODAL ACTUALIZADO (v5)
+// FUEL MODAL ACTUALIZADO (v6)
 // CAMBIOS: Actualiza automáticamente kmActual de la unidad
 // ──────────────────────────────────────────────────────────────
 
@@ -8989,7 +8989,7 @@ export default function App() {
   useEffect(() => {
     if (tema === "light") document.documentElement.removeAttribute("data-theme");
     else document.documentElement.setAttribute("data-theme", tema);
-    window.storage?.set("fp5:tema", tema).catch(()=>{});
+    window.storage?.set("fp6:tema", tema).catch(()=>{});
   }, [tema]);
   const [tabulador, setTabulador] = useState([]);
   const [extrasTabulador, setExtrasTabulador] = useState([]);
@@ -9007,30 +9007,30 @@ export default function App() {
   useEffect(() => {
     (async () => {
       const pairs = [
-        [setUnits, "fp5:units", D_UNITS],
-        [setDrivers, "fp5:drivers", D_DRIVERS],
-        [setDocs, "fp5:docs", D_DOCS],
-        [setMaints, "fp5:maints", D_MAINTS],
-        [setFuels, "fp5:fuels", D_FUELS],
-        [setTrips, "fp5:trips", D_TRIPS],
-        [setGastos, "fp5:gastos", D_GASTOS],
-        [setExternos, "fp5:externos", D_EXTERNOS],
-        [setClientes, "fp5:clientes", D_CLIENTES],
-        [setFacturas, "fp5:facturas", D_FACTURAS],
-        [setProveedores, "fp5:proveedores", D_PROVEEDORES],
-        [setTiposPersonalizados, "fp5:tipos", []],
-        [setBranding, "fp5:branding", { nombre: "Mi Empresa", slogan: "Sistema de Flota", logo: "" }],
-        [setNominasAdmin, "fp5:nominasAdmin", D_NOMINAS_ADMIN],
-        [setRoles, "fp5:roles", D_ROLES],
-        [setTraccarConfig, "fp5:traccarConfig", null],
-        [setUsuarios, "fp5:usuarios", D_USUARIOS],
-        [setFacturApiKey, "fp5:facturApiKey", ""],
-        [setTabulador, "fp5:tabulador", D_TABULADOR],
-        [setExtrasTabulador, "fp5:extrasTabulador", D_EXTRAS_TABULADOR],
-        [setCotizaciones, "fp5:cotizaciones", []]
+        [setUnits, "fp6:units", D_UNITS],
+        [setDrivers, "fp6:drivers", D_DRIVERS],
+        [setDocs, "fp6:docs", D_DOCS],
+        [setMaints, "fp6:maints", D_MAINTS],
+        [setFuels, "fp6:fuels", D_FUELS],
+        [setTrips, "fp6:trips", D_TRIPS],
+        [setGastos, "fp6:gastos", D_GASTOS],
+        [setExternos, "fp6:externos", D_EXTERNOS],
+        [setClientes, "fp6:clientes", D_CLIENTES],
+        [setFacturas, "fp6:facturas", D_FACTURAS],
+        [setProveedores, "fp6:proveedores", D_PROVEEDORES],
+        [setTiposPersonalizados, "fp6:tipos", []],
+        [setBranding, "fp6:branding", { nombre: "Mi Empresa", slogan: "Sistema de Flota", logo: "" }],
+        [setNominasAdmin, "fp6:nominasAdmin", D_NOMINAS_ADMIN],
+        [setRoles, "fp6:roles", D_ROLES],
+        [setTraccarConfig, "fp6:traccarConfig", null],
+        [setUsuarios, "fp6:usuarios", D_USUARIOS],
+        [setFacturApiKey, "fp6:facturApiKey", ""],
+        [setTabulador, "fp6:tabulador", D_TABULADOR],
+        [setExtrasTabulador, "fp6:extrasTabulador", D_EXTRAS_TABULADOR],
+        [setCotizaciones, "fp6:cotizaciones", []]
       ];
       // Load theme
-      try { const tr = await window.storage.get("fp5:tema"); if (tr?.value) { setTema(tr.value); if (tr.value==="light") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme",tr.value); } } catch(e){}
+      try { const tr = await window.storage.get("fp6:tema"); if (tr?.value) { setTema(tr.value); if (tr.value==="light") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme",tr.value); } } catch(e){}
 
       await Promise.all(pairs.map(async ([s, k, d]) => {
         try {
@@ -9064,23 +9064,23 @@ export default function App() {
     del: id => setConfirm({ msg: "¿Eliminar este registro?", onOk: async () => { const next = getRef().filter(x => x.id !== id); setter(next); await sv(key, next); setConfirm(null); notify("Eliminado") } })
   });
 
-  const UC = mkCRUD(() => uRef.current, setUnits, "fp5:units");
-  const DC = mkCRUD(() => dRef.current, setDrivers, "fp5:drivers");
-  const DoC = mkCRUD(() => dcRef.current, setDocs, "fp5:docs");
-  const MC = mkCRUD(() => mRef.current, setMaints, "fp5:maints");
-  const FC = mkCRUD(() => fRef.current, setFuels, "fp5:fuels");
-  const TC = mkCRUD(() => tRef.current, setTrips, "fp5:trips");
-  const GC = mkCRUD(() => gRef.current, setGastos, "fp5:gastos");
-  const EC = mkCRUD(() => eRef.current, setExternos, "fp5:externos");
-  const CliC = mkCRUD(() => cliRef.current, setClientes, "fp5:clientes");
-  const FacC = mkCRUD(() => facRef.current, setFacturas, "fp5:facturas");
-  const PVC = mkCRUD(() => pvRef.current, setProveedores, "fp5:proveedores");
+  const UC = mkCRUD(() => uRef.current, setUnits, "fp6:units");
+  const DC = mkCRUD(() => dRef.current, setDrivers, "fp6:drivers");
+  const DoC = mkCRUD(() => dcRef.current, setDocs, "fp6:docs");
+  const MC = mkCRUD(() => mRef.current, setMaints, "fp6:maints");
+  const FC = mkCRUD(() => fRef.current, setFuels, "fp6:fuels");
+  const TC = mkCRUD(() => tRef.current, setTrips, "fp6:trips");
+  const GC = mkCRUD(() => gRef.current, setGastos, "fp6:gastos");
+  const EC = mkCRUD(() => eRef.current, setExternos, "fp6:externos");
+  const CliC = mkCRUD(() => cliRef.current, setClientes, "fp6:clientes");
+  const FacC = mkCRUD(() => facRef.current, setFacturas, "fp6:facturas");
+  const PVC = mkCRUD(() => pvRef.current, setProveedores, "fp6:proveedores");
 
   const saveExternoWithTipo = async (item) => {
     if (item.tipoUnidad && !TIPOS.includes(item.tipoUnidad) && !tiposPersonalizados.includes(item.tipoUnidad)) {
       const newTipos = [...tiposPersonalizados, item.tipoUnidad];
       setTiposPersonalizados(newTipos);
-      await sv("fp5:tipos", newTipos);
+      await sv("fp6:tipos", newTipos);
     }
     EC.save(item);
   };
@@ -9094,12 +9094,12 @@ export default function App() {
   const resetAll = () => setConfirm({
     msg: "¿Restaurar datos de ejemplo? Se perderán los cambios actuales.", onOk: async () => {
       const pairs = [
-        [D_UNITS, "fp5:units", setUnits], [D_DRIVERS, "fp5:drivers", setDrivers],
-        [D_DOCS, "fp5:docs", setDocs], [D_MAINTS, "fp5:maints", setMaints],
-        [D_FUELS, "fp5:fuels", setFuels], [D_TRIPS, "fp5:trips", setTrips],
-        [D_GASTOS, "fp5:gastos", setGastos], [D_EXTERNOS, "fp5:externos", setExternos],
-        [D_CLIENTES, "fp5:clientes", setClientes], [D_FACTURAS, "fp5:facturas", setFacturas],
-        [[], "fp5:tipos", setTiposPersonalizados]
+        [D_UNITS, "fp6:units", setUnits], [D_DRIVERS, "fp6:drivers", setDrivers],
+        [D_DOCS, "fp6:docs", setDocs], [D_MAINTS, "fp6:maints", setMaints],
+        [D_FUELS, "fp6:fuels", setFuels], [D_TRIPS, "fp6:trips", setTrips],
+        [D_GASTOS, "fp6:gastos", setGastos], [D_EXTERNOS, "fp6:externos", setExternos],
+        [D_CLIENTES, "fp6:clientes", setClientes], [D_FACTURAS, "fp6:facturas", setFacturas],
+        [[], "fp6:tipos", setTiposPersonalizados]
       ];
       for (const [d, k, s] of pairs) { s(d); await sv(k, d); }
       setConfirm(null); notify("Datos restaurados", "info");
@@ -9124,7 +9124,7 @@ export default function App() {
     ].join("\n");
     const blob = new Blob([content], { type: "text/tab-separated-values" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-    a.download = `FleetPro_v5_${new Date().toISOString().slice(0, 10)}.tsv`; a.click();
+    a.download = `FleetPro_v6_${new Date().toISOString().slice(0, 10)}.tsv`; a.click();
   };
 
   const alertCount = (() => {
@@ -9171,7 +9171,7 @@ export default function App() {
 
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--bg0)", color: "var(--muted)", fontFamily: "var(--font-hd)", fontSize: 22, letterSpacing: ".1em" }}>
-      <style>{CSS}</style>⟳ Cargando Fleet Pro v5.0...
+      <style>{CSS}</style>⟳ Cargando Fleet Pro v6.0...
     </div>
   );
 
@@ -9191,14 +9191,14 @@ export default function App() {
                 : u
               );
               setUsuarios(nuevos);
-              sv("fp5:usuarios", nuevos);
+              sv("fp6:usuarios", nuevos);
               return;
             }
             if (tipo === "exitoso" && usuarioActualizado) {
               // Actualizar usuario con datos de acceso y loguear
               const nuevos = usuarios.map(u => u.id === uid_login ? usuarioActualizado : u);
               setUsuarios(nuevos);
-              sv("fp5:usuarios", nuevos);
+              sv("fp6:usuarios", nuevos);
               setCurrentUser(usuarioActualizado);
             }
           }}
@@ -9368,9 +9368,9 @@ export default function App() {
               cotizaciones={cotizaciones}
               clientes={clientes}
               branding={branding}
-              onSaveTabulador={async t => { setTabulador(t); await sv("fp5:tabulador", t); }}
-              onSaveExtras={async e => { setExtrasTabulador(e); await sv("fp5:extrasTabulador", e); }}
-              onSaveCotizaciones={async c => { setCotizaciones(c); await sv("fp5:cotizaciones", c); }}
+              onSaveTabulador={async t => { setTabulador(t); await sv("fp6:tabulador", t); }}
+              onSaveExtras={async e => { setExtrasTabulador(e); await sv("fp6:extrasTabulador", e); }}
+              onSaveCotizaciones={async c => { setCotizaciones(c); await sv("fp6:cotizaciones", c); }}
             />
           )}
           {tab === "facturacion" && userCan("verFacturacion") && <FacturacionPage
@@ -9393,7 +9393,7 @@ export default function App() {
               trips={trips}
               onOpenNomina={d => setModal({ type: "nomina", data: d })}
               nominasAdmin={userCan("verNominasAdmin") ? nominasAdmin : []}
-              onSaveNominasAdmin={async list => { setNominasAdmin(list); await sv("fp5:nominasAdmin", list); }}
+              onSaveNominasAdmin={async list => { setNominasAdmin(list); await sv("fp6:nominasAdmin", list); }}
             />
           )}
           {tab === "proveedores" && isSupervisor && <ProveedoresPage
@@ -9425,9 +9425,9 @@ export default function App() {
       </div>
 
       {/* MODALES */}
-      {modal?.type === "branding" && <BrandingModal branding={branding} onSave={async b => { setBranding(b); await sv("fp5:branding", b); }} onClose={() => setModal(null)} />}
-      {modalGpsConfig && <TraccarConfigModal config={traccarConfig || { serverUrl:"", email:"", password:"", intervalo:"30" }} onSave={async c => { setTraccarConfig(c); await sv("fp5:traccarConfig", c); }} onClose={() => setModalGpsConfig(false)} />}
-      {modal?.type === "usuarios" && isAdmin && <UsuariosModal usuarios={usuarios} roles={roles} onSave={async u => { setUsuarios(u); await sv("fp5:usuarios", u); }} onSaveRoles={async r => { setRoles(r); await sv("fp5:roles", r); }} onClose={() => setModal(null)} />}
+      {modal?.type === "branding" && <BrandingModal branding={branding} onSave={async b => { setBranding(b); await sv("fp6:branding", b); }} onClose={() => setModal(null)} />}
+      {modalGpsConfig && <TraccarConfigModal config={traccarConfig || { serverUrl:"", email:"", password:"", intervalo:"30" }} onSave={async c => { setTraccarConfig(c); await sv("fp6:traccarConfig", c); }} onClose={() => setModalGpsConfig(false)} />}
+      {modal?.type === "usuarios" && isAdmin && <UsuariosModal usuarios={usuarios} roles={roles} onSave={async u => { setUsuarios(u); await sv("fp6:usuarios", u); }} onSaveRoles={async r => { setRoles(r); await sv("fp6:roles", r); }} onClose={() => setModal(null)} />}
       {modal?.type === "facturapi" && isAdmin && (() => {
         const fac = modal.data;
         const cli = clientes.find(c => c.id === fac.clienteId);
@@ -9439,7 +9439,7 @@ export default function App() {
           apiKey={facturApiKey}
           onSuccess={async f => {
             FacC.save(f);
-            await sv("fp5:facturApiKey", facturApiKey);
+            await sv("fp6:facturApiKey", facturApiKey);
             setModal(null);
           }}
           onClose={() => setModal(null)}
