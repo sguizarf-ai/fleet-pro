@@ -1,0 +1,17 @@
+{
+  "name": "Fleet Pro v6",
+  "short_name": "Fleet Pro",
+  "description": "Sistema Integral de Gestión de Flota",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0099CC",
+  "theme_color": "#0099CC",
+  "icons": [
+    {
+      "src": "/truck.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
