@@ -6557,18 +6557,17 @@ function FacturacionPage({ facturas, clientes, viajes, onAdd, onEdit, onDelete, 
   const [sf, setSf] = useState("TODOS");
   const [cf, setCf] = useState("TODOS");
 
-  // Actualizar status basado en vencimiento
+  // Actualizar status basado en vencimiento — solo una vez al montar
+  const autoVencidaRef = useRef(false);
   useEffect(() => {
-    facturas.forEach(f => {
-      if (f.status === "PENDIENTE") {
-        const days = daysUntil(f.fechaVencimiento);
-        if (days !== null && days < 0) {
-          // Auto-cambiar a VENCIDA
-          onEdit({ ...f, status: "VENCIDA" });
-        }
-      }
-    });
-  }, [facturas, onEdit]);
+    if (autoVencidaRef.current) return;
+    autoVencidaRef.current = true;
+    facturas.filter(f => {
+      if (f.status !== "PENDIENTE") return false;
+      const days = daysUntil(f.fechaVencimiento);
+      return days !== null && days < 0;
+    }).forEach(f => onEdit({ ...f, status: "VENCIDA" }));
+  }, []); // solo al montar
 
   const fil = facturas.filter(f => {
     const cli = clientes.find(c => c.id === f.clienteId);
