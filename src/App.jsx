@@ -290,10 +290,8 @@ tbody tr:hover{background:var(--bg2)}
 .sec-lbl{
   font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;
   color:var(--cyan);padding:16px 0 10px;
-  border-bottom:1px solid rgba(var(--cyan),0.15);
+  border-bottom:1px solid var(--border);
   margin-bottom:14px;
-  background:linear-gradient(90deg,var(--cyan),var(--purple));
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
   display:block;
 }
 
