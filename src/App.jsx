@@ -292,6 +292,8 @@ tbody tr:hover{background:var(--bg2)}
   color:var(--cyan);padding:16px 0 10px;
   border-bottom:1px solid var(--border);
   margin-bottom:14px;
+  background:linear-gradient(90deg,var(--cyan),var(--purple));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
   display:block;
 }
 
@@ -1772,8 +1774,7 @@ function LoginScreen({ usuarios, branding, onLogin }) {
               type="email"
               autoFocus
               style={{ width:"100%", padding:"11px 14px", borderRadius:8, border:`1px solid ${err?"var(--red)":"var(--border)"}`, background:"var(--bg0)", color:"var(--text)", fontSize:13, boxSizing:"border-box", outline:"none", fontFamily:"var(--font-bd)", transition:"all .2s" }}
-              onFocus={e=>{ e.target.style.borderColor="var(--cyan)"; e.target.style.boxShadow="0 0 0 3px var(--glow-cyan)"; }}
-              onBlur={e=>{ e.target.style.borderColor=err?"var(--red)":"var(--border)"; e.target.style.boxShadow="none"; }}
+              
             />
           </div>
 
@@ -1787,8 +1788,7 @@ function LoginScreen({ usuarios, branding, onLogin }) {
                 placeholder="••••••••"
                 type={showPass ? "text" : "password"}
                 style={{ width:"100%", padding:"11px 42px 11px 14px", borderRadius:8, border:`1px solid ${err?"var(--red)":"var(--border)"}`, background:"var(--bg0)", color:"var(--text)", fontSize:13, boxSizing:"border-box", outline:"none", fontFamily:"var(--font-bd)", transition:"all .2s" }}
-                onFocus={e=>{ e.target.style.borderColor="var(--cyan)"; e.target.style.boxShadow="0 0 0 3px var(--glow-cyan)"; }}
-                onBlur={e=>{ e.target.style.borderColor=err?"var(--red)":"var(--border)"; e.target.style.boxShadow="none"; }}
+                
               />
               <button onClick={() => setShowPass(!showPass)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:"var(--muted)", fontSize:15 }}>
                 {showPass ? "🙈" : "👁️"}
@@ -1801,7 +1801,6 @@ function LoginScreen({ usuarios, branding, onLogin }) {
           <button
             onClick={doLogin}
             style={{ width:"100%", padding:"13px", borderRadius:10, border:"none", background:"linear-gradient(135deg,var(--cyan),var(--purple))", color:"#fff", fontWeight:700, fontSize:13, cursor:"pointer", letterSpacing:".08em", fontFamily:"var(--font-hd)", boxShadow:"0 4px 20px var(--glow-cyan)", transition:"all .2s" }}
-            onMouseOver={e=>e.target.style.opacity=".9"} onMouseOut={e=>e.target.style.opacity="1"}
           >
             ENTRAR AL SISTEMA
           </button>
