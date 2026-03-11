@@ -516,7 +516,7 @@ function MultiPhotoInput({ values = [], onChange, label = "Evidencias Fotográfi
 
 
 // ══════════════════════════════════════════════════════════════
-function UnitModal({ unit, drivers, onSave, onClose }) {
+function UnitModal({ unit, drivers, onSave, onClose, tiposPersonalizados = [], onAddTipo }) {
   const [f, setF] = useState(unit || { 
     num: "", 
     operador: "", 
@@ -588,9 +588,28 @@ function UnitModal({ unit, drivers, onSave, onClose }) {
           <div className="fg">
             <div className="field">
               <label>Tipo</label>
-              <select value={f.tipo} onChange={ch("tipo")}>
-                {TIPOS.map(t => <option key={t}>{t}</option>)}
+              <select value={[...TIPOS, ...tiposPersonalizados].includes(f.tipo) ? f.tipo : "__custom__"}
+                onChange={e => {
+                  if (e.target.value === "__custom__") setF(p=>({...p, tipo:""}));
+                  else setF(p=>({...p, tipo:e.target.value}));
+                }}>
+                {[...TIPOS, ...tiposPersonalizados].map(t => <option key={t} value={t}>{t}</option>)}
+                <option value="__custom__">✏️ Agregar tipo nuevo...</option>
               </select>
+              {(![...TIPOS, ...tiposPersonalizados].includes(f.tipo) || f.tipo === "") && (
+                <input
+                  value={f.tipo}
+                  onChange={ch("tipo")}
+                  placeholder="Escribe el tipo de unidad"
+                  style={{marginTop:6}}
+                  onBlur={() => {
+                    if (f.tipo && f.tipo.trim() && !TIPOS.includes(f.tipo) && !tiposPersonalizados.includes(f.tipo)) {
+                      if (onAddTipo) onAddTipo(f.tipo.trim().toUpperCase());
+                      setF(p=>({...p, tipo: p.tipo.trim().toUpperCase()}));
+                    }
+                  }}
+                />
+              )}
             </div>
             <div className="field">
               <label>Marca</label>
@@ -5497,123 +5516,113 @@ function FuelPage({ units, fuels, onAdd, onEdit, onDelete }) {
   );
 }
 
-function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, drivers = [] }) {
 
-  // ── FILTROS DE PERÍODO ────────────────────────────────────────
-  const hoy = new Date();
+// ════════════════════════════════════════════════════════════════════════════
+//  CHARTS PAGE v6  —  10 vistas de análisis
+// ════════════════════════════════════════════════════════════════════════════
+function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, drivers = [], proveedores = [], externos = [], nominasAdmin = [] }) {
+
+  const hoy        = new Date();
   const anioActual = hoy.getFullYear();
-  const [vistaTab, setVistaTab] = useState("resumen"); // resumen | nominas | facturas | gastos | viajes
-  const [filtroPer, setFiltroPer] = useState("mes");   // semana | mes | trimestre | anio | custom
-  const [filtroAnio, setFiltroAnio] = useState(anioActual);
-  const [filtroMes, setFiltroMes] = useState(hoy.getMonth()); // 0-11
-  const [filtroTrim, setFiltroTrim] = useState(Math.floor(hoy.getMonth() / 3));
-  const [filtroSemana, setFiltroSemana] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.toISOString().slice(0,10);
-  });
-  const [customDe, setCustomDe] = useState("");
-  const [customA, setCustomA] = useState("");
 
-  // Años disponibles (de los datos)
+  const [vistaTab,    setVistaTab]    = useState("resumen");
+  const [filtroPer,   setFiltroPer]   = useState("mes");
+  const [filtroAnio,  setFiltroAnio]  = useState(anioActual);
+  const [filtroMes,   setFiltroMes]   = useState(hoy.getMonth());
+  const [filtroTrim,  setFiltroTrim]  = useState(Math.floor(hoy.getMonth() / 3));
+  const [filtroSemana,setFiltroSemana]= useState(() => { const d=new Date(); d.setDate(d.getDate()-d.getDay()); return d.toISOString().slice(0,10); });
+  const [customDe,    setCustomDe]    = useState("");
+  const [customA,     setCustomA]     = useState("");
+
+  // ── helpers ───────────────────────────────────────────────────────────────
   const todosAnios = [...new Set([
-    ...facturas.map(f => { const d = toISO(f.fechaEmision); return d ? new Date(d).getFullYear() : null; }),
-    ...gastos.map(g => { const d = toISO(g.fecha); return d ? new Date(d).getFullYear() : null; }),
-    ...trips.map(t => { const d = toISO(t.fechaReg || t.fecha); return d ? new Date(d).getFullYear() : null; }),
-    ...maints.map(m => { const d = toISO(m.fechaEjec); return d ? new Date(d).getFullYear() : null; }),
+    ...facturas.map(f=>{ const d=toISO(f.fechaEmision); return d?new Date(d).getFullYear():null; }),
+    ...gastos.map(g=>{ const d=toISO(g.fecha); return d?new Date(d).getFullYear():null; }),
+    ...trips.map(t=>{ const d=toISO(t.fechaReg||t.fecha); return d?new Date(d).getFullYear():null; }),
+    ...maints.map(m=>{ const d=toISO(m.fechaEjec); return d?new Date(d).getFullYear():null; }),
     anioActual
-  ].filter(Boolean))].sort((a,b) => b - a);
+  ].filter(Boolean))].sort((a,b)=>b-a);
 
-  // Rango ISO del período seleccionado
   const getRango = () => {
-    if (filtroPer === "custom" && customDe && customA) {
-      return { de: toISO(customDe), a: toISO(customA) };
-    }
-    if (filtroPer === "semana") {
-      const ini = new Date(filtroSemana);
-      const fin = new Date(ini); fin.setDate(fin.getDate() + 6);
-      return { de: ini.toISOString().slice(0,10), a: fin.toISOString().slice(0,10) };
-    }
-    if (filtroPer === "mes") {
-      const ini = `${filtroAnio}-${String(filtroMes+1).padStart(2,"0")}-01`;
-      const fin = new Date(filtroAnio, filtroMes+1, 0).toISOString().slice(0,10);
-      return { de: ini, a: fin };
-    }
-    if (filtroPer === "trimestre") {
-      const m0 = filtroTrim * 3;
-      const ini = `${filtroAnio}-${String(m0+1).padStart(2,"0")}-01`;
-      const fin = new Date(filtroAnio, m0+3, 0).toISOString().slice(0,10);
-      return { de: ini, a: fin };
-    }
-    if (filtroPer === "anio") {
-      return { de: `${filtroAnio}-01-01`, a: `${filtroAnio}-12-31` };
-    }
-    return { de: null, a: null };
+    if (filtroPer==="custom"&&customDe&&customA) return { de:toISO(customDe), a:toISO(customA) };
+    if (filtroPer==="semana") { const i=new Date(filtroSemana),f=new Date(i); f.setDate(f.getDate()+6); return { de:i.toISOString().slice(0,10), a:f.toISOString().slice(0,10) }; }
+    if (filtroPer==="mes")    { const ini=`${filtroAnio}-${String(filtroMes+1).padStart(2,"0")}-01`, fin=new Date(filtroAnio,filtroMes+1,0).toISOString().slice(0,10); return { de:ini, a:fin }; }
+    if (filtroPer==="trimestre") { const m0=filtroTrim*3, ini=`${filtroAnio}-${String(m0+1).padStart(2,"0")}-01`, fin=new Date(filtroAnio,m0+3,0).toISOString().slice(0,10); return { de:ini, a:fin }; }
+    if (filtroPer==="anio") return { de:`${filtroAnio}-01-01`, a:`${filtroAnio}-12-31` };
+    return { de:null, a:null };
   };
-
-  const rango = getRango();
-
+  const rango   = getRango();
   const enRango = (fechaStr) => {
-    if (!rango.de || !rango.a) return true;
-    const iso = toISO(fechaStr);
-    if (!iso) return false;
-    return iso >= rango.de && iso <= rango.a;
+    if (!rango.de||!rango.a) return true;
+    const iso = toISO(fechaStr); if (!iso) return false;
+    return iso>=rango.de && iso<=rango.a;
   };
-
   const lblPeriodo = () => {
-    if (filtroPer === "semana") return `Semana del ${filtroSemana}`;
-    if (filtroPer === "mes") return `${MESES[filtroMes]} ${filtroAnio}`;
-    if (filtroPer === "trimestre") return `Q${filtroTrim+1} ${filtroAnio}`;
-    if (filtroPer === "anio") return `Año ${filtroAnio}`;
-    if (filtroPer === "custom" && customDe && customA) return `${customDe} → ${customA}`;
-    return "Período personalizado";
+    if (filtroPer==="semana") return `Semana del ${filtroSemana}`;
+    if (filtroPer==="mes")    return `${MESES[filtroMes]} ${filtroAnio}`;
+    if (filtroPer==="trimestre") return `Q${filtroTrim+1} ${filtroAnio}`;
+    if (filtroPer==="anio")  return `Año ${filtroAnio}`;
+    if (filtroPer==="custom"&&customDe&&customA) return `${customDe} → ${customA}`;
+    return "Período";
   };
 
-  // ── DATOS FILTRADOS ───────────────────────────────────────────
-  const fFacturas   = facturas.filter(f => enRango(f.fechaEmision));
-  const fFactPag    = facturas.filter(f => f.status === "PAGADA" && enRango(f.fechaPago));
-  const fGastos     = gastos.filter(g => enRango(g.fecha));
-  const fFuels      = fuels.filter(f => enRango(f.fecha));
-  const fMaints     = maints.filter(m => enRango(m.fechaEjec));
-  const fTrips      = trips.filter(t => (t.status === "COMPLETADO") && enRango(t.fechaReg || t.fecha));
-  const fTripsProp  = fTrips.filter(t => !t.esExterno);
-  const fTripsExt   = fTrips.filter(t => t.esExterno);
+  // ── datos filtrados ────────────────────────────────────────────────────────
+  const fFacturas  = facturas.filter(f=>enRango(f.fechaEmision));
+  const fFactPag   = facturas.filter(f=>f.status==="PAGADA"&&enRango(f.fechaPago));
+  const fGastos    = gastos.filter(g=>enRango(g.fecha));
+  const fFuels     = fuels.filter(f=>enRango(f.fecha));
+  const fMaints    = maints.filter(m=>enRango(m.fechaEjec));
+  const fTrips     = trips.filter(t=>t.status==="COMPLETADO"&&enRango(t.fechaReg||t.fecha));
+  const fTripsProp = fTrips.filter(t=>!t.esExterno);
+  const fTripsExt  = fTrips.filter(t=>t.esExterno);
 
-  // Totales del período
-  const totFacturado  = fFacturas.reduce((a,f) => a+(Number(f.total)||0), 0);
-  const totCobrado    = fFactPag.reduce((a,f) => a+(Number(f.total)||0), 0);
-  const totPendFact   = fFacturas.filter(f=>f.status==="PENDIENTE"||f.status==="VENCIDA").reduce((a,f)=>a+(Number(f.total)||0),0);
-  const totGastos     = fGastos.reduce((a,g) => a+(Number(g.monto)||0), 0);
-  const totComb       = fFuels.reduce((a,f) => a+(Number(f.litros)||0)*(Number(f.precio)||0), 0);
-  const totMant       = fMaints.reduce((a,m) => a+(Number(m.costoRef)||0)+(Number(m.costoMO)||0), 0);
-  const totIngresos   = fTrips.reduce((a,t) => a+(Number(t.costoOfrecido)||0), 0);
-  const totCostoViaj  = fTrips.reduce((a,t) => a+(Number(t.gastosExtras)||0)+(Number(t.costoEstadias)||0)+(Number(t.costoPagar)||0), 0);
-  const totCostoOper  = totComb + totMant + totGastos + totCostoViaj;
-  const utilidadBruta = totIngresos - totCostoOper;
-  const margen        = totIngresos > 0 ? ((utilidadBruta/totIngresos)*100).toFixed(1) : 0;
+  // totales
+  const totFacturado = fFacturas.reduce((a,f)=>a+(Number(f.total)||0),0);
+  const totCobrado   = fFactPag.reduce((a,f)=>a+(Number(f.total)||0),0);
+  const totPendFact  = fFacturas.filter(f=>f.status==="PENDIENTE"||f.status==="VENCIDA").reduce((a,f)=>a+(Number(f.total)||0),0);
+  const totGastos    = fGastos.reduce((a,g)=>a+(Number(g.monto)||0),0);
+  const totComb      = fFuels.reduce((a,f)=>a+(Number(f.litros)||0)*(Number(f.precio)||0),0);
+  const totLitros    = fFuels.reduce((a,f)=>a+(Number(f.litros)||0),0);
+  const totMant      = fMaints.reduce((a,m)=>a+(Number(m.costoRef)||0)+(Number(m.costoMO)||0),0);
+  const totIngresos  = fTrips.reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0);
+  const totCostoViaj = fTrips.reduce((a,t)=>a+(Number(t.gastosExtras)||0)+(Number(t.costoEstadias)||0)+(Number(t.costoPagar)||0),0);
+  const totCostoOper = totComb+totMant+totGastos+totCostoViaj;
+  const utilidadBruta= totIngresos-totCostoOper;
+  const margen       = totIngresos>0?((utilidadBruta/totIngresos)*100).toFixed(1):0;
 
-  // Nómina del período: suma sueldo base de activos + comisiones calculadas
-  const nomPorDriver = drivers.map(d => {
-    const unit = units.find(u => u.operador === d.id);
-    const viajesD = unit ? fTripsProp.filter(t => t.unidadId === unit.id) : [];
-    const comision = viajesD.reduce((a,t) => a+(Number(t.costoOfrecido)||0),0) * (Number(d.porcentajeViaje)||0) / 100;
-    const sueldo = Number(d.sueldoBase) || 0;
-    return { driver: d, unit, viajesD, comision, sueldo, total: sueldo + comision };
-  }).filter(x => x.sueldo > 0 || x.comision > 0);
-  const totNomina = nomPorDriver.reduce((a,x) => a+x.total, 0);
+  // nómina estimada del período
+  const nomPorDriver = drivers.map(d=>{
+    const unit   = units.find(u=>u.operador===d.id);
+    const viajesD= unit?fTripsProp.filter(t=>t.unidadId===unit.id):[];
+    const comision= viajesD.reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0)*(Number(d.porcentajeViaje)||0)/100;
+    const sueldo = Number(d.sueldoBase)||0;
+    return { driver:d, unit, viajesD, comision, sueldo, total:sueldo+comision };
+  }).filter(x=>x.sueldo>0||x.comision>0);
+  const totNomina     = nomPorDriver.reduce((a,x)=>a+x.total,0);
+  const totNominaAdmin= nominasAdmin.reduce((a,n)=>a+(Number(n.sueldoBruto)||0),0);
 
-  // ── GRÁFICA DE BARRAS MENSUAL (año completo para el año seleccionado) ──
-  const meses12 = Array(12).fill(0).map((_,i) => {
-    const mFuel  = fuels.filter(f => { const d=toISO(f.fecha); return d && new Date(d).getFullYear()===filtroAnio && new Date(d).getMonth()===i }).reduce((a,f)=>a+(Number(f.litros)||0)*(Number(f.precio)||0),0);
-    const mMaint = maints.filter(m => { const d=toISO(m.fechaEjec); return d && new Date(d).getFullYear()===filtroAnio && new Date(d).getMonth()===i }).reduce((a,m)=>a+(Number(m.costoRef)||0)+(Number(m.costoMO)||0),0);
-    const mGast  = gastos.filter(g => { const d=toISO(g.fecha); return d && new Date(d).getFullYear()===filtroAnio && new Date(d).getMonth()===i }).reduce((a,g)=>a+(Number(g.monto)||0),0);
-    const mIng   = trips.filter(t => { const d=toISO(t.fechaReg||t.fecha); return t.status==="COMPLETADO" && d && new Date(d).getFullYear()===filtroAnio && new Date(d).getMonth()===i }).reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0);
-    const mFact  = facturas.filter(f => { const d=toISO(f.fechaEmision); return d && new Date(d).getFullYear()===filtroAnio && new Date(d).getMonth()===i }).reduce((a,f)=>a+(Number(f.total)||0),0);
-    return { fuel:mFuel, maint:mMaint, gast:mGast, ing:mIng, fact:mFact, costos:mFuel+mMaint+mGast };
+  // datos por mes (año completo para el año seleccionado)
+  const meses12 = Array(12).fill(0).map((_,i)=>{
+    const yr = filtroAnio;
+    const byMes = (arr, fechaFn) => arr.filter(x=>{ const d=toISO(fechaFn(x)); return d&&new Date(d).getFullYear()===yr&&new Date(d).getMonth()===i; });
+    const mFuel  = byMes(fuels, f=>f.fecha).reduce((a,f)=>a+(Number(f.litros)||0)*(Number(f.precio)||0),0);
+    const mMaint = byMes(maints,m=>m.fechaEjec).reduce((a,m)=>a+(Number(m.costoRef)||0)+(Number(m.costoMO)||0),0);
+    const mGast  = byMes(gastos,g=>g.fecha).reduce((a,g)=>a+(Number(g.monto)||0),0);
+    const mIng   = byMes(trips.filter(t=>t.status==="COMPLETADO"),t=>t.fechaReg||t.fecha).reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0);
+    const mFact  = byMes(facturas,f=>f.fechaEmision).reduce((a,f)=>a+(Number(f.total)||0),0);
+    const mViaj  = byMes(trips.filter(t=>t.status==="COMPLETADO"&&!t.esExterno),t=>t.fechaReg||t.fecha).length;
+    const mExt   = byMes(trips.filter(t=>t.status==="COMPLETADO"&&t.esExterno),t=>t.fechaReg||t.fecha).length;
+    const mLit   = byMes(fuels,f=>f.fecha).reduce((a,f)=>a+(Number(f.litros)||0),0);
+    const mMantN = byMes(maints,m=>m.fechaEjec).length;
+    return { fuel:mFuel, maint:mMaint, gast:mGast, ing:mIng, fact:mFact, costos:mFuel+mMaint+mGast, viajes:mViaj, ext:mExt, litros:mLit, mantN:mMantN };
   });
-  const maxBar = Math.max(...meses12.map(m => Math.max(m.ing, m.costos, m.fact)), 1);
 
-  // ── COMPONENTES INTERNOS ──────────────────────────────────────
-  const KR = ({ icon, lbl, val, sub, c = "var(--cyan)" }) => (
-    <div className="stat" style={{"--c": c}}>
+  // colores palette
+  const PAL = ["var(--cyan)","var(--orange)","var(--purple)","var(--yellow)","var(--green)","var(--red)","#06b6d4","#f97316","#8b5cf6","#eab308"];
+
+  // ── componentes UI reutilizables ───────────────────────────────────────────
+  const KR = ({ icon, lbl, val, sub, c="var(--cyan)" }) => (
+    <div className="stat" style={{"--c":c}}>
       <div className="stat-icon">{icon}</div>
       <div className="stat-val sm">{val}</div>
       <div className="stat-lbl">{lbl}</div>
@@ -5621,583 +5630,494 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     </div>
   );
 
-  const MiniBar = ({ v, max, c }) => (
-    <div style={{ flex:1, height:6, background:"var(--bg3)", borderRadius:3, overflow:"hidden" }}>
-      <div style={{ width:`${Math.min((v/max)*100,100)}%`, height:"100%", background:c, borderRadius:3 }} />
+  // barra horizontal simple
+  const HBar = ({ v, max, c="#06b6d4", h=10 }) => (
+    <div style={{flex:1,height:h,background:"var(--bg3)",borderRadius:h/2,overflow:"hidden"}}>
+      <div style={{width:`${Math.min((v/Math.max(max,1))*100,100)}%`,height:"100%",background:c,borderRadius:h/2,transition:"width .35s"}}/>
     </div>
   );
 
-  // ── CONTROLES DE PERÍODO ──────────────────────────────────────
-  const ControlPer = () => (
-    <div style={{ display:"flex", flexWrap:"wrap", gap:8, alignItems:"center", padding:"12px 16px", background:"var(--bg2)", borderRadius:10, marginBottom:16, border:"1px solid var(--border)" }}>
-      <div className="ftabs">
-        {[["semana","Semana"],["mes","Mes"],["trimestre","Trimestre"],["anio","Año"],["custom","Personalizado"]].map(([k,l]) => (
-          <button key={k} className={`ftab${filtroPer===k?" on":""}`} onClick={() => setFiltroPer(k)}>{l}</button>
+  // barra segmentada tipo "pie horizontal"
+  const SegBar = ({ items, h=16 }) => {
+    const tot = items.reduce((a,x)=>a+x.v,0)||1;
+    return (
+      <div style={{display:"flex",height:h,borderRadius:h/2,overflow:"hidden",gap:1}}>
+        {items.map((x,i)=>(
+          <div key={i} title={`${x.lbl}: ${fmt$(x.v)} (${((x.v/tot)*100).toFixed(0)}%)`}
+            style={{width:`${(x.v/tot)*100}%`,background:x.c,cursor:"default",transition:"width .35s"}}/>
         ))}
       </div>
-      <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
-        {filtroPer !== "custom" && filtroPer !== "semana" && (
-          <select value={filtroAnio} onChange={e=>setFiltroAnio(Number(e.target.value))} style={{ padding:"4px 10px", borderRadius:6, border:"1px solid var(--border)", background:"var(--bg0)", color:"var(--text)", fontSize:13 }}>
-            {todosAnios.map(y => <option key={y} value={y}>{y}</option>)}
+    );
+  };
+
+  // Fila de leyenda para SegBar
+  const Legend = ({ items }) => (
+    <div style={{display:"flex",flexWrap:"wrap",gap:"4px 14px",marginTop:8}}>
+      {items.map((x,i)=>(
+        <span key={i} style={{display:"flex",alignItems:"center",gap:5,fontSize:11}}>
+          <span style={{width:10,height:10,borderRadius:"50%",background:x.c,display:"inline-block",flexShrink:0}}/>
+          <span style={{color:"var(--muted)"}}>{x.lbl}</span>
+          <strong style={{color:x.c}}>{fmt$(x.v)}</strong>
+        </span>
+      ))}
+    </div>
+  );
+
+  // ── control de período ─────────────────────────────────────────────────────
+  const ControlPer = () => (
+    <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",padding:"12px 16px",background:"var(--bg2)",borderRadius:10,marginBottom:16,border:"1px solid var(--border)"}}>
+      <div className="ftabs">
+        {[["semana","Semana"],["mes","Mes"],["trimestre","Trimestre"],["anio","Año"],["custom","Personalizado"]].map(([k,l])=>(
+          <button key={k} className={`ftab${filtroPer===k?" on":""}`} onClick={()=>setFiltroPer(k)}>{l}</button>
+        ))}
+      </div>
+      <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+        {filtroPer!=="custom"&&filtroPer!=="semana"&&(
+          <select value={filtroAnio} onChange={e=>setFiltroAnio(Number(e.target.value))} style={{padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",fontSize:13}}>
+            {todosAnios.map(y=><option key={y} value={y}>{y}</option>)}
           </select>
         )}
-        {filtroPer === "mes" && (
-          <select value={filtroMes} onChange={e=>setFiltroMes(Number(e.target.value))} style={{ padding:"4px 10px", borderRadius:6, border:"1px solid var(--border)", background:"var(--bg0)", color:"var(--text)", fontSize:13 }}>
-            {MESES.map((m,i) => <option key={i} value={i}>{m}</option>)}
+        {filtroPer==="mes"&&(
+          <select value={filtroMes} onChange={e=>setFiltroMes(Number(e.target.value))} style={{padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",fontSize:13}}>
+            {MESES.map((m,i)=><option key={i} value={i}>{m}</option>)}
           </select>
         )}
-        {filtroPer === "trimestre" && (
-          <select value={filtroTrim} onChange={e=>setFiltroTrim(Number(e.target.value))} style={{ padding:"4px 10px", borderRadius:6, border:"1px solid var(--border)", background:"var(--bg0)", color:"var(--text)", fontSize:13 }}>
+        {filtroPer==="trimestre"&&(
+          <select value={filtroTrim} onChange={e=>setFiltroTrim(Number(e.target.value))} style={{padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",fontSize:13}}>
             <option value={0}>Q1 Ene-Mar</option><option value={1}>Q2 Abr-Jun</option>
             <option value={2}>Q3 Jul-Sep</option><option value={3}>Q4 Oct-Dic</option>
           </select>
         )}
-        {filtroPer === "semana" && (
-          <input type="date" value={filtroSemana} onChange={e=>setFiltroSemana(e.target.value)} style={{ padding:"4px 10px", borderRadius:6, border:"1px solid var(--border)", background:"var(--bg0)", color:"var(--text)", fontSize:13 }} />
+        {filtroPer==="semana"&&(
+          <input type="date" value={filtroSemana} onChange={e=>setFiltroSemana(e.target.value)} style={{padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",fontSize:13}}/>
         )}
-        {filtroPer === "custom" && (
+        {filtroPer==="custom"&&(
           <>
-            <input type="text" placeholder="De dd/mm/aaaa" value={customDe} onChange={e=>setCustomDe(e.target.value)} style={{ padding:"4px 10px", borderRadius:6, border:"1px solid var(--border)", background:"var(--bg0)", color:"var(--text)", fontSize:13, width:130 }} />
+            <input type="text" placeholder="De dd/mm/aaaa" value={customDe} onChange={e=>setCustomDe(e.target.value)} style={{padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",fontSize:13,width:130}}/>
             <span style={{color:"var(--muted)"}}>→</span>
-            <input type="text" placeholder="A dd/mm/aaaa" value={customA} onChange={e=>setCustomA(e.target.value)} style={{ padding:"4px 10px", borderRadius:6, border:"1px solid var(--border)", background:"var(--bg0)", color:"var(--text)", fontSize:13, width:130 }} />
+            <input type="text" placeholder="A dd/mm/aaaa" value={customA} onChange={e=>setCustomA(e.target.value)} style={{padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",fontSize:13,width:130}}/>
           </>
         )}
-        <span style={{ fontSize:12, color:"var(--cyan)", fontWeight:700, marginLeft:4 }}>📅 {lblPeriodo()}</span>
+        <span style={{fontSize:12,color:"var(--cyan)",fontWeight:700,marginLeft:4}}>📅 {lblPeriodo()}</span>
       </div>
     </div>
   );
 
-  // ── VISTAS ────────────────────────────────────────────────────
-
-  const VistaResumen = () => (
-    <div>
-      {/* KPIs resumen */}
-      <div className="stats" style={{ marginBottom:16 }}>
-        <KR icon="💵" lbl="Ingresos" val={fmt$(totIngresos)} sub={`${fTrips.length} viajes`} c="var(--green)" />
-        <KR icon="📉" lbl="Costos Operación" val={fmt$(totCostoOper)} sub="comb+mant+gastos" c="var(--red)" />
-        <KR icon="💰" lbl="Utilidad Bruta" val={fmt$(utilidadBruta)} sub={`${margen}% margen`} c={utilidadBruta>=0?"var(--cyan)":"var(--red)"} />
-        <KR icon="🧾" lbl="Facturado" val={fmt$(totFacturado)} sub={`${fFacturas.length} facturas`} c="var(--yellow)" />
-        <KR icon="✅" lbl="Cobrado" val={fmt$(totCobrado)} sub={`${fFactPag.length} cobradas`} c="var(--green)" />
-        <KR icon="⏳" lbl="Por Cobrar" val={fmt$(totPendFact)} c="var(--orange)" />
-        <KR icon="👷" lbl="Nómina Est." val={fmt$(totNomina)} sub={`${nomPorDriver.length} operadores`} c="var(--purple)" />
-        <KR icon="⛽" lbl="Combustible" val={fmt$(totComb)} c="var(--cyan)" />
-        <KR icon="🔧" lbl="Mantenimiento" val={fmt$(totMant)} c="var(--orange)" />
-      </div>
-
-      {/* Gráfica mensual del año */}
-      <div className="card">
-        <div className="card-hdr"><h3>📊 Ingresos vs Costos — {filtroAnio}</h3>
-          <div style={{fontSize:11,color:"var(--muted)"}}>La barra azul muestra el año completo para contexto</div>
-        </div>
-        <div style={{ padding:"16px 20px" }}>
-          {MESES.map((m,i) => {
-            const d = meses12[i];
-            const util = d.ing - d.costos;
-            return (
-              <div key={m} className="chart-row">
-                <div className="chart-lbl" style={{fontSize:10}}>{m}</div>
-                <div style={{flex:1, display:"flex", flexDirection:"column", gap:3}}>
-                  {[
-                    [d.ing, "var(--green)", fmt$(d.ing)],
-                    [d.costos, "var(--red)", fmt$(d.costos)],
-                    [Math.abs(util), util>=0?"var(--cyan)":"var(--orange)", (util>=0?"":"−")+fmt$(Math.abs(util))]
-                  ].map(([v,c,lbl],j) => (
-                    <div key={j} className="bar-bg" style={{height:14}}>
-                      <div className="bar-fill" style={{width:`${(v/maxBar)*100}%`, background:c}}>
-                        {v > 0 && <span style={{fontSize:9,color:"#fff",fontWeight:700,whiteSpace:"nowrap"}}>{lbl}</span>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-          <div style={{display:"flex",gap:14,marginTop:8,paddingLeft:80,flexWrap:"wrap"}}>
-            {[["💵 Ingresos","var(--green)"],["📉 Costos","var(--red)"],["💰 Utilidad","var(--cyan)"]].map(([l,c]) => (
-              <span key={l} style={{fontSize:11,color:c,fontWeight:600}}>{l}</span>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Desglose costos */}
-      <div className="card">
-        <div className="card-hdr"><h3>🔍 Desglose de Costos — {lblPeriodo()}</h3></div>
-        <div style={{padding:"16px 20px"}}>
-          {[
-            ["⛽ Combustible", totComb, "var(--cyan)"],
-            ["🔧 Mantenimiento", totMant, "var(--orange)"],
-            ["📋 Gastos Generales", totGastos, "var(--purple)"],
-            ["🚛 Gastos de Viajes", totCostoViaj, "var(--yellow)"],
-          ].map(([lbl, v, c]) => (
-            <div key={lbl} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-              <div style={{width:180,fontSize:12,fontWeight:600}}>{lbl}</div>
-              <MiniBar v={v} max={Math.max(totComb,totMant,totGastos,totCostoViaj,1)} c={c} />
-              <div style={{width:110,textAlign:"right",fontWeight:700,color:c,fontSize:13}}>{fmt$(v)}</div>
-              <div style={{width:50,textAlign:"right",fontSize:11,color:"var(--muted)"}}>
-                {totCostoOper>0?`${((v/totCostoOper)*100).toFixed(0)}%`:"—"}
-              </div>
-            </div>
-          ))}
-          <div style={{borderTop:"1px solid var(--border)",marginTop:8,paddingTop:8,display:"flex",justifyContent:"space-between"}}>
-            <span style={{fontWeight:700}}>TOTAL COSTOS</span>
-            <span style={{fontWeight:700,color:"var(--red)",fontFamily:"var(--font-hd)",fontSize:16}}>{fmt$(totCostoOper)}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const VistaFacturas = () => {
-    const [sfF, setSfF] = useState("TODOS");
-    const filF = fFacturas.filter(f => sfF==="TODOS" || f.status===sfF);
-    const grpCliente = clientes.map(c => ({
-      ...c,
-      factsPer: fFacturas.filter(f=>f.clienteId===c.id),
-      totalPer: fFacturas.filter(f=>f.clienteId===c.id).reduce((a,f)=>a+(Number(f.total)||0),0)
-    })).filter(c=>c.factsPer.length>0).sort((a,b)=>b.totalPer-a.totalPer);
+  // ══════════════════════════════════════════════════════════════
+  //  1. RESUMEN EJECUTIVO
+  // ══════════════════════════════════════════════════════════════
+  const VistaResumen = () => {
+    const maxBar = Math.max(...meses12.map(m=>Math.max(m.ing,m.costos,m.fact)),1);
+    const segCostos = [
+      {v:totComb,     c:"var(--cyan)",  lbl:"⛽ Combustible"},
+      {v:totMant,     c:"var(--orange)",lbl:"🔧 Mantenimiento"},
+      {v:totGastos,   c:"var(--purple)",lbl:"💸 Gastos grales"},
+      {v:totCostoViaj,c:"var(--yellow)",lbl:"🚛 Gastos viajes"},
+    ];
+    const segCartera = [
+      {v:totCobrado,    c:"var(--green)", lbl:"✅ Cobrado"},
+      {v:totPendFact,   c:"var(--orange)",lbl:"⏳ Pendiente"},
+      {v:fFacturas.filter(f=>f.status==="VENCIDA").reduce((a,f)=>a+(Number(f.total)||0),0), c:"var(--red)",lbl:"❌ Vencido"},
+    ];
     return (
-      <div>
-        <div className="stats" style={{marginBottom:16}}>
-          <KR icon="🧾" lbl="Emitidas" val={fFacturas.length} sub={fmt$(totFacturado)} c="var(--yellow)" />
-          <KR icon="✅" lbl="Cobradas" val={fFactPag.length} sub={fmt$(totCobrado)} c="var(--green)" />
-          <KR icon="⏳" lbl="Pendientes" val={fFacturas.filter(f=>f.status==="PENDIENTE").length} sub={fmt$(fFacturas.filter(f=>f.status==="PENDIENTE").reduce((a,f)=>a+(Number(f.total)||0),0))} c="var(--orange)" />
-          <KR icon="❌" lbl="Vencidas" val={fFacturas.filter(f=>f.status==="VENCIDA").length} sub={fmt$(fFacturas.filter(f=>f.status==="VENCIDA").reduce((a,f)=>a+(Number(f.total)||0),0))} c="var(--red)" />
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        {/* KPIs */}
+        <div className="stats">
+          <KR icon="💵" lbl="Ingresos" val={fmt$(totIngresos)} sub={`${fTrips.length} viajes`} c="var(--green)"/>
+          <KR icon="📉" lbl="Costo operación" val={fmt$(totCostoOper)} c="var(--red)"/>
+          <KR icon="💰" lbl="Utilidad bruta" val={fmt$(utilidadBruta)} sub={`${margen}% margen`} c={utilidadBruta>=0?"var(--cyan)":"var(--red)"}/>
+          <KR icon="🧾" lbl="Facturado" val={fmt$(totFacturado)} sub={`${fFacturas.length} fact.`} c="var(--yellow)"/>
+          <KR icon="✅" lbl="Cobrado" val={fmt$(totCobrado)} c="var(--green)"/>
+          <KR icon="⏳" lbl="Por cobrar" val={fmt$(totPendFact)} c="var(--orange)"/>
+          <KR icon="👷" lbl="Nómina est." val={fmt$(totNomina+totNominaAdmin)} c="var(--purple)"/>
+          <KR icon="⛽" lbl="Combustible" val={fmt$(totComb)} sub={`${totLitros.toFixed(0)}L`} c="var(--cyan)"/>
+          <KR icon="🔧" lbl="Mantenimiento" val={fmt$(totMant)} c="var(--orange)"/>
         </div>
+
+        {/* Gráfica ingresos vs costos 12 meses */}
         <div className="card">
-          <div className="card-hdr"><h3>🧾 Facturas — {lblPeriodo()}</h3>
-            <div className="ftabs">{["TODOS","PENDIENTE","PAGADA","VENCIDA"].map(s=><button key={s} className={`ftab${sfF===s?" on":""}`} onClick={()=>setSfF(s)}>{s}</button>)}</div>
-          </div>
-          <div className="sbar"><span>Mostrando {filF.length} facturas</span><span style={{color:"var(--cyan)",fontWeight:700}}>Total: {fmt$(filF.reduce((a,f)=>a+(Number(f.total)||0),0))}</span></div>
-          <div className="card-body">
-            {filF.length === 0
-              ? <div className="empty"><div className="empty-icon">🧾</div><p>Sin facturas en este período</p></div>
-              : <table>
-                  <thead><tr><th>Folio</th><th>Cliente</th><th>Emisión</th><th>Vencimiento</th><th>Status</th><th>Total</th><th>Pagada</th></tr></thead>
-                  <tbody>{filF.sort((a,b)=>(b.fechaEmision||"").localeCompare(a.fechaEmision||"")).map(f=>{
-                    const dy = daysUntil(f.fechaVencimiento);
-                    return <tr key={f.id}>
-                      <td style={{fontFamily:"var(--font-hd)",fontWeight:700}}>{f.serie}-{f.numeroFactura}</td>
-                      <td><div style={{fontWeight:600,fontSize:12}}>{f.cliente}</div><div style={{fontSize:10,color:"var(--muted)"}}>{f.rfcCliente}</div></td>
-                      <td style={{fontSize:12}}>{f.fechaEmision}</td>
-                      <td style={{fontSize:12,color:dy!==null&&dy<0?"var(--red)":dy!==null&&dy<=5?"var(--orange)":"inherit"}}>{f.fechaVencimiento}</td>
-                      <td><Bdg c={f.status==="PAGADA"?"bg":f.status==="VENCIDA"?"br":"by"} t={f.status}/></td>
-                      <td style={{fontWeight:700,color:"var(--cyan)"}}>{fmt$(f.total)}</td>
-                      <td style={{fontSize:12,color:"var(--green)"}}>{f.fechaPago||"—"}</td>
-                    </tr>;
-                  })}</tbody>
-                </table>
-            }
-          </div>
-        </div>
-        {grpCliente.length > 0 && (
-          <div className="card">
-            <div className="card-hdr"><h3>👥 Facturación por Cliente — {lblPeriodo()}</h3></div>
-            <div className="card-body">
-              <table>
-                <thead><tr><th>Cliente</th><th>RFC</th><th>Facturas</th><th>Cobrado</th><th>Pendiente</th><th>Total</th></tr></thead>
-                <tbody>{grpCliente.map(c=>{
-                  const cobrado = c.factsPer.filter(f=>f.status==="PAGADA").reduce((a,f)=>a+(Number(f.total)||0),0);
-                  const pend = c.factsPer.filter(f=>f.status!=="PAGADA").reduce((a,f)=>a+(Number(f.total)||0),0);
-                  return <tr key={c.id}>
-                    <td style={{fontWeight:700}}>{c.nombre}</td>
-                    <td style={{fontSize:11,color:"var(--muted)"}}>{c.rfc||"—"}</td>
-                    <td style={{textAlign:"center"}}>{c.factsPer.length}</td>
-                    <td style={{color:"var(--green)",fontWeight:700}}>{fmt$(cobrado)}</td>
-                    <td style={{color:pend>0?"var(--orange)":"var(--muted)"}}>{fmt$(pend)}</td>
-                    <td style={{fontWeight:700,color:"var(--cyan)"}}>{fmt$(c.totalPer)}</td>
-                  </tr>;
-                })}</tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const VistaGastos = () => {
-    // Agrupar gastos por tipo
-    const porTipo = [...new Set(fGastos.map(g=>g.tipo||"Otros"))].map(tipo => ({
-      tipo,
-      items: fGastos.filter(g=>(g.tipo||"Otros")===tipo),
-      total: fGastos.filter(g=>(g.tipo||"Otros")===tipo).reduce((a,g)=>a+(Number(g.monto)||0),0)
-    })).sort((a,b)=>b.total-a.total);
-    const maxTipo = Math.max(...porTipo.map(p=>p.total),1);
-
-    return (
-      <div>
-        <div className="stats" style={{marginBottom:16}}>
-          <KR icon="📋" lbl="Gastos Generales" val={fmt$(totGastos)} sub={`${fGastos.length} registros`} c="var(--purple)" />
-          <KR icon="⛽" lbl="Combustible" val={fmt$(totComb)} sub={`${fFuels.length} cargas`} c="var(--cyan)" />
-          <KR icon="🔧" lbl="Mantenimiento" val={fmt$(totMant)} sub={`${fMaints.length} servicios`} c="var(--orange)" />
-          <KR icon="💸" lbl="Total Egresos" val={fmt$(totGastos+totComb+totMant)} c="var(--red)" />
-        </div>
-
-        {/* Gastos por categoría */}
-        <div className="card">
-          <div className="card-hdr"><h3>📋 Gastos Generales por Categoría — {lblPeriodo()}</h3></div>
+          <div className="card-hdr"><h3>📊 Ingresos vs Costos vs Facturación — {filtroAnio}</h3></div>
           <div style={{padding:"16px 20px"}}>
-            {porTipo.length === 0
-              ? <div className="empty"><div className="empty-icon">📋</div><p>Sin gastos en este período</p></div>
-              : porTipo.map(p => (
-                <div key={p.tipo} style={{marginBottom:14}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                    <span style={{fontWeight:700,fontSize:13}}>{p.tipo}</span>
-                    <span style={{fontWeight:700,color:"var(--cyan)"}}>{fmt$(p.total)}</span>
-                  </div>
-                  <MiniBar v={p.total} max={maxTipo} c="var(--purple)" />
-                  <div style={{marginTop:6}}>
-                    {p.items.slice(0,5).map(g => (
-                      <div key={g.id} style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--muted)",padding:"2px 8px"}}>
-                        <span>{g.fecha} · {g.desc||g.concepto||"—"}</span>
-                        <span>{fmt$(g.monto)}</span>
+            {MESES.map((m,i)=>{
+              const d=meses12[i]; const util=d.ing-d.costos;
+              return (
+                <div key={m} style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:10}}>
+                  <div style={{width:28,fontSize:9,color:"var(--muted)",fontWeight:700,paddingTop:2}}>{m.slice(0,3)}</div>
+                  <div style={{flex:1,display:"flex",flexDirection:"column",gap:3}}>
+                    {[
+                      [d.ing,"var(--green)","Ingresos"],
+                      [d.costos,"var(--red)","Costos"],
+                      [Math.abs(util),util>=0?"var(--cyan)":"var(--orange)",(util>=0?"":"−")+"Utilidad"],
+                      [d.fact,"var(--yellow)","Facturado"],
+                    ].map(([v,c,nm],j)=>(
+                      <div key={j} style={{display:"flex",alignItems:"center",gap:6}}>
+                        <div style={{width:64,fontSize:9,color:c}}>{nm}</div>
+                        <HBar v={v} max={maxBar} c={c} h={9}/>
+                        <div style={{width:82,textAlign:"right",fontSize:9,fontWeight:700,color:c}}>{v>0?fmt$(v):"—"}</div>
                       </div>
                     ))}
-                    {p.items.length > 5 && <div style={{fontSize:10,color:"var(--muted)",paddingLeft:8}}>+{p.items.length-5} más...</div>}
                   </div>
                 </div>
-              ))
-            }
+              );
+            })}
+            <div style={{display:"flex",gap:14,marginTop:4,paddingLeft:36,flexWrap:"wrap"}}>
+              {[["💵 Ingresos","var(--green)"],["📉 Costos","var(--red)"],["💰 Utilidad","var(--cyan)"],["🧾 Facturado","var(--yellow)"]].map(([l,c])=>(
+                <span key={l} style={{fontSize:11,color:c,fontWeight:600}}>{l}</span>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Mantenimientos del período */}
-        {fMaints.length > 0 && (
+        {/* 2 cards lado a lado */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+          {/* Distribución costos */}
           <div className="card">
-            <div className="card-hdr"><h3>🔧 Mantenimientos Ejecutados — {lblPeriodo()}</h3></div>
-            <div className="card-body">
-              <table>
-                <thead><tr><th>Unidad</th><th>Tipo</th><th>Descripción</th><th>Fecha</th><th>Prioridad</th><th>Costo</th></tr></thead>
-                <tbody>{fMaints.map(m=>{
-                  const u = units.find(u=>u.id===m.unidadId);
-                  const ct = (Number(m.costoRef)||0)+(Number(m.costoMO)||0);
-                  return <tr key={m.id}>
-                    <td><strong>{u?.num||"?"}</strong> <span style={{fontSize:11,color:"var(--muted)"}}>{u?.placas}</span></td>
-                    <td><Bdg c="bb" t={m.tipo}/></td>
-                    <td style={{fontSize:12}}>{m.desc}</td>
-                    <td style={{fontSize:12}}>{m.fechaEjec||"—"}</td>
-                    <td>{prioBdg(m.prioridad)}</td>
-                    <td style={{color:"var(--orange)",fontWeight:700}}>{ct>0?fmt$(ct):"—"}</td>
-                  </tr>;
-                })}</tbody>
-              </table>
+            <div className="card-hdr"><h3>🥧 Distribución de Costos</h3></div>
+            <div style={{padding:"16px 20px"}}>
+              <SegBar items={segCostos} h={18}/>
+              <Legend items={segCostos}/>
+              <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:8}}>
+                {segCostos.map(x=>(
+                  <div key={x.lbl} style={{display:"flex",alignItems:"center",gap:8}}>
+                    <div style={{width:8,height:8,borderRadius:"50%",background:x.c,flexShrink:0}}/>
+                    <div style={{flex:1,fontSize:12}}>{x.lbl}</div>
+                    <HBar v={x.v} max={totCostoOper} c={x.c} h={7}/>
+                    <div style={{width:85,textAlign:"right",fontSize:11,fontWeight:700,color:x.c}}>{fmt$(x.v)}</div>
+                    <div style={{width:34,textAlign:"right",fontSize:10,color:"var(--muted)"}}>{totCostoOper>0?`${((x.v/totCostoOper)*100).toFixed(0)}%`:"—"}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        )}
+          {/* Cartera */}
+          <div className="card">
+            <div className="card-hdr"><h3>💳 Estado de Cartera</h3></div>
+            <div style={{padding:"16px 20px"}}>
+              <SegBar items={segCartera} h={18}/>
+              <Legend items={segCartera}/>
+              <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:8}}>
+                {segCartera.map(x=>(
+                  <div key={x.lbl} style={{display:"flex",alignItems:"center",gap:8}}>
+                    <div style={{width:8,height:8,borderRadius:"50%",background:x.c,flexShrink:0}}/>
+                    <div style={{flex:1,fontSize:12}}>{x.lbl}</div>
+                    <HBar v={x.v} max={totFacturado} c={x.c} h={7}/>
+                    <div style={{width:85,textAlign:"right",fontSize:11,fontWeight:700,color:x.c}}>{fmt$(x.v)}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{borderTop:"1px solid var(--border)",paddingTop:8,marginTop:8,display:"flex",justifyContent:"space-between",fontSize:12}}>
+                <span style={{color:"var(--muted)"}}>Eficiencia cobranza</span>
+                <strong style={{color:"var(--green)"}}>{totFacturado>0?`${((totCobrado/totFacturado)*100).toFixed(0)}%`:"—"}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   };
 
-  const VistaNominas = () => (
-    <div>
-      <div className="stats" style={{marginBottom:16}}>
-        <KR icon="👷" lbl="Operadores con movimiento" val={nomPorDriver.length} c="var(--cyan)" />
-        <KR icon="💵" lbl="Total Sueldos Base" val={fmt$(nomPorDriver.reduce((a,x)=>a+x.sueldo,0))} c="var(--green)" />
-        <KR icon="📈" lbl="Total Comisiones" val={fmt$(nomPorDriver.reduce((a,x)=>a+x.comision,0))} sub={`${fTripsProp.length} viajes propios`} c="var(--purple)" />
-        <KR icon="💰" lbl="Nómina Total Est." val={fmt$(totNomina)} c="var(--cyan)" />
-      </div>
-      <div className="card">
-        <div className="card-hdr"><h3>💵 Desglose de Nómina — {lblPeriodo()}</h3>
-          <div style={{fontSize:11,color:"var(--muted)"}}>Comisiones calculadas sobre viajes completados en el período</div>
-        </div>
-        <div className="card-body">
-          {nomPorDriver.length === 0
-            ? <div className="empty"><div className="empty-icon">👷</div><p>Sin operadores con sueldo o comisiones en este período</p></div>
-            : <table>
-                <thead><tr><th>Operador</th><th>Unidad</th><th>Viajes</th><th>Ingresos Generados</th><th>% Com.</th><th>Sueldo Base</th><th>Comisión</th><th>Total Est.</th></tr></thead>
-                <tbody>{nomPorDriver.sort((a,b)=>b.total-a.total).map(({driver:d,unit,viajesD,comision,sueldo,total})=>{
-                  const ingGen = viajesD.reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0);
-                  return <tr key={d.id}>
-                    <td>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        {d.foto?<img src={d.foto} style={{width:28,height:28,borderRadius:"50%",objectFit:"cover"}} alt=""/>:<span style={{fontSize:18}}>👤</span>}
-                        <div><div style={{fontWeight:700,fontSize:12}}>{d.nombre}</div><div style={{fontSize:10,color:"var(--muted)"}}>Lic. {d.licTipo}</div></div>
-                      </div>
-                    </td>
-                    <td>{unit?<Bdg c="bb" t={`${unit.num} ${unit.placas}`}/>:<span style={{color:"var(--muted)",fontSize:11}}>Sin unidad</span>}</td>
-                    <td style={{textAlign:"center",fontWeight:700,color:"var(--cyan)"}}>{viajesD.length}</td>
-                    <td style={{color:"var(--green)",fontWeight:700}}>{ingGen>0?fmt$(ingGen):"—"}</td>
-                    <td><Bdg c="bp" t={`${d.porcentajeViaje||0}%`}/></td>
-                    <td style={{color:"var(--cyan)",fontWeight:700}}>{fmt$(sueldo)}</td>
-                    <td style={{color:"var(--green)",fontWeight:700}}>{comision>0?fmt$(comision):"—"}</td>
-                    <td style={{fontFamily:"var(--font-hd)",fontSize:16,fontWeight:700,color:"var(--orange)"}}>{fmt$(total)}</td>
-                  </tr>;
-                })}
-                <tr style={{borderTop:"2px solid var(--border)"}}>
-                  <td colSpan={5} style={{fontWeight:700,textAlign:"right",paddingRight:12}}>TOTAL NÓMINA ESTIMADA:</td>
-                  <td style={{fontWeight:700,color:"var(--cyan)"}}>{fmt$(nomPorDriver.reduce((a,x)=>a+x.sueldo,0))}</td>
-                  <td style={{fontWeight:700,color:"var(--green)"}}>{fmt$(nomPorDriver.reduce((a,x)=>a+x.comision,0))}</td>
-                  <td style={{fontFamily:"var(--font-hd)",fontSize:18,fontWeight:700,color:"var(--cyan)"}}>{fmt$(totNomina)}</td>
-                </tr>
-                </tbody>
-              </table>
-          }
-        </div>
-      </div>
-    </div>
-  );
+  // ══════════════════════════════════════════════════════════════
+  //  2. RENDIMIENTO DE FLOTA (por unidad)
+  // ══════════════════════════════════════════════════════════════
+  const VistaRendimiento = () => {
+    const stats = units.map(u=>{
+      const vUs     = fTripsProp.filter(t=>t.unidadId===u.id);
+      const ingresos= vUs.reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0);
+      const km      = vUs.reduce((a,t)=>a+(Number(t.km)||0),0);
+      const combU   = fFuels.filter(f=>f.unidadId===u.id);
+      const litros  = combU.reduce((a,f)=>a+(Number(f.litros)||0),0);
+      const costComb= combU.reduce((a,f)=>a+(Number(f.litros)||0)*(Number(f.precio)||0),0);
+      const maintU  = fMaints.filter(m=>m.unidadId===u.id).reduce((a,m)=>a+(Number(m.costoRef)||0)+(Number(m.costoMO)||0),0);
+      const costos  = costComb+maintU;
+      const utilidad= ingresos-costos;
+      const rendL   = km>0?(litros/km*100).toFixed(2):null;
+      const ingKm   = km>0?(ingresos/km).toFixed(2):null;
+      return { ...u, viajes:vUs.length, ingresos, km, litros, costComb, maintU, costos, utilidad, rendL, ingKm };
+    }).sort((a,b)=>b.ingresos-a.ingresos);
 
-  const VistaViajes = () => (
-    <div>
-      <div className="stats" style={{marginBottom:16}}>
-        <KR icon="🚛" lbl="Viajes Propios" val={fTripsProp.length} sub={fmt$(fTripsProp.reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0))} c="var(--cyan)" />
-        <KR icon="🔄" lbl="Logística Externa" val={fTripsExt.length} sub={fmt$(fTripsExt.reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0))} c="var(--purple)" />
-        <KR icon="📦" lbl="Total Viajes" val={fTrips.length} sub={fmt$(totIngresos)} c="var(--green)" />
-        <KR icon="📍" lbl="Destinos Únicos" val={[...new Set(fTrips.map(t=>t.destino).filter(Boolean))].length} c="var(--orange)" />
-      </div>
-      <div className="card">
-        <div className="card-hdr"><h3>🗺️ Viajes Completados — {lblPeriodo()}</h3></div>
-        <div className="card-body">
-          {fTrips.length === 0
-            ? <div className="empty"><div className="empty-icon">🗺️</div><p>Sin viajes completados en este período</p></div>
-            : <table>
-                <thead><tr><th>Tipo</th><th>Unidad</th><th>Origen</th><th>Destino</th><th>Fecha</th><th>Cliente</th><th>Carga</th><th>Ingreso</th></tr></thead>
-                <tbody>{fTrips.sort((a,b)=>(b.fechaReg||b.fecha||"").localeCompare(a.fechaReg||a.fecha||"")).map(t=>{
-                  const u = units.find(u=>u.id===t.unidadId);
-                  return <tr key={t.id}>
-                    <td>
-                      <Bdg c={t.esExterno?"bp":"bb"} t={t.esExterno?"EXT":"INT"}/>
-                      {t.esExterno && (
-                        <div style={{marginTop:3}}>
-                          <Bdg c={t.pagoStatus==="pagado"?"bg":t.pagoStatus==="parcial"?"bb":"by"} t={t.pagoStatus==="pagado"?"💳 Pago OK":t.pagoStatus==="parcial"?"💳 Parcial":"💳 Pend."}/>
-                        </div>
-                      )}
-                    </td>
-                    <td style={{fontSize:12}}>{u?`${u.num} ${u.placas}`:"Externo"}</td>
-                    <td style={{fontSize:12,maxWidth:120}}>{t.origen}</td>
-                    <td style={{fontSize:12,maxWidth:120}}>{t.destino||"—"}</td>
-                    <td style={{fontSize:11,color:"var(--muted)"}}>{t.fechaReg||t.fecha}</td>
-                    <td style={{fontSize:12}}>{t.cliente||"—"}</td>
-                    <td style={{fontSize:11,color:"var(--muted)"}}>{t.carga||"—"}</td>
-                    <td style={{fontWeight:700,color:"var(--green)"}}>{fmt$(t.costoOfrecido)}</td>
-                  </tr>;
-                })}</tbody>
-              </table>
-          }
-        </div>
-      </div>
-    </div>
-  );
-
-  return (
-    <div>
-      <ControlPer />
-
-      {/* Tabs de vista */}
-      <div style={{marginBottom:16}}>
-        <div className="ftabs" style={{fontSize:13}}>
-          {[
-            ["resumen","📊 Resumen General"],
-            ["facturas",`🧾 Facturas (${fFacturas.length})`],
-            ["gastos","💸 Gastos & Costos"],
-            ["nominas","👷 Nóminas"],
-            ["viajes",`🗺️ Viajes (${fTrips.length})`],
-            ["rendimiento","🏆 Rendimiento Flota"],
-            ["proveedores_chart","🏪 Proveedores"],
-            ["operadores_chart","👨‍✈️ Operadores"],
-          ].map(([k,l]) => (
-            <button key={k} className={`ftab${vistaTab===k?" on":""}`} onClick={()=>setVistaTab(k)} style={{padding:"8px 14px"}}>{l}</button>
-          ))}
-        </div>
-      </div>
-
-      {vistaTab === "resumen"  && <VistaResumen />}
-      {vistaTab === "facturas" && <VistaFacturas />}
-      {vistaTab === "gastos"   && <VistaGastos />}
-      {vistaTab === "nominas"  && <VistaNominas />}
-      {vistaTab === "viajes"   && <VistaViajes />}
-      {vistaTab === "rendimiento" && <VistaRendimiento />}
-      {vistaTab === "proveedores_chart" && <VistaProveedores />}
-      {vistaTab === "operadores_chart" && <VistaOperadores />}
-    </div>
-  );
-
-  // ── Vista: Rendimiento de Flota ─────────────────────────────────────────────
-  function VistaRendimiento() {
-    // Km por unidad (desde viajes)
-    const kmPorUnidad = units.map(u => {
-      const viajesU = trips.filter(t => t.unidadId === u.id && t.status === "COMPLETADO");
-      const km = viajesU.reduce((s,t) => s + (Number(t.km)||0), 0);
-      const ingresos = viajesU.reduce((s,t) => s + (Number(t.costoOfrecido)||0), 0);
-      const costosComb = fuels.filter(f => f.unidadId === u.id).reduce((s,f) => s + (Number(f.litros)||0)*(Number(f.precio)||0), 0);
-      const rendKm = km > 0 ? ingresos / km : 0;
-      return { ...u, km, ingresos, costosComb, rendKm, viajes: viajesU.length };
-    }).sort((a,b) => b.ingresos - a.ingresos);
-
-    // Conductores más activos
-    const conductorStats = drivers.map(d => {
-      const viajesD = trips.filter(t => t.conductorId === d.id && t.status === "COMPLETADO");
-      const ingresos = viajesD.reduce((s,t) => s + (Number(t.costoOfrecido)||0), 0);
-      return { ...d, viajes: viajesD.length, ingresos };
-    }).sort((a,b) => b.viajes - a.viajes).slice(0,8);
-
-    // Costos por categoría (pie-style bars)
-    const totalComb = fuels.reduce((s,f)=>s+(Number(f.litros)||0)*(Number(f.precio)||0),0);
-    const totalMant = maints.reduce((s,m)=>s+(Number(m.costoRef)||0)+(Number(m.costoMO)||0),0);
-    const totalGast = gastos.reduce((s,g)=>s+(Number(g.monto)||0),0);
-    const totalCost = totalComb + totalMant + totalGast || 1;
-
-    const maxKm = Math.max(...kmPorUnidad.map(u=>u.km),1);
-    const maxViajes = Math.max(...conductorStats.map(d=>d.viajes),1);
+    const maxIng = Math.max(...stats.map(s=>s.ingresos),1);
 
     return (
-      <div style={{display:"flex",flexDirection:"column",gap:20}}>
-        {/* Distribución de costos */}
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <div className="stats">
+          <KR icon="🚛" lbl="Unidades activas" val={stats.filter(s=>s.viajes>0).length} sub={`de ${units.length} total`} c="var(--cyan)"/>
+          <KR icon="🗺️" lbl="Viajes propios" val={fTripsProp.length} c="var(--green)"/>
+          <KR icon="⛽" lbl="Combustible total" val={`${totLitros.toFixed(0)}L`} sub={fmt$(totComb)} c="var(--yellow)"/>
+          <KR icon="🔧" lbl="Mantenimientos" val={fMaints.length} sub={fmt$(totMant)} c="var(--orange)"/>
+        </div>
+
+        {/* barras comparativas por unidad */}
         <div className="card">
-          <div className="card-hdr"><h3>🍕 Distribución de Costos Operativos</h3></div>
-          <div className="card-body">
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:16}}>
-              {[["⛽ Combustible",totalComb,"var(--orange)"],["🔧 Mantenimiento",totalMant,"var(--red)"],["💵 Gastos Generales",totalGast,"var(--purple)"]].map(([lbl,val,color])=>(
-                <div key={lbl} style={{padding:"14px 16px",background:"var(--bg2)",borderRadius:10,border:"1px solid var(--border)"}}>
-                  <div style={{fontSize:12,color:"var(--muted)",marginBottom:4}}>{lbl}</div>
-                  <div style={{fontWeight:800,fontSize:18,color,marginBottom:6}}>{fmt$(val)}</div>
-                  <div style={{height:8,background:"var(--bg3)",borderRadius:4,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:`${(val/totalCost*100).toFixed(1)}%`,background:color,borderRadius:4}}/>
-                  </div>
-                  <div style={{fontSize:11,color:"var(--muted)",marginTop:4}}>{(val/totalCost*100).toFixed(1)}% del total</div>
+          <div className="card-hdr"><h3>📊 Ingresos Comparativos por Unidad — {lblPeriodo()}</h3></div>
+          <div style={{padding:"16px 20px"}}>
+            {stats.filter(s=>s.ingresos>0).length===0
+              ? <div className="empty"><div className="empty-icon">🚛</div><p>Sin viajes en el período</p></div>
+              : stats.filter(s=>s.ingresos>0).map((s,i)=>(
+              <div key={s.id} style={{marginBottom:14}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4,fontSize:12}}>
+                  <span style={{fontWeight:700}}>{s.num} <span style={{color:"var(--muted)",fontWeight:400}}>{s.placas}</span> <span style={{fontSize:10,color:"var(--muted)"}}>{s.tipo}</span></span>
+                  <span style={{color:"var(--green)",fontWeight:700}}>{fmt$(s.ingresos)} · {s.viajes}v</span>
                 </div>
-              ))}
-            </div>
+                <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <div style={{width:56,fontSize:9,color:"var(--green)"}}>Ingresos</div>
+                    <HBar v={s.ingresos} max={maxIng} c="var(--green)" h={9}/>
+                    <div style={{width:80,textAlign:"right",fontSize:9,fontWeight:700,color:"var(--green)"}}>{fmt$(s.ingresos)}</div>
+                  </div>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <div style={{width:56,fontSize:9,color:"var(--red)"}}>Costos</div>
+                    <HBar v={s.costos} max={maxIng} c="var(--red)" h={9}/>
+                    <div style={{width:80,textAlign:"right",fontSize:9,fontWeight:700,color:"var(--red)"}}>{fmt$(s.costos)}</div>
+                  </div>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <div style={{width:56,fontSize:9,color:s.utilidad>=0?"var(--cyan)":"var(--orange)"}}>Utilidad</div>
+                    <HBar v={Math.abs(s.utilidad)} max={maxIng} c={s.utilidad>=0?"var(--cyan)":"var(--orange)"} h={9}/>
+                    <div style={{width:80,textAlign:"right",fontSize:9,fontWeight:700,color:s.utilidad>=0?"var(--cyan)":"var(--orange)"}}>{s.utilidad>=0?"":"-"}{fmt$(Math.abs(s.utilidad))}</div>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:12,marginTop:3,fontSize:10,color:"var(--muted)"}}>
+                  {s.rendL&&<span>🔥 {s.rendL}L/100km</span>}
+                  {s.ingKm&&<span>💲${s.ingKm}/km</span>}
+                  <span>🔧 {fmt$(s.maintU)}</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* KM e ingresos por unidad */}
+        {/* tabla detalle */}
         <div className="card">
-          <div className="card-hdr"><h3>🚛 Kilometraje e Ingresos por Unidad</h3></div>
+          <div className="card-hdr"><h3>📋 Tabla Detalle Unidades</h3></div>
           <div className="card-body" style={{padding:0}}>
             <table>
-              <thead><tr><th>Unidad</th><th>Placas</th><th>Viajes</th><th>KM Total</th><th style={{textAlign:"right"}}>Ingresos</th><th style={{textAlign:"right"}}>$/km</th><th>Comb.</th><th>Barra KM</th></tr></thead>
+              <thead><tr><th>Unidad</th><th>Tipo</th><th>Viajes</th><th>Km</th><th>Ingresos</th><th>Comb $</th><th>Mant $</th><th>Utilidad</th><th>L/100km</th><th>$/km</th></tr></thead>
               <tbody>
-                {kmPorUnidad.map(u=>(
-                  <tr key={u.id}>
-                    <td><strong>{u.num}</strong></td>
-                    <td style={{fontSize:11,color:"var(--muted)"}}>{u.placas}</td>
-                    <td style={{textAlign:"center",fontWeight:700,color:"var(--cyan)"}}>{u.viajes}</td>
-                    <td style={{fontWeight:700}}>{u.km.toLocaleString()} km</td>
-                    <td style={{textAlign:"right",fontWeight:700,color:"var(--green)"}}>{fmt$(u.ingresos)}</td>
-                    <td style={{textAlign:"right",fontSize:12,color:"var(--cyan)"}}>{u.km>0?`$${(u.ingresos/u.km).toFixed(0)}`:"—"}</td>
-                    <td style={{fontSize:11,color:"var(--orange)"}}>{fmt$(u.costosComb)}</td>
-                    <td style={{minWidth:100}}>
-                      <div style={{height:10,background:"var(--bg3)",borderRadius:5,overflow:"hidden"}}>
-                        <div style={{height:"100%",width:`${(u.km/maxKm*100).toFixed(0)}%`,background:"var(--cyan)",borderRadius:5}}/>
-                      </div>
-                    </td>
+                {stats.length===0
+                  ? <tr><td colSpan={10} style={{textAlign:"center",color:"var(--muted)",padding:20}}>Sin datos</td></tr>
+                  : stats.map(s=>(
+                  <tr key={s.id}>
+                    <td><strong>{s.num}</strong><div style={{fontSize:10,color:"var(--muted)"}}>{s.placas}</div></td>
+                    <td style={{fontSize:11}}><Bdg c="bb" t={s.tipo||"—"}/></td>
+                    <td style={{textAlign:"center",fontWeight:700,color:"var(--cyan)"}}>{s.viajes}</td>
+                    <td style={{fontSize:12}}>{s.km>0?`${s.km.toLocaleString()}`:"-"}</td>
+                    <td style={{fontWeight:700,color:"var(--green)"}}>{fmt$(s.ingresos)}</td>
+                    <td style={{color:"var(--yellow)",fontSize:12}}>{fmt$(s.costComb)}</td>
+                    <td style={{color:"var(--orange)",fontSize:12}}>{fmt$(s.maintU)}</td>
+                    <td style={{fontWeight:700,color:s.utilidad>=0?"var(--cyan)":"var(--red)"}}>{fmt$(s.utilidad)}</td>
+                    <td style={{fontSize:11,color:"var(--muted)"}}>{s.rendL?`${s.rendL}L`:"—"}</td>
+                    <td style={{fontSize:11,color:"var(--muted)"}}>{s.ingKm?`$${s.ingKm}`:"—"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </div>
+      </div>
+    );
+  };
 
-        {/* Conductores más activos */}
-        <div className="card">
-          <div className="card-hdr"><h3>👨‍✈️ Conductores Más Activos</h3></div>
-          <div className="card-body" style={{padding:"16px"}}>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {conductorStats.map((d,i)=>(
-                <div key={d.id} style={{display:"flex",alignItems:"center",gap:12}}>
-                  <div style={{width:24,height:24,borderRadius:"50%",background:i<3?"var(--cyan)":"var(--bg3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:i<3?"#fff":"var(--muted)",flexShrink:0}}>{i+1}</div>
-                  <div style={{flex:"0 0 140px",fontWeight:600,fontSize:13}}>{d.nombre}</div>
-                  <div style={{flex:1,height:18,background:"var(--bg3)",borderRadius:9,overflow:"hidden",position:"relative"}}>
-                    <div style={{height:"100%",width:`${(d.viajes/maxViajes*100).toFixed(0)}%`,background:i===0?"var(--gold,#f4c542)":i===1?"var(--muted)":i===2?"var(--orange)":"var(--cyan)",borderRadius:9,transition:"width .4s"}}/>
-                    <span style={{position:"absolute",left:8,top:1,fontSize:11,fontWeight:700,color:"var(--bg0)"}}>{d.viajes} viajes · {fmt$(d.ingresos)}</span>
+  // ══════════════════════════════════════════════════════════════
+  //  3. OPERADORES / CONDUCTORES
+  // ══════════════════════════════════════════════════════════════
+  const VistaOperadores = () => {
+    const stats = drivers.map(d=>{
+      const unit    = units.find(u=>u.operador===d.id);
+      const vUs     = unit?fTripsProp.filter(t=>t.unidadId===unit.id):[];
+      const ingresos= vUs.reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0);
+      const km      = vUs.reduce((a,t)=>a+(Number(t.km)||0),0);
+      const comision= ingresos*(Number(d.porcentajeViaje)||0)/100;
+      const sueldo  = Number(d.sueldoBase)||0;
+      const destinos= [...new Set(vUs.map(t=>t.destino).filter(Boolean))].length;
+      return { ...d, unit, viajes:vUs.length, ingresos, km, comision, sueldo, total:sueldo+comision, destinos };
+    }).sort((a,b)=>b.ingresos-a.ingresos);
+
+    const maxIng  = Math.max(...stats.map(s=>s.ingresos),1);
+    const maxViaj = Math.max(...stats.map(s=>s.viajes),1);
+
+    return (
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <div className="stats">
+          <KR icon="👨‍✈️" lbl="Operadores" val={drivers.length} sub={`${stats.filter(s=>s.viajes>0).length} activos`} c="var(--cyan)"/>
+          <KR icon="🗺️" lbl="Viajes propios" val={fTripsProp.length} c="var(--green)"/>
+          <KR icon="💰" lbl="Nómina total" val={fmt$(totNomina)} c="var(--purple)"/>
+          <KR icon="🎯" lbl="Ingreso promedio" val={stats.filter(s=>s.viajes>0).length>0?fmt$(totIngresos/stats.filter(s=>s.viajes>0).length):"—"} c="var(--yellow)"/>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+          {/* ranking ingresos */}
+          <div className="card">
+            <div className="card-hdr"><h3>🏆 Ranking por Ingresos Generados</h3></div>
+            <div style={{padding:"16px 20px"}}>
+              {stats.length===0 ? <div className="empty"><p>Sin operadores</p></div>
+              : stats.map((s,i)=>(
+                <div key={s.id} style={{marginBottom:12}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
+                    <div style={{width:20,height:20,borderRadius:"50%",background:i===0?"#f4c542":i===1?"#b0bec5":i===2?"#cd7f32":"var(--bg3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:i<3?"#000":"var(--muted)",flexShrink:0}}>{i+1}</div>
+                    <div style={{flex:1,fontWeight:700,fontSize:12}}>{s.nombre}</div>
+                    <div style={{fontSize:11,color:"var(--green)",fontWeight:700}}>{fmt$(s.ingresos)}</div>
+                  </div>
+                  <div style={{paddingLeft:28}}>
+                    <HBar v={s.ingresos} max={maxIng} c={i===0?"#f4c542":i===1?"#b0bec5":i===2?"#cd7f32":"var(--cyan)"} h={8}/>
+                    <div style={{fontSize:9,color:"var(--muted)",marginTop:2}}>{s.viajes} viajes · {s.km>0?`${s.km.toLocaleString()}km`:"sin km"} · {s.destinos} destinos</div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
+
+          {/* ranking viajes */}
+          <div className="card">
+            <div className="card-hdr"><h3>🗺️ Ranking por Viajes Realizados</h3></div>
+            <div style={{padding:"16px 20px"}}>
+              {stats.length===0 ? <div className="empty"><p>Sin operadores</p></div>
+              : [...stats].sort((a,b)=>b.viajes-a.viajes).map((s,i)=>(
+                <div key={s.id} style={{marginBottom:12}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:12}}>
+                    <span style={{fontWeight:700}}>{s.nombre}</span>
+                    <span style={{color:"var(--cyan)",fontWeight:700}}>{s.viajes} viajes</span>
+                  </div>
+                  <HBar v={s.viajes} max={maxViaj} c="var(--cyan)" h={8}/>
+                  <div style={{fontSize:9,color:"var(--muted)",marginTop:2}}>Base: {fmt$(s.sueldo)} · Comisión: {fmt$(s.comision)} → Total: {fmt$(s.total)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* tabla detalle */}
+        <div className="card">
+          <div className="card-hdr"><h3>📋 Detalle Operadores — {lblPeriodo()}</h3></div>
+          <div className="card-body" style={{padding:0}}>
+            <table>
+              <thead><tr><th>Operador</th><th>Unidad</th><th>Viajes</th><th>Km</th><th>Ingresos</th><th>Sueldo base</th><th>Comisión</th><th>Costo total</th><th>Destinos únicos</th></tr></thead>
+              <tbody>
+                {stats.length===0
+                  ? <tr><td colSpan={9} style={{textAlign:"center",color:"var(--muted)",padding:20}}>Sin datos</td></tr>
+                  : stats.map(s=>(
+                  <tr key={s.id}>
+                    <td><strong style={{fontSize:12}}>{s.nombre}</strong><div style={{fontSize:10,color:"var(--muted)"}}>{s.licTipo||"—"}</div></td>
+                    <td style={{fontSize:11}}>{s.unit?`${s.unit.num}·${s.unit.placas}`:"Sin asignar"}</td>
+                    <td style={{textAlign:"center",fontWeight:700,color:"var(--cyan)"}}>{s.viajes}</td>
+                    <td style={{fontSize:12}}>{s.km>0?`${s.km.toLocaleString()} km`:"—"}</td>
+                    <td style={{fontWeight:700,color:"var(--green)"}}>{fmt$(s.ingresos)}</td>
+                    <td style={{fontSize:12}}>{fmt$(s.sueldo)}</td>
+                    <td style={{color:"var(--purple)",fontSize:12}}>{fmt$(s.comision)}<div style={{fontSize:9,color:"var(--muted)"}}>{s.porcentajeViaje||0}%</div></td>
+                    <td style={{fontWeight:700,color:"var(--orange)"}}>{fmt$(s.total)}</td>
+                    <td style={{textAlign:"center"}}>{s.destinos}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     );
-  }
+  };
 
-  // ── Vista: Operadores ───────────────────────────────────────────────────────
-  function VistaOperadores() {
-    const activos   = drivers.filter(d => d.status === "ACTIVO");
-    const inactivos = drivers.filter(d => d.status !== "ACTIVO");
-    const enRutaIds = new Set(fTrips.filter(t=>t.status==="EN RUTA").map(t=>t.conductorId).filter(Boolean));
+  // ══════════════════════════════════════════════════════════════
+  //  4. COMBUSTIBLE & RENDIMIENTO
+  // ══════════════════════════════════════════════════════════════
+  const VistaCombustible = () => {
+    const porUnidad = units.map(u=>{
+      const fUs    = fFuels.filter(f=>f.unidadId===u.id);
+      const litros = fUs.reduce((a,f)=>a+(Number(f.litros)||0),0);
+      const costo  = fUs.reduce((a,f)=>a+(Number(f.litros)||0)*(Number(f.precio)||0),0);
+      const vUs    = fTripsProp.filter(t=>t.unidadId===u.id);
+      const km     = vUs.reduce((a,t)=>a+(Number(t.km)||0),0);
+      const rend   = km>0?(litros/km*100).toFixed(2):null;
+      const precProm=litros>0?(costo/litros).toFixed(2):null;
+      return { ...u, litros, costo, km, rend, precProm, cargas:fUs.length };
+    }).filter(u=>u.litros>0).sort((a,b)=>b.litros-a.litros);
 
-    const viajesPorOp = {};
-    fTrips.filter(t=>!t.esExterno && t.status==="COMPLETADO").forEach(t => {
-      if (!t.conductorId) return;
-      if (!viajesPorOp[t.conductorId]) viajesPorOp[t.conductorId] = { viajes:0, ingresos:0 };
-      viajesPorOp[t.conductorId].viajes++;
-      viajesPorOp[t.conductorId].ingresos += Number(t.costoOfrecido)||0;
+    const maxLit = Math.max(...porUnidad.map(u=>u.litros),1);
+
+    const precMeses = meses12.map((m,i)=>{
+      const lit  = m.litros;
+      const cost = m.fuel;
+      return { lbl:MESES[i].slice(0,3), lit, prec:lit>0?(cost/lit).toFixed(2):0, cost };
     });
-
-    const ranking = drivers.map(d => ({
-      ...d,
-      viajes:   viajesPorOp[d.id]?.viajes   || 0,
-      ingresos: viajesPorOp[d.id]?.ingresos || 0,
-      enRuta:   enRutaIds.has(d.id),
-    })).sort((a,b) => b.viajes - a.viajes);
-
-    const maxViajes = Math.max(1, ...ranking.map(r=>r.viajes));
+    const maxPrec = Math.max(...precMeses.map(m=>Number(m.prec)),1);
+    const maxLitM = Math.max(...meses12.map(m=>m.litros),1);
 
     return (
-      <div>
-        <div className="stats" style={{marginBottom:16}}>
-          <div className="stat" style={{"--c":"var(--green)"}}>
-            <div className="stat-icon">✅</div><div className="stat-val sm">{activos.length}</div><div className="stat-lbl">Operadores activos</div>
-          </div>
-          <div className="stat" style={{"--c":"var(--cyan)"}}>
-            <div className="stat-icon">🗺️</div><div className="stat-val sm">{enRutaIds.size}</div><div className="stat-lbl">En ruta ahora</div>
-          </div>
-          <div className="stat" style={{"--c":"var(--muted)"}}>
-            <div className="stat-icon">🔇</div><div className="stat-val sm">{inactivos.length}</div><div className="stat-lbl">Inactivos / Bajas</div>
-          </div>
-          <div className="stat" style={{"--c":"var(--orange)"}}>
-            <div className="stat-icon">📋</div><div className="stat-val sm">{fTrips.filter(t=>!t.esExterno&&t.status==="COMPLETADO").length}</div><div className="stat-lbl">Viajes en período</div>
-          </div>
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <div className="stats">
+          <KR icon="⛽" lbl="Litros cargados" val={`${totLitros.toFixed(0)}L`} sub={`${fFuels.length} cargas`} c="var(--cyan)"/>
+          <KR icon="💵" lbl="Gasto combustible" val={fmt$(totComb)} c="var(--yellow)"/>
+          <KR icon="📊" lbl="Precio promedio" val={totLitros>0?`$${(totComb/totLitros).toFixed(2)}/L`:"—"} c="var(--orange)"/>
+          <KR icon="🏭" lbl="Unidades con carga" val={porUnidad.length} c="var(--green)"/>
         </div>
 
-        <div className="card" style={{marginBottom:16}}>
-          <div className="card-hdr"><h3>🏆 Productividad por Operador — {lblPeriodo()}</h3></div>
-          <div className="card-body">
-            {ranking.length === 0
-              ? <div className="empty"><div className="empty-icon">👨‍✈️</div><p>Sin operadores registrados</p></div>
-              : ranking.map((r, idx) => (
-                <div key={r.id} style={{marginBottom:14}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
-                    <div style={{display:"flex",gap:10,alignItems:"center"}}>
-                      <span style={{fontWeight:900,fontSize:16,color:idx===0?"#f5a623":idx===1?"var(--muted)":idx===2?"var(--orange)":"var(--text)",width:22,textAlign:"right"}}>
-                        {idx===0?"🥇":idx===1?"🥈":idx===2?"🥉":`${idx+1}.`}
-                      </span>
-                      <div>
-                        <div style={{fontWeight:700,fontSize:13}}>{r.nombre}</div>
-                        <div style={{fontSize:10,color:"var(--muted)"}}>{r.licencia||"Sin lic."} {r.enRuta && <span style={{color:"var(--cyan)",fontWeight:700}}>· 🟢 En ruta</span>}</div>
-                      </div>
-                    </div>
-                    <div style={{textAlign:"right"}}>
-                      <div style={{fontWeight:700,color:"var(--cyan)",fontSize:14}}>{r.viajes} viaje{r.viajes!==1?"s":""}</div>
-                      {r.ingresos>0 && <div style={{fontSize:11,color:"var(--muted)"}}>{fmt$(r.ingresos)}</div>}
-                    </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+          {/* consumo por unidad */}
+          <div className="card">
+            <div className="card-hdr"><h3>⛽ Consumo por Unidad — {lblPeriodo()}</h3></div>
+            <div style={{padding:"16px 20px"}}>
+              {porUnidad.length===0
+                ? <div className="empty"><div className="empty-icon">⛽</div><p>Sin cargas en el período</p></div>
+                : porUnidad.map(u=>(
+                <div key={u.id} style={{marginBottom:14}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:12}}>
+                    <span style={{fontWeight:700}}>{u.num} <span style={{color:"var(--muted)",fontWeight:400,fontSize:10}}>{u.placas}</span></span>
+                    <span style={{color:"var(--cyan)",fontWeight:700}}>{u.litros.toFixed(0)}L — {fmt$(u.costo)}</span>
                   </div>
-                  <div style={{height:12,background:"var(--bg3)",borderRadius:6,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:`${(r.viajes/maxViajes)*100}%`,background:idx===0?"#f5a623":idx===1?"#aaa":idx===2?"var(--orange)":"var(--cyan)",borderRadius:6,transition:"width .5s"}}/>
+                  <HBar v={u.litros} max={maxLit} c="var(--cyan)" h={10}/>
+                  <div style={{display:"flex",gap:10,marginTop:3,fontSize:10,color:"var(--muted)"}}>
+                    <span>{u.cargas} cargas</span>
+                    {u.rend&&<span>🔥 {u.rend}L/100km</span>}
+                    {u.precProm&&<span>💲${u.precProm}/L</span>}
                   </div>
                 </div>
-              ))
-            }
+              ))}
+            </div>
+          </div>
+
+          {/* precio/litro por mes */}
+          <div className="card">
+            <div className="card-hdr"><h3>📈 Precio Promedio por Litro — {filtroAnio}</h3></div>
+            <div style={{padding:"16px 20px"}}>
+              {precMeses.map((m,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                  <div style={{width:28,fontSize:10,color:"var(--muted)",fontWeight:700}}>{m.lbl}</div>
+                  <div style={{flex:1,display:"flex",flexDirection:"column",gap:2}}>
+                    <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                      <HBar v={Number(m.prec)} max={maxPrec} c="var(--yellow)" h={8}/>
+                      <div style={{width:52,textAlign:"right",fontSize:10,fontWeight:700,color:"var(--yellow)"}}>{m.prec>0?`$${m.prec}`:"—"}</div>
+                    </div>
+                    <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                      <HBar v={meses12[i].litros} max={maxLitM} c="var(--cyan)" h={6}/>
+                      <div style={{width:52,textAlign:"right",fontSize:9,color:"var(--cyan)"}}>{meses12[i].litros>0?`${meses12[i].litros.toFixed(0)}L`:"—"}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div style={{display:"flex",gap:12,marginTop:6}}>
+                <span style={{fontSize:10,color:"var(--yellow)"}}>■ Precio/L</span>
+                <span style={{fontSize:10,color:"var(--cyan)"}}>■ Litros</span>
+              </div>
+            </div>
           </div>
         </div>
 
+        {/* tabla */}
         <div className="card">
-          <div className="card-hdr"><h3>📋 Tabla Detallada de Operadores</h3></div>
+          <div className="card-hdr"><h3>📋 Detalle Combustible por Unidad</h3></div>
           <div className="card-body" style={{padding:0}}>
             <table>
-              <thead><tr><th>#</th><th>Operador</th><th>Licencia</th><th>Sueldo Base</th><th>Viajes período</th><th>Ingresos generados</th><th>Status</th></tr></thead>
+              <thead><tr><th>Unidad</th><th>Tipo</th><th>Cargas</th><th>Litros</th><th>Costo total</th><th>Precio prom.</th><th>Km recorridos</th><th>Rendimiento</th></tr></thead>
               <tbody>
-                {ranking.map((r,i) => (
-                  <tr key={r.id} style={{background:r.enRuta?"rgba(0,153,204,.05)":""}}>
-                    <td style={{fontWeight:900,color:"var(--muted)",textAlign:"center"}}>{i+1}</td>
-                    <td><div style={{fontWeight:700}}>{r.nombre}</div><div style={{fontSize:10,color:"var(--muted)"}}>{r.tel||""}</div></td>
-                    <td><Bdg c="bb" t={r.licencia||"—"}/></td>
-                    <td style={{fontWeight:700,color:"var(--cyan)"}}>{r.sueldoBase>0?fmt$(r.sueldoBase):"—"}</td>
-                    <td style={{textAlign:"center",fontWeight:700}}>{r.viajes>0?<span style={{color:"var(--green)"}}>{r.viajes}</span>:<span style={{color:"var(--muted)"}}>0</span>}</td>
-                    <td style={{fontWeight:700,color:"var(--orange)"}}>{r.ingresos>0?fmt$(r.ingresos):"—"}</td>
-                    <td><div style={{display:"flex",gap:4}}><Bdg c={r.status==="ACTIVO"?"bg":"bm"} t={r.status||"—"}/>{r.enRuta&&<Bdg c="bb" t="🟢 En ruta"/>}</div></td>
+                {porUnidad.length===0
+                  ? <tr><td colSpan={8} style={{textAlign:"center",color:"var(--muted)",padding:20}}>Sin cargas de combustible</td></tr>
+                  : porUnidad.map(u=>(
+                  <tr key={u.id}>
+                    <td><strong>{u.num}</strong><div style={{fontSize:10,color:"var(--muted)"}}>{u.placas}</div></td>
+                    <td><Bdg c="bb" t={u.tipo||"—"}/></td>
+                    <td style={{textAlign:"center"}}>{u.cargas}</td>
+                    <td style={{fontWeight:700,color:"var(--cyan)"}}>{u.litros.toFixed(0)}L</td>
+                    <td style={{fontWeight:700,color:"var(--yellow)"}}>{fmt$(u.costo)}</td>
+                    <td style={{color:"var(--muted)",fontSize:12}}>{u.precProm?`$${u.precProm}/L`:"—"}</td>
+                    <td style={{fontSize:12}}>{u.km>0?`${u.km.toLocaleString()} km`:"—"}</td>
+                    <td style={{fontWeight:700,color:u.rend&&Number(u.rend)<30?"var(--green)":"var(--orange)"}}>{u.rend?`${u.rend}L/100km`:"—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -6206,1040 +6126,466 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
         </div>
       </div>
     );
-  }
+  };
 
-  // ── Vista: Proveedores ──────────────────────────────────────────────────────
-  function VistaProveedores() {
-    const provs = units.length > 0 ? [] : []; // placeholder — receives via ChartsPage prop
-    // Gasto por proveedor (maints + gastos)
-    const gastoPorProv = [...new Set([...maints.map(m=>m.proveedorId), ...gastos.map(g=>g.proveedorId)])].filter(Boolean).map(pid => {
-      const gm = maints.filter(m=>m.proveedorId===pid).reduce((s,m)=>s+(Number(m.costoRef)||0)+(Number(m.costoMO)||0),0);
-      const gg = gastos.filter(g=>g.proveedorId===pid).reduce((s,g)=>s+(Number(g.monto)||0),0);
-      return { id:pid, total: gm+gg, mantenimientos:gm, gastosGen:gg };
-    }).sort((a,b)=>b.total-a.total).slice(0,10);
+  // ══════════════════════════════════════════════════════════════
+  //  5. MANTENIMIENTOS
+  // ══════════════════════════════════════════════════════════════
+  const VistaMantenimientos = () => {
+    const porUnidad = units.map(u=>{
+      const mUs  = fMaints.filter(m=>m.unidadId===u.id);
+      const cRef = mUs.reduce((a,m)=>a+(Number(m.costoRef)||0),0);
+      const cMO  = mUs.reduce((a,m)=>a+(Number(m.costoMO)||0),0);
+      return { ...u, n:mUs.length, cRef, cMO, total:cRef+cMO, servicios:mUs };
+    }).filter(u=>u.n>0).sort((a,b)=>b.total-a.total);
 
-    const maxGasto = Math.max(...gastoPorProv.map(p=>p.total),1);
+    const porTipo = {};
+    fMaints.forEach(m=>{ const t=m.tipo||"Otro"; porTipo[t]=(porTipo[t]||0)+(Number(m.costoRef)||0)+(Number(m.costoMO)||0); });
+    const tipoArr = Object.entries(porTipo).sort((a,b)=>b[1]-a[1]);
+    const maxTip  = Math.max(...tipoArr.map(([,v])=>v),1);
+    const maxUni  = Math.max(...porUnidad.map(u=>u.total),1);
 
-    // Tipos de gasto en mantenimientos
-    const tiposMant = {};
-    maints.forEach(m => { tiposMant[m.tipo] = (tiposMant[m.tipo]||0) + (Number(m.costoRef)||0)+(Number(m.costoMO)||0); });
-    const tiposArr = Object.entries(tiposMant).sort((a,b)=>b[1]-a[1]);
+    const porMesM = meses12.map((m,i)=>({ lbl:MESES[i].slice(0,3), n:m.mantN, costo:m.maint }));
+    const maxMM   = Math.max(...porMesM.map(m=>m.costo),1);
 
     return (
-      <div style={{display:"flex",flexDirection:"column",gap:20}}>
-        <div className="card">
-          <div className="card-hdr"><h3>🏪 Gasto por Proveedor (Top 10)</h3></div>
-          <div className="card-body" style={{padding:"16px"}}>
-            {gastoPorProv.length === 0
-              ? <div className="empty"><div className="empty-icon">🏪</div><p>Sin datos de proveedores aún</p></div>
-              : <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                  {gastoPorProv.map((p,i) => (
-                    <div key={p.id} style={{display:"flex",alignItems:"center",gap:12}}>
-                      <div style={{flex:"0 0 160px",fontSize:12,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>Prov. #{p.id.slice(-4)}</div>
-                      <div style={{flex:1,height:20,background:"var(--bg3)",borderRadius:10,overflow:"hidden",position:"relative"}}>
-                        <div style={{height:"100%",width:`${(p.total/maxGasto*100).toFixed(0)}%`,background:"var(--orange)",borderRadius:10}}/>
-                        <span style={{position:"absolute",left:8,top:2,fontSize:11,fontWeight:700,color:"var(--bg0)"}}>{fmt$(p.total)}</span>
-                      </div>
-                      <div style={{fontSize:11,color:"var(--muted)",flex:"0 0 80px",textAlign:"right"}}>{fmt$(p.mantenimientos)} mant.</div>
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <div className="stats">
+          <KR icon="🔧" lbl="Servicios" val={fMaints.length} c="var(--orange)"/>
+          <KR icon="💵" lbl="Costo total" val={fmt$(totMant)} c="var(--red)"/>
+          <KR icon="🚛" lbl="Unidades atendidas" val={porUnidad.length} c="var(--cyan)"/>
+          <KR icon="📊" lbl="Costo promedio" val={fMaints.length>0?fmt$(totMant/fMaints.length):"—"} c="var(--yellow)"/>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+          {/* por tipo */}
+          <div className="card">
+            <div className="card-hdr"><h3>🔧 Costo por Tipo de Servicio</h3></div>
+            <div style={{padding:"16px 20px"}}>
+              {tipoArr.length===0 ? <div className="empty"><p>Sin mantenimientos</p></div>
+              : <>
+                <SegBar items={tipoArr.map(([,v],i)=>({v,c:PAL[i%PAL.length],lbl:""}))} h={14}/>
+                <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:8}}>
+                  {tipoArr.map(([tipo,v],i)=>(
+                    <div key={tipo} style={{display:"flex",alignItems:"center",gap:8}}>
+                      <div style={{width:8,height:8,borderRadius:"50%",background:PAL[i%PAL.length],flexShrink:0}}/>
+                      <div style={{flex:1,fontSize:12}}>{tipo}</div>
+                      <HBar v={v} max={maxTip} c={PAL[i%PAL.length]} h={7}/>
+                      <div style={{width:80,textAlign:"right",fontSize:11,fontWeight:700,color:PAL[i%PAL.length]}}>{fmt$(v)}</div>
+                      <div style={{width:30,textAlign:"right",fontSize:10,color:"var(--muted)"}}>{totMant>0?`${((v/totMant)*100).toFixed(0)}%`:"—"}</div>
                     </div>
                   ))}
                 </div>
-            }
+              </>}
+            </div>
+          </div>
+
+          {/* por mes */}
+          <div className="card">
+            <div className="card-hdr"><h3>📅 Mantenimientos por Mes — {filtroAnio}</h3></div>
+            <div style={{padding:"16px 20px"}}>
+              {porMesM.map((m,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                  <div style={{width:28,fontSize:10,color:"var(--muted)",fontWeight:700}}>{m.lbl}</div>
+                  <HBar v={m.costo} max={maxMM} c="var(--orange)" h={10}/>
+                  <div style={{width:75,textAlign:"right",fontSize:10,fontWeight:700,color:"var(--orange)"}}>{m.costo>0?fmt$(m.costo):"—"}</div>
+                  <div style={{width:26,textAlign:"right",fontSize:9,color:"var(--muted)"}}>{m.n>0?`${m.n}sv`:""}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
+
+        {/* por unidad */}
         <div className="card">
-          <div className="card-hdr"><h3>🔧 Costo por Tipo de Mantenimiento</h3></div>
-          <div className="card-body" style={{padding:"16px"}}>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {tiposArr.map(([tipo,monto])=>{
-                const pct = (monto/Math.max(...tiposArr.map(x=>x[1]),1)*100).toFixed(0);
-                return (
-                  <div key={tipo} style={{display:"flex",alignItems:"center",gap:12}}>
-                    <div style={{flex:"0 0 160px",fontSize:12,fontWeight:600}}>{tipo}</div>
-                    <div style={{flex:1,height:18,background:"var(--bg3)",borderRadius:9,overflow:"hidden",position:"relative"}}>
-                      <div style={{height:"100%",width:`${pct}%`,background:"var(--red)",borderRadius:9}}/>
-                      <span style={{position:"absolute",left:8,top:1,fontSize:11,fontWeight:700,color:"#fff"}}>{fmt$(monto)}</span>
+          <div className="card-hdr"><h3>🚛 Costo de Mantenimiento por Unidad — {lblPeriodo()}</h3></div>
+          <div style={{padding:"16px 20px"}}>
+            {porUnidad.length===0 ? <div className="empty"><div className="empty-icon">🔧</div><p>Sin mantenimientos en el período</p></div>
+            : porUnidad.map(u=>(
+              <div key={u.id} style={{marginBottom:12}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:12}}>
+                  <span style={{fontWeight:700}}>{u.num} <span style={{color:"var(--muted)",fontWeight:400}}>{u.placas}</span></span>
+                  <span style={{color:"var(--red)",fontWeight:700}}>{fmt$(u.total)} ({u.n} serv.)</span>
+                </div>
+                <SegBar items={[{v:u.cRef,c:"var(--orange)",lbl:"Refac"},{v:u.cMO,c:"var(--red)",lbl:"M.O."}]} h={10}/>
+                <div style={{display:"flex",gap:12,marginTop:3,fontSize:10,color:"var(--muted)"}}>
+                  <span>Refacciones: {fmt$(u.cRef)}</span>
+                  <span>Mano de obra: {fmt$(u.cMO)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ══════════════════════════════════════════════════════════════
+  //  6. CLIENTES & FACTURACIÓN
+  // ══════════════════════════════════════════════════════════════
+  const VistaFacturas = () => {
+    const porCliente = clientes.map(c=>{
+      const fCli    = fFacturas.filter(f=>f.clienteId===c.id);
+      const total   = fCli.reduce((a,f)=>a+(Number(f.total)||0),0);
+      const cobrado = fCli.filter(f=>f.status==="PAGADA").reduce((a,f)=>a+(Number(f.total)||0),0);
+      const pend    = total-cobrado;
+      return { ...c, n:fCli.length, total, cobrado, pend };
+    }).filter(c=>c.n>0).sort((a,b)=>b.total-a.total);
+    const maxCli  = Math.max(...porCliente.map(c=>c.total),1);
+    const maxFact = Math.max(...meses12.map(m=>m.fact),1);
+
+    return (
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <div className="stats">
+          <KR icon="🧾" lbl="Emitidas" val={fFacturas.length} sub={fmt$(totFacturado)} c="var(--yellow)"/>
+          <KR icon="✅" lbl="Cobradas" val={fFactPag.length} sub={fmt$(totCobrado)} c="var(--green)"/>
+          <KR icon="⏳" lbl="Pendientes" val={fFacturas.filter(f=>f.status==="PENDIENTE").length} sub={fmt$(fFacturas.filter(f=>f.status==="PENDIENTE").reduce((a,f)=>a+(Number(f.total)||0),0))} c="var(--orange)"/>
+          <KR icon="❌" lbl="Vencidas" val={fFacturas.filter(f=>f.status==="VENCIDA").length} sub={fmt$(fFacturas.filter(f=>f.status==="VENCIDA").reduce((a,f)=>a+(Number(f.total)||0),0))} c="var(--red)"/>
+        </div>
+
+        {/* facturación mensual */}
+        <div className="card">
+          <div className="card-hdr"><h3>📈 Facturación Mensual — {filtroAnio}</h3></div>
+          <div style={{padding:"16px 20px"}}>
+            {meses12.map((m,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                <div style={{width:28,fontSize:10,color:"var(--muted)",fontWeight:700}}>{MESES[i].slice(0,3)}</div>
+                <HBar v={m.fact} max={maxFact} c="var(--yellow)" h={12}/>
+                <div style={{width:88,textAlign:"right",fontSize:11,fontWeight:700,color:"var(--yellow)"}}>{m.fact>0?fmt$(m.fact):"—"}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* top clientes */}
+        <div className="card">
+          <div className="card-hdr"><h3>🏆 Top Clientes por Facturación — {lblPeriodo()}</h3></div>
+          <div style={{padding:"16px 20px"}}>
+            {porCliente.length===0 ? <div className="empty"><div className="empty-icon">👥</div><p>Sin facturas en el período</p></div>
+            : porCliente.map((c,i)=>(
+              <div key={c.id} style={{marginBottom:14}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:12}}>
+                  <span><span style={{color:"var(--muted)",marginRight:6}}>#{i+1}</span><strong>{c.nombre}</strong></span>
+                  <span style={{color:"var(--yellow)",fontWeight:700}}>{fmt$(c.total)} · {c.n} fact.</span>
+                </div>
+                <SegBar items={[{v:c.cobrado,c:"var(--green)",lbl:"Cobrado"},{v:c.pend,c:"var(--orange)",lbl:"Pendiente"}]} h={10}/>
+                <div style={{display:"flex",gap:12,marginTop:3,fontSize:10,color:"var(--muted)"}}>
+                  <span style={{color:"var(--green)"}}>✅ {fmt$(c.cobrado)}</span>
+                  <span style={{color:"var(--orange)"}}>⏳ {fmt$(c.pend)}</span>
+                  <span>Cobrado: {c.total>0?`${((c.cobrado/c.total)*100).toFixed(0)}%`:"—"}</span>
+                  <span>Participación: {totFacturado>0?`${((c.total/totFacturado)*100).toFixed(0)}%`:"—"}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ══════════════════════════════════════════════════════════════
+  //  7. GASTOS GENERALES
+  // ══════════════════════════════════════════════════════════════
+  const VistaGastos = () => {
+    const porTipo = {};
+    fGastos.forEach(g=>{ const t=g.tipo||"Otro"; porTipo[t]=(porTipo[t]||0)+(Number(g.monto)||0); });
+    const tipoArr = Object.entries(porTipo).sort((a,b)=>b[1]-a[1]);
+    const maxG    = Math.max(...tipoArr.map(([,v])=>v),1);
+    const maxMG   = Math.max(...meses12.map(m=>m.gast),1);
+
+    return (
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <div className="stats">
+          <KR icon="💸" lbl="Total gastos" val={fmt$(totGastos)} sub={`${fGastos.length} registros`} c="var(--purple)"/>
+          <KR icon="📊" lbl="Categorías activas" val={tipoArr.length} c="var(--cyan)"/>
+          <KR icon="📅" lbl="Prom. mensual" val={fmt$(totGastos/12)} c="var(--yellow)"/>
+          <KR icon="🏆" lbl="Mayor categoría" val={tipoArr[0]?tipoArr[0][0]:"—"} sub={tipoArr[0]?fmt$(tipoArr[0][1]):"—"} c="var(--orange)"/>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+          {/* por categoría */}
+          <div className="card">
+            <div className="card-hdr"><h3>🥧 Gastos por Categoría — {lblPeriodo()}</h3></div>
+            <div style={{padding:"16px 20px"}}>
+              {tipoArr.length===0 ? <div className="empty"><div className="empty-icon">💸</div><p>Sin gastos en el período</p></div>
+              : <>
+                <SegBar items={tipoArr.map(([,v],i)=>({v,c:PAL[i%PAL.length],lbl:""}))} h={14}/>
+                <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:8}}>
+                  {tipoArr.map(([tipo,v],i)=>(
+                    <div key={tipo} style={{display:"flex",alignItems:"center",gap:8}}>
+                      <div style={{width:8,height:8,borderRadius:"50%",background:PAL[i%PAL.length],flexShrink:0}}/>
+                      <div style={{flex:1,fontSize:12}}>{tipo}</div>
+                      <HBar v={v} max={maxG} c={PAL[i%PAL.length]} h={7}/>
+                      <div style={{width:80,textAlign:"right",fontSize:11,fontWeight:700,color:PAL[i%PAL.length]}}>{fmt$(v)}</div>
+                      <div style={{width:30,textAlign:"right",fontSize:10,color:"var(--muted)"}}>{totGastos>0?`${((v/totGastos)*100).toFixed(0)}%`:"—"}</div>
                     </div>
-                    <div style={{fontSize:11,color:"var(--muted)",flex:"0 0 40px",textAlign:"right"}}>{pct}%</div>
-                  </div>
-                );
-              })}
+                  ))}
+                </div>
+              </>}
+            </div>
+          </div>
+
+          {/* por mes */}
+          <div className="card">
+            <div className="card-hdr"><h3>📅 Gastos por Mes — {filtroAnio}</h3></div>
+            <div style={{padding:"16px 20px"}}>
+              {meses12.map((m,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                  <div style={{width:28,fontSize:10,color:"var(--muted)",fontWeight:700}}>{MESES[i].slice(0,3)}</div>
+                  <HBar v={m.gast} max={maxMG} c="var(--purple)" h={10}/>
+                  <div style={{width:80,textAlign:"right",fontSize:10,fontWeight:700,color:"var(--purple)"}}>{m.gast>0?fmt$(m.gast):"—"}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </div>
     );
-  }
-}
-
-
-function AlertsPage({ units, docs, maints }) {
-  const alerts = [];
-  docs.forEach(d => { const u = units.find(u => u.id === d.unidadId); const dy = daysUntil(d.vence); if (dy === null) return; if (dy < 0) alerts.push({ l: "r", title: `DOC VENCIDO — ${d.nombre}`, body: `${u?.num} ${u?.placas}: venció hace ${Math.abs(dy)} días (${d.vence})` }); else if (dy <= 30) alerts.push({ l: "y", title: `DOC PRÓXIMO A VENCER — ${d.nombre}`, body: `${u?.num} ${u?.placas}: vence en ${dy} días (${d.vence})` }) });
-  maints.filter(m => m.realizado === "NO" && m.prioridad === "ALTA").forEach(m => { const u = units.find(u => u.id === m.unidadId); alerts.push({ l: "r", title: "MANTENIMIENTO ALTA PRIORIDAD PENDIENTE", body: `${u?.num} ${u?.placas}: ${m.desc} — Prog: ${m.fechaProg}` }) });
-  units.filter(u => u.estado !== "ACTIVA").forEach(u => { alerts.push({ l: u.estado === "EN TALLER" ? "y" : "r", title: `UNIDAD ${u.estado}`, body: `${u.num} ${u.placas}` }) });
-  return (
-    <div>
-      <div className="stats" style={{ marginBottom: 18 }}>
-        <div className="stat" style={{ "--c": "var(--red)" }}><div className="stat-icon">🚨</div><div className="stat-val">{alerts.filter(a => a.l === "r").length}</div><div className="stat-lbl">Alertas Críticas</div></div>
-        <div className="stat" style={{ "--c": "var(--yellow)" }}><div className="stat-icon">⚠️</div><div className="stat-val">{alerts.filter(a => a.l === "y").length}</div><div className="stat-lbl">Preventivas</div></div>
-        <div className="stat" style={{ "--c": "var(--green)" }}><div className="stat-icon">✅</div><div className="stat-val">{units.filter(u => u.estado === "ACTIVA").length}</div><div className="stat-lbl">Unidades OK</div></div>
-      </div>
-      {alerts.length === 0 ? <div className="card"><div className="empty"><div className="empty-icon">✅</div><p style={{ fontSize: 16 }}>Sin alertas. ¡Flota en orden!</p></div></div> :
-        <div>{alerts.sort((a, b) => (a.l === "r" ? 0 : 1) - (b.l === "r" ? 0 : 1)).map((a, i) => (
-          <div key={i} className={`ab ab-${a.l}`}><span style={{ fontSize: 19, flexShrink: 0 }}>{a.l === "r" ? "🚨" : "⚠️"}</span><div><div style={{ fontWeight: 700, fontSize: 13 }}>{a.title}</div><div style={{ opacity: .9, marginTop: 3, fontSize: 12 }}>{a.body}</div></div></div>
-        ))}</div>}
-    </div>
-  );
-}
-
-function ClientesPage({ clientes, facturas, onAdd, onEdit, onDelete }) {
-  const [q, setQ] = useState("");
-  const [tf, setTf] = useState("TODOS");
-  const [sf, setSf] = useState("TODOS");
-
-  const fil = clientes.filter(c => {
-    const match = (c.nombre + c.rfc + c.nombreCorto).toLowerCase().includes(q.toLowerCase());
-    const tipoMatch = tf === "TODOS" || c.tipo === tf;
-    const statusMatch = sf === "TODOS" || c.status === sf;
-    return match && tipoMatch && statusMatch;
-  });
-
-  // Calcular estadísticas por cliente
-  const getClienteStats = (clienteId) => {
-    const facsCli = facturas.filter(f => f.clienteId === clienteId);
-    const pendientes = facsCli.filter(f => f.status === "PENDIENTE");
-    const totalPendiente = pendientes.reduce((a, f) => a + (Number(f.total) || 0), 0);
-    const totalFacturado = facsCli.reduce((a, f) => a + (Number(f.total) || 0), 0);
-    return { totalFacturado, totalPendiente, numFacturas: facsCli.length };
   };
 
-  const totales = {
-    activos: clientes.filter(c => c.status === "ACTIVO").length,
-    morales: clientes.filter(c => c.tipo === "MORAL").length,
-    fisicas: clientes.filter(c => c.tipo === "FISICA").length,
-  };
+  // ══════════════════════════════════════════════════════════════
+  //  8. NÓMINAS
+  // ══════════════════════════════════════════════════════════════
+  const VistaNominas = () => {
+    const maxOp   = Math.max(...nomPorDriver.map(x=>x.total),1);
+    const maxAdm  = Math.max(...nominasAdmin.map(n=>Number(n.sueldoBruto)||0),1);
+    const totTotal= totNomina+totNominaAdmin;
 
-  return (
-    <div>
-      <div className="card">
-        <div className="card-hdr">
-          <h3>👥 Clientes ({clientes.length})</h3>
-          <div className="row-gap">
-            <div className="sw">
-              <span style={{ color: "var(--muted)" }}>🔍</span>
-              <input 
-                placeholder="Buscar cliente..." 
-                value={q} 
-                onChange={e => setQ(e.target.value)} 
-              />
+    return (
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <div className="stats">
+          <KR icon="👷" lbl="Nómina operadores" val={fmt$(totNomina)} sub={`${nomPorDriver.length} activos`} c="var(--purple)"/>
+          <KR icon="👔" lbl="Nómina admin" val={fmt$(totNominaAdmin)} sub={`${nominasAdmin.length} empleados`} c="var(--cyan)"/>
+          <KR icon="💰" lbl="Total nómina" val={fmt$(totTotal)} c="var(--green)"/>
+          <KR icon="📊" lbl="% sobre ingresos" val={totIngresos>0?`${((totTotal/totIngresos)*100).toFixed(1)}%`:"—"} c="var(--yellow)"/>
+        </div>
+
+        {/* barra comparativa nómina vs ingresos */}
+        <div className="card">
+          <div className="card-hdr"><h3>📊 Nómina vs Ingresos — {lblPeriodo()}</h3></div>
+          <div style={{padding:"16px 20px"}}>
+            <SegBar items={[{v:totTotal,c:"var(--purple)",lbl:"Nómina"},{v:Math.max(totIngresos-totTotal,0),c:"var(--green)",lbl:"Ingreso restante"}]} h={20}/>
+            <div style={{marginTop:10,display:"flex",gap:14,flexWrap:"wrap",fontSize:12}}>
+              <span style={{color:"var(--purple)"}}>■ Nómina: {fmt$(totTotal)} ({totIngresos>0?`${((totTotal/totIngresos)*100).toFixed(0)}%`:"—"})</span>
+              <span style={{color:"var(--green)"}}>■ Margen restante: {fmt$(Math.max(totIngresos-totTotal,0))}</span>
             </div>
-            <button className="btn btn-cyan" onClick={onAdd}>
-              + Nuevo Cliente
-            </button>
           </div>
         </div>
 
-        <div style={{ 
-          padding: "10px 16px", 
-          borderBottom: "1px solid var(--border)",
-          display: "flex",
-          gap: 20,
-          flexWrap: "wrap",
-          alignItems: "center"
-        }}>
-          <div className="ftabs">
-            <span style={{ fontSize: 10, color: "var(--muted)", marginRight: 4, fontWeight: 700 }}>
-              TIPO:
-            </span>
-            {["TODOS", "FISICA", "MORAL"].map(t => (
-              <button 
-                key={t} 
-                className={`ftab${tf === t ? " on" : ""}`} 
-                onClick={() => setTf(t)}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-
-          <div className="ftabs">
-            <span style={{ fontSize: 10, color: "var(--muted)", marginRight: 4, fontWeight: 700 }}>
-              STATUS:
-            </span>
-            {["TODOS", "ACTIVO", "SUSPENDIDO", "BLOQUEADO"].map(s => (
-              <button 
-                key={s} 
-                className={`ftab${sf === s ? " on" : ""}`} 
-                onClick={() => setSf(s)}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="sbar">
-          <span>Total: <strong>{fil.length}</strong></span>
-          <span>Activos: <strong style={{ color: "var(--green)" }}>{totales.activos}</strong></span>
-          <span>Morales: <strong>{totales.morales}</strong></span>
-          <span>Físicas: <strong>{totales.fisicas}</strong></span>
-        </div>
-
-        <div className="card-body">
-          {fil.length === 0 ? (
-            <div className="empty">
-              <div className="empty-icon">👥</div>
-              <p>Sin clientes encontrados</p>
-            </div>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Cliente</th>
-                  <th>RFC</th>
-                  <th>Tipo</th>
-                  <th>Contacto</th>
-                  <th>Crédito</th>
-                  <th>Límite</th>
-                  <th>Facturado</th>
-                  <th>Pendiente</th>
-                  <th>Status</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {fil.map(c => {
-                  const stats = getClienteStats(c.id);
-                  const pctUsado = c.limiteCredito > 0 
-                    ? ((stats.totalPendiente / c.limiteCredito) * 100).toFixed(0) 
-                    : 0;
-                  const colorLimite = pctUsado > 80 ? "var(--red)" : pctUsado > 60 ? "var(--yellow)" : "var(--green)";
-
-                  return (
-                    <tr key={c.id}>
-                      <td>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>
-                          {c.nombreCorto || c.nombre}
-                        </div>
-                        {c.nombreCorto && (
-                          <div style={{ fontSize: 10, color: "var(--muted)" }}>
-                            {c.nombre}
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ 
-                        fontFamily: "monospace", 
-                        fontSize: 11,
-                        color: "var(--muted)" 
-                      }}>
-                        {c.rfc}
-                      </td>
-                      <td>
-                        <Bdg 
-                          c={c.tipo === "MORAL" ? "bp" : "bb"} 
-                          t={c.tipo} 
-                        />
-                      </td>
-                      <td style={{ fontSize: 11 }}>
-                        <div>{c.telefono || "—"}</div>
-                        <div style={{ color: "var(--muted)" }}>
-                          {c.email || "—"}
-                        </div>
-                      </td>
-                      <td style={{ fontSize: 12 }}>
-                        {c.diasCreditoDefault} días
-                      </td>
-                      <td>
-                        <div style={{ fontSize: 11, color: "var(--muted)" }}>
-                          {fmt$(c.limiteCredito)}
-                        </div>
-                        {c.limiteCredito > 0 && stats.totalPendiente > 0 && (
-                          <div style={{ 
-                            fontSize: 10, 
-                            color: colorLimite,
-                            fontWeight: 600 
-                          }}>
-                            {pctUsado}% usado
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ 
-                        fontWeight: 600,
-                        color: "var(--cyan)" 
-                      }}>
-                        {fmt$(stats.totalFacturado)}
-                        <div style={{ 
-                          fontSize: 10, 
-                          color: "var(--muted)",
-                          fontWeight: 400 
-                        }}>
-                          {stats.numFacturas} facturas
-                        </div>
-                      </td>
-                      <td style={{ 
-                        fontWeight: 600,
-                        color: stats.totalPendiente > 0 ? "var(--orange)" : "var(--muted)"
-                      }}>
-                        {fmt$(stats.totalPendiente)}
-                      </td>
-                      <td>
-                        <Bdg 
-                          c={
-                            c.status === "ACTIVO" ? "bg" : 
-                            c.status === "SUSPENDIDO" ? "by" : "br"
-                          } 
-                          t={c.status} 
-                        />
-                      </td>
-                      <td>
-                        <div className="acts">
-                          <button 
-                            className="btn btn-ghost btn-sm" 
-                            onClick={() => onEdit(c)}
-                            title="Editar"
-                          >
-                            ✏️
-                          </button>
-                          <button 
-                            className="btn btn-red btn-sm" 
-                            onClick={() => onDelete(c.id)}
-                            title="Eliminar"
-                          >
-                            🗑
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-
-      {/* Estadísticas resumidas */}
-      <div className="stats">
-        <div className="stat" style={{ "--c": "var(--cyan)" }}>
-          <div className="stat-icon">👥</div>
-          <div className="stat-val">{clientes.length}</div>
-          <div className="stat-lbl">Total Clientes</div>
-          <div className="stat-sub">
-            {totales.activos} activos
-          </div>
-        </div>
-
-        <div className="stat" style={{ "--c": "var(--purple)" }}>
-          <div className="stat-icon">🏢</div>
-          <div className="stat-val">{totales.morales}</div>
-          <div className="stat-lbl">Personas Morales</div>
-          <div className="stat-sub">
-            Con retención 4%
-          </div>
-        </div>
-
-        <div className="stat" style={{ "--c": "var(--green)" }}>
-          <div className="stat-icon">👤</div>
-          <div className="stat-val">{totales.fisicas}</div>
-          <div className="stat-lbl">Personas Físicas</div>
-          <div className="stat-sub">
-            IVA completo
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FacturacionPage({ facturas, clientes, viajes, onAdd, onEdit, onDelete, onMarcarPagada, onTimbrar, canCobrar = true, canCrear = true }) {
-  const can_cobrar = canCobrar;
-  const [q, setQ] = useState("");
-  const [sf, setSf] = useState("TODOS");
-  const [cf, setCf] = useState("TODOS");
-
-  // Actualizar status basado en vencimiento
-  useEffect(() => {
-    facturas.forEach(f => {
-      if (f.status === "PENDIENTE") {
-        const days = daysUntil(f.fechaVencimiento);
-        if (days !== null && days < 0) {
-          // Auto-cambiar a VENCIDA
-          onEdit({ ...f, status: "VENCIDA" });
-        }
-      }
-    });
-  }, [facturas, onEdit]);
-
-  const fil = facturas.filter(f => {
-    const cli = clientes.find(c => c.id === f.clienteId);
-    const match = (f.numeroFactura + f.cliente + f.rfcCliente).toLowerCase().includes(q.toLowerCase());
-    const statusMatch = sf === "TODOS" || f.status === sf;
-    const clienteMatch = cf === "TODOS" || f.clienteId === cf;
-    return match && statusMatch && clienteMatch;
-  });
-
-  // Calcular estadísticas
-  const pendientes = facturas.filter(f => f.status === "PENDIENTE");
-  const vencidas = facturas.filter(f => f.status === "VENCIDA");
-  const porVencer = pendientes.filter(f => {
-    const days = daysUntil(f.fechaVencimiento);
-    return days !== null && days >= 0 && days <= 5;
-  });
-  const pagadas = facturas.filter(f => f.status === "PAGADA");
-
-  const totalPendiente = pendientes.reduce((a, f) => a + (Number(f.total) || 0), 0);
-  const totalVencido = vencidas.reduce((a, f) => a + (Number(f.total) || 0), 0);
-  const totalCobrado = pagadas.reduce((a, f) => a + (Number(f.total) || 0), 0);
-
-  // Calcular días promedio de cobranza
-  const facturasConPago = pagadas.filter(f => f.fechaPago && f.fechaEmision);
-  const diasCobranza = facturasConPago.length > 0
-    ? facturasConPago.reduce((a, f) => {
-        const dias = daysUntil(f.fechaEmision) * -1 - daysUntil(f.fechaPago) * -1;
-        return a + dias;
-      }, 0) / facturasConPago.length
-    : 0;
-
-  return (
-    <div>
-      {/* KPIs */}
-      <div className="stats">
-        <div className="stat" style={{ "--c": "var(--yellow)" }}>
-          <div className="stat-icon">🧾</div>
-          <div className="stat-val sm">{pendientes.length}</div>
-          <div className="stat-lbl">Pendientes</div>
-          <div className="stat-sub">{fmt$(totalPendiente)}</div>
-        </div>
-
-        <div className="stat" style={{ "--c": "var(--red)" }}>
-          <div className="stat-icon">⏰</div>
-          <div className="stat-val sm">{vencidas.length}</div>
-          <div className="stat-lbl">Vencidas</div>
-          <div className="stat-sub">{fmt$(totalVencido)}</div>
-        </div>
-
-        <div className="stat" style={{ "--c": "var(--orange)" }}>
-          <div className="stat-icon">📅</div>
-          <div className="stat-val sm">{porVencer.length}</div>
-          <div className="stat-lbl">Por Vencer (5d)</div>
-          <div className="stat-sub">
-            {porVencer.reduce((a, f) => a + f.total, 0).toLocaleString("es-MX", { style: "currency", currency: "MXN" })}
-          </div>
-        </div>
-
-        <div className="stat" style={{ "--c": "var(--green)" }}>
-          <div className="stat-icon">💰</div>
-          <div className="stat-val sm">{pagadas.length}</div>
-          <div className="stat-lbl">Pagadas</div>
-          <div className="stat-sub">{fmt$(totalCobrado)}</div>
-        </div>
-
-        <div className="stat" style={{ "--c": "var(--cyan)" }}>
-          <div className="stat-icon">💳</div>
-          <div className="stat-val">{Math.round(diasCobranza)}</div>
-          <div className="stat-lbl">Días Prom. Cobranza</div>
-          <div className="stat-sub">DSO</div>
-        </div>
-      </div>
-
-      {/* Tabla principal */}
-      <div className="card">
-        <div className="card-hdr">
-          <h3>🧾 Facturación ({facturas.length})</h3>
-          <div className="row-gap">
-            <div className="sw">
-              <span style={{ color: "var(--muted)" }}>🔍</span>
-              <input 
-                placeholder="Buscar factura..." 
-                value={q} 
-                onChange={e => setQ(e.target.value)} 
-              />
-            </div>
-            {canCrear && onAdd && <button className="btn btn-cyan" onClick={onAdd}>+ Nueva Factura</button>}
-          </div>
-        </div>
-
-        <div style={{ 
-          padding: "10px 16px", 
-          borderBottom: "1px solid var(--border)",
-          display: "flex",
-          gap: 20,
-          flexWrap: "wrap"
-        }}>
-          <div className="ftabs">
-            <span style={{ fontSize: 10, color: "var(--muted)", marginRight: 4, fontWeight: 700 }}>
-              STATUS:
-            </span>
-            {["TODOS", "PENDIENTE", "VENCIDA", "PAGADA", "CANCELADA"].map(s => (
-              <button 
-                key={s} 
-                className={`ftab${sf === s ? " on" : ""}`} 
-                onClick={() => setSf(s)}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-
-          <div className="ftabs">
-            <span style={{ fontSize: 10, color: "var(--muted)", marginRight: 4, fontWeight: 700 }}>
-              CLIENTE:
-            </span>
-            <button className={`ftab${cf === "TODOS" ? " on" : ""}`} onClick={() => setCf("TODOS")}>
-              TODOS
-            </button>
-            {clientes.slice(0, 5).map(c => (
-              <button 
-                key={c.id} 
-                className={`ftab${cf === c.id ? " on" : ""}`} 
-                onClick={() => setCf(c.id)}
-              >
-                {c.nombreCorto || c.nombre}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="sbar">
-          <span>Total: <strong>{fil.length}</strong></span>
-          <span>Pendiente: <strong style={{ color: "var(--orange)" }}>{fmt$(totalPendiente)}</strong></span>
-          <span>Vencido: <strong style={{ color: "var(--red)" }}>{fmt$(totalVencido)}</strong></span>
-          <span>Cobrado: <strong style={{ color: "var(--green)" }}>{fmt$(totalCobrado)}</strong></span>
-        </div>
-
-        <div className="card-body">
-          {fil.length === 0 ? (
-            <div className="empty">
-              <div className="empty-icon">🧾</div>
-              <p>Sin facturas encontradas</p>
-            </div>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Folio</th>
-                  <th>Cliente</th>
-                  <th>Tipo</th>
-                  <th>Emisión</th>
-                  <th>Vencimiento</th>
-                  <th>Subtotal</th>
-                  <th>IVA</th>
-                  <th>Ret. IVA</th>
-                  <th>Total</th>
-                  <th>Status</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {fil.map(f => {
-                  const days = daysUntil(f.fechaVencimiento);
-                  const statusColor = 
-                    f.status === "PAGADA" ? "var(--green)" :
-                    f.status === "VENCIDA" ? "var(--red)" :
-                    days <= 5 ? "var(--orange)" : "var(--yellow)";
-
-                  return (
-                    <tr key={f.id}>
-                      <td style={{ 
-                        fontFamily: "var(--font-hd)", 
-                        fontSize: 14,
-                        fontWeight: 700 
-                      }}>
-                        {f.serie}-{f.numeroFactura}
-                      </td>
-                      <td>
-                        <div style={{ fontWeight: 600, fontSize: 12 }}>
-                          {f.cliente}
-                        </div>
-                        <div style={{ 
-                          fontSize: 10, 
-                          color: "var(--muted)",
-                          fontFamily: "monospace" 
-                        }}>
-                          {f.rfcCliente}
-                        </div>
-                      </td>
-                      <td>
-                        <Bdg 
-                          c={f.tipoCliente === "MORAL" ? "bp" : "bb"} 
-                          t={f.tipoCliente} 
-                        />
-                      </td>
-                      <td style={{ fontSize: 12 }}>{f.fechaEmision}</td>
-                      <td style={{ fontSize: 12, fontWeight: 600, color: statusColor }}>
-                        {f.fechaVencimiento}
-                        {days !== null && f.status === "PENDIENTE" && (
-                          <div style={{ fontSize: 10 }}>
-                            {days >= 0 ? `${days}d restantes` : `${Math.abs(days)}d vencida`}
-                          </div>
-                        )}
-                      </td>
-                      <td>{fmt$(f.subtotal)}</td>
-                      <td style={{ color: "var(--green)" }}>+{fmt$(f.iva)}</td>
-                      <td style={{ color: "var(--red)" }}>
-                        {f.retencionIVA > 0 ? `-${fmt$(f.retencionIVA)}` : "—"}
-                      </td>
-                      <td style={{ 
-                        fontWeight: 700,
-                        fontSize: 13,
-                        fontFamily: "var(--font-hd)" 
-                      }}>
-                        {fmt$(f.total)}
-                      </td>
-                      <td>
-                        <Bdg 
-                          c={
-                            f.status === "PAGADA" ? "bg" :
-                            f.status === "VENCIDA" ? "br" :
-                            f.status === "CANCELADA" ? "bm" : "by"
-                          } 
-                          t={f.status} 
-                        />
-                      </td>
-                      <td>
-                        <div className="acts">
-                          {f.status === "PENDIENTE" && (
-                            <button 
-                              className="btn btn-green btn-xs" 
-                              onClick={() => onMarcarPagada(f)}
-                              title="Marcar como pagada"
-                            >
-                              ✓
-                            </button>
-                          )}
-                          <button 
-                            className="btn btn-ghost btn-sm" 
-                            onClick={() => onEdit(f)}
-                            title="Editar"
-                          >
-                            ✏️
-                          </button>
-                          <button 
-                            className="btn btn-red btn-sm" 
-                            onClick={() => onDelete(f.id)}
-                            title="Eliminar"
-                          >
-                            🗑
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ══════════════════════════════════════════════════════════════
-// MAIN APP
-// ══════════════════════════════════════════════════════════════
-
-// ══════════════════════════════════════════════════════════════════════════════
-// MÓDULO GPS — Integración con Traccar (demo o servidor propio)
-// API: https://demo.traccar.org/api  |  Docs: https://www.traccar.org/traccar-api/
-// ══════════════════════════════════════════════════════════════════════════════
-
-// Coordenadas → URL de OpenStreetMap estático
-const osmUrl = (lat, lng, zoom = 14) =>
-  `https://www.openstreetmap.org/export/embed.html?bbox=${lng - 0.05},${lat - 0.03},${lng + 0.05},${lat + 0.03}&layer=mapnik&marker=${lat},${lng}`;
-
-// Status del vehículo basado en velocidad y tiempo
-const getVehicleStatus = (pos) => {
-  if (!pos) return { lbl: "Sin señal", color: "var(--muted)", icon: "⚫" };
-  const secsAgo = (Date.now() - new Date(pos.fixTime || pos.deviceTime).getTime()) / 1000;
-  if (secsAgo > 3600) return { lbl: "Sin señal", color: "var(--muted)", icon: "⚫" };
-  if ((pos.speed || 0) > 5) return { lbl: `En ruta ${Math.round(pos.speed)} km/h`, color: "var(--green)", icon: "🟢" };
-  if (secsAgo < 300) return { lbl: "Detenido", color: "var(--yellow)", icon: "🟡" };
-  return { lbl: "Inactivo", color: "var(--orange)", icon: "🟠" };
-};
-
-const fmtTime = (iso) => {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return d.toLocaleString("es-MX", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-};
-
-// ── Componente mapa embebido (OpenStreetMap iframe) ───────────────────────────
-function MapaUnidad({ lat, lng, nombre, zoom = 13 }) {
-  if (!lat || !lng) return (
-    <div style={{ height: 220, background: "var(--bg2)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)", fontSize: 13, border: "1px solid var(--border)" }}>
-      📍 Sin posición disponible
-    </div>
-  );
-  const url = `https://www.openstreetmap.org/export/embed.html?bbox=${lng-0.08},${lat-0.05},${lng+0.08},${lat+0.05}&layer=mapnik&marker=${lat},${lng}`;
-  return (
-    <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)" }}>
-      <iframe src={url} width="100%" height={220} style={{ border: "none", display: "block" }} title={`Mapa ${nombre}`} />
-      <div style={{ padding: "6px 10px", background: "var(--bg2)", fontSize: 11, color: "var(--muted)", display: "flex", gap: 10 }}>
-        <span>📍 {lat.toFixed(5)}, {lng.toFixed(5)}</span>
-        <a href={`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=15/${lat}/${lng}`} target="_blank" rel="noreferrer" style={{ color: "var(--cyan)", textDecoration: "none" }}>Ver en mapa completo ↗</a>
-      </div>
-    </div>
-  );
-}
-
-// ── Modal detalle de unidad GPS ───────────────────────────────────────────────
-function FuelGauge({ pct, litros, capacidad }) {
-  // Barra visual de nivel de combustible
-  const color = pct > 50 ? "var(--green)" : pct > 25 ? "var(--yellow)" : "var(--red)";
-  return (
-    <div>
-      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4, fontSize:11 }}>
-        <span style={{ color:"var(--muted)" }}>Nivel de combustible</span>
-        <span style={{ fontWeight:700, color }}>{Math.round(pct)}%{litros!=null ? ` — ${litros.toFixed(0)}L` : ""}{capacidad ? ` / ${capacidad}L` : ""}</span>
-      </div>
-      <div style={{ height:14, background:"var(--bg3)", borderRadius:7, overflow:"hidden", border:"1px solid var(--border)" }}>
-        <div style={{ height:"100%", width:`${Math.min(pct,100)}%`, background:color, borderRadius:7, transition:"width .4s" }} />
-      </div>
-      <div style={{ display:"flex", justifyContent:"space-between", fontSize:9, color:"var(--muted)", marginTop:2 }}>
-        <span>Vacío</span><span>1/4</span><span>1/2</span><span>3/4</span><span>Lleno</span>
-      </div>
-    </div>
-  );
-}
-
-function GpsUnitModal({ device, position, unit, fuelConfig, fuelHistory, onClose }) {
-  const st = getVehicleStatus(position);
-  const hasFuel = fuelConfig?.activo;
-
-  // Calcular nivel combustible desde atributos Traccar
-  const fuelRaw = position?.attributes?.fuel ?? position?.attributes?.fuelLevel ?? null;
-  const fuelPct = fuelRaw != null ? (fuelRaw > 1 ? fuelRaw : fuelRaw * 100) : null;
-  const capacidad = fuelConfig?.capacidadLitros || null;
-  const litros = fuelPct != null && capacidad ? (fuelPct / 100) * capacidad : null;
-
-  // Detectar caída brusca en historial (últimas 2 lecturas)
-  const caida = fuelHistory && fuelHistory.length >= 2
-    ? fuelHistory[fuelHistory.length - 2].pct - fuelHistory[fuelHistory.length - 1].pct
-    : 0;
-  const posibleRobo = caida > 10; // más de 10% de caída brusca sin recarga
-
-  return (
-    <div className="modal-ov" onClick={onClose}>
-      <div className="modal wide" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
-        <div className="mhdr" style={{ borderBottom: `3px solid ${st.color}` }}>
-          <h3>{st.icon} {device?.name || unit?.num || "Unidad"}</h3>
-          <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-            {hasFuel && <span style={{ fontSize:11, padding:"3px 8px", borderRadius:10, background:"rgba(0,153,204,.15)", color:"var(--cyan)", border:"1px solid var(--cyan)" }}>⛽ Sensor combustible</span>}
-            <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
-          </div>
-        </div>
-        <div className="mbody">
-          <MapaUnidad lat={position?.latitude} lng={position?.longitude} nombre={device?.name} />
-
-          {/* Alerta robo combustible */}
-          {hasFuel && posibleRobo && (
-            <div style={{ margin:"12px 0", padding:"12px 16px", background:"rgba(220,50,50,.12)", border:"2px solid var(--red)", borderRadius:10, display:"flex", gap:12, alignItems:"center" }}>
-              <span style={{ fontSize:28 }}>🚨</span>
-              <div>
-                <div style={{ fontWeight:700, color:"var(--red)", fontSize:13 }}>¡Posible extracción de combustible!</div>
-                <div style={{ fontSize:12, color:"var(--muted)", marginTop:2 }}>
-                  Caída de {caida.toFixed(1)}% ({capacidad ? `~${(caida/100*capacidad).toFixed(0)}L` : "nivel"}) detectada sin carga de combustible registrada.
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+          {/* operadores */}
+          <div className="card">
+            <div className="card-hdr"><h3>👷 Operadores — Desglose</h3></div>
+            <div style={{padding:"16px 20px"}}>
+              {nomPorDriver.length===0 ? <div className="empty"><p>Sin operadores con nómina</p></div>
+              : nomPorDriver.map(x=>(
+                <div key={x.driver.id} style={{marginBottom:12}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:12}}>
+                    <span style={{fontWeight:700}}>{x.driver.nombre}</span>
+                    <span style={{color:"var(--purple)",fontWeight:700}}>{fmt$(x.total)}</span>
+                  </div>
+                  <SegBar items={[{v:x.sueldo,c:"var(--cyan)",lbl:"Base"},{v:x.comision,c:"var(--purple)",lbl:"Comisión"}]} h={8}/>
+                  <div style={{fontSize:9,color:"var(--muted)",marginTop:2}}>Base {fmt$(x.sueldo)} + Comisión {x.driver.porcentajeViaje||0}% = {fmt$(x.comision)} · {x.viajesD.length}v</div>
                 </div>
+              ))}
+              <div style={{borderTop:"1px solid var(--border)",paddingTop:8,display:"flex",justifyContent:"space-between",fontSize:12}}>
+                <strong>Total operadores</strong><strong style={{color:"var(--purple)"}}>{fmt$(totNomina)}</strong>
               </div>
             </div>
-          )}
-
-          {/* Indicador combustible */}
-          {hasFuel && fuelPct != null && (
-            <div style={{ padding:"14px 16px", background:"var(--bg2)", borderRadius:10, border:"1px solid var(--border)", margin:"12px 0" }}>
-              <FuelGauge pct={fuelPct} litros={litros} capacidad={capacidad} />
-              {fuelHistory && fuelHistory.length > 1 && (
-                <div style={{ marginTop:12 }}>
-                  <div style={{ fontSize:11, color:"var(--muted)", marginBottom:6 }}>Historial reciente del turno</div>
-                  <div style={{ display:"flex", alignItems:"flex-end", gap:3, height:40 }}>
-                    {fuelHistory.slice(-12).map((h, i) => {
-                      const isRobo = i > 0 && (fuelHistory.slice(-12)[i-1].pct - h.pct) > 10;
-                      const isCarga = i > 0 && (h.pct - fuelHistory.slice(-12)[i-1].pct) > 5;
-                      const barColor = isRobo ? "var(--red)" : isCarga ? "var(--cyan)" : "var(--green)";
-                      return (
-                        <div key={i} title={`${Math.round(h.pct)}% — ${h.hora||""}`}
-                          style={{ flex:1, height:`${Math.max(4, h.pct * 0.4)}px`, background:barColor, borderRadius:2, transition:"height .3s" }} />
-                      );
-                    })}
-                  </div>
-                  <div style={{ display:"flex", justifyContent:"space-between", fontSize:9, color:"var(--muted)", marginTop:2 }}>
-                    <span>Hace 2h</span><span>Ahora</span>
-                  </div>
-                  <div style={{ display:"flex", gap:12, fontSize:10, marginTop:6 }}>
-                    <span style={{ color:"var(--green)" }}>■ Normal</span>
-                    <span style={{ color:"var(--cyan)" }}>■ Carga</span>
-                    <span style={{ color:"var(--red)" }}>■ Caída brusca</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          {hasFuel && fuelPct == null && (
-            <div style={{ padding:"10px 14px", background:"var(--bg2)", borderRadius:8, border:"1px dashed var(--border)", fontSize:12, color:"var(--muted)", margin:"8px 0" }}>
-              ⛽ Sensor de combustible activo — sin datos del dispositivo en este momento
-            </div>
-          )}
-
-          {/* Grid de datos GPS */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginTop: hasFuel ? 4 : 14 }}>
-            {[
-              ["📡 Status", <span style={{ color: st.color, fontWeight: 700 }}>{st.lbl}</span>],
-              ["🚀 Velocidad", `${Math.round(position?.speed || 0)} km/h`],
-              ["🧭 Dirección", position?.course != null ? `${Math.round(position.course)}°` : "—"],
-              ["🔋 Señal GPS", position?.valid ? "✅ Válida" : "⚠️ Baja"],
-              ["🕐 Última posición", fmtTime(position?.fixTime)],
-              ["📶 Último reporte", fmtTime(position?.deviceTime)],
-              ["🛣️ Odómetro GPS", position?.attributes?.totalDistance ? `${(position.attributes.totalDistance / 1000).toFixed(1)} km` : "—"],
-              ["⚡ Ignición", position?.attributes?.ignition != null ? (position.attributes.ignition ? "🟢 Encendido" : "🔴 Apagado") : "—"],
-            ].map(([lbl, val]) => (
-              <div key={lbl} style={{ padding: "10px 14px", background: "var(--bg2)", borderRadius: 8, border: "1px solid var(--border)" }}>
-                <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>{lbl}</div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>{val}</div>
-              </div>
-            ))}
           </div>
-          {unit && (
-            <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--bg2)", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12 }}>
-              <strong>Unidad en Fleet Pro:</strong> {unit.num} — {unit.marca} {unit.modelo} {unit.año} — Placas: {unit.placas}
+
+          {/* admin */}
+          <div className="card">
+            <div className="card-hdr"><h3>👔 Personal Administrativo</h3></div>
+            <div style={{padding:"16px 20px"}}>
+              {nominasAdmin.length===0 ? <div className="empty"><p>Sin nómina administrativa</p></div>
+              : nominasAdmin.map(n=>(
+                <div key={n.id} style={{marginBottom:12}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:12}}>
+                    <span style={{fontWeight:700}}>{n.nombre} <span style={{color:"var(--muted)",fontSize:10}}>{n.puesto}</span></span>
+                    <span style={{color:"var(--cyan)",fontWeight:700}}>{fmt$(n.sueldoBruto)}</span>
+                  </div>
+                  <HBar v={Number(n.sueldoBruto)||0} max={maxAdm} c="var(--cyan)" h={8}/>
+                </div>
+              ))}
+              <div style={{borderTop:"1px solid var(--border)",paddingTop:8,display:"flex",justifyContent:"space-between",fontSize:12}}>
+                <strong>Total administrativos</strong><strong style={{color:"var(--cyan)"}}>{fmt$(totNominaAdmin)}</strong>
+              </div>
             </div>
-          )}
-        </div>
-        <div className="mftr">
-          <button className="btn btn-ghost" onClick={onClose}>Cerrar</button>
-          {position?.latitude && (
-            <a className="btn btn-cyan" href={`https://www.google.com/maps?q=${position.latitude},${position.longitude}`} target="_blank" rel="noreferrer">
-              🗺️ Abrir en Google Maps
-            </a>
-          )}
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-// ── Configuración Traccar Modal ───────────────────────────────────────────────
-function TraccarConfigModal({ config, onSave, onClose }) {
-  const [f, setF] = useState({ ...config });
-  const [testStatus, setTestStatus] = useState(null); // null | "loading" | "ok" | "error"
-  const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
-
-  const doTest = async () => {
-    setTestStatus("loading");
-    try {
-      const url = `${f.serverUrl.replace(/\/$/, "")}/api/server`;
-      const headers = { "Authorization": "Basic " + btoa(`${f.email}:${f.password}`) };
-      const r = await fetch(url, { headers });
-      if (r.ok) { setTestStatus("ok"); }
-      else { setTestStatus("error"); }
-    } catch { setTestStatus("error"); }
+    );
   };
 
-  return (
-    <div className="modal-ov" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="mhdr"><h3>⚙️ Configuración GPS — Traccar</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
-        <div className="mbody">
-          <div style={{ padding: "12px 16px", background: "rgba(0,153,204,.08)", border: "1px solid var(--cyan)", borderRadius: 8, fontSize: 12, marginBottom: 16 }}>
-            <strong>🧪 Modo demo:</strong> Usa el servidor público de Traccar para probar. Escribe:<br/>
-            URL: <code style={{ background: "var(--bg3)", padding: "1px 5px", borderRadius: 4 }}>https://demo.traccar.org</code><br/>
-            Email: <code style={{ background: "var(--bg3)", padding: "1px 5px", borderRadius: 4 }}>demo</code> &nbsp; Contraseña: <code style={{ background: "var(--bg3)", padding: "1px 5px", borderRadius: 4 }}>demo</code>
-          </div>
-          <div className="fg">
-            <div className="field s2">
-              <label>URL del servidor Traccar</label>
-              <input value={f.serverUrl} onChange={ch("serverUrl")} placeholder="https://demo.traccar.org" />
-            </div>
-            <div className="field">
-              <label>Email / Usuario</label>
-              <input value={f.email} onChange={ch("email")} placeholder="demo" />
-            </div>
-            <div className="field">
-              <label>Contraseña</label>
-              <input value={f.password} onChange={ch("password")} type="password" placeholder="demo" />
-            </div>
-            <div className="field s2">
-              <label>Intervalo de actualización</label>
-              <select value={f.intervalo} onChange={ch("intervalo")}>
-                <option value="15">Cada 15 segundos (tiempo real)</option>
-                <option value="30">Cada 30 segundos</option>
-                <option value="60">Cada 1 minuto</option>
-                <option value="300">Cada 5 minutos</option>
-              </select>
-            </div>
-          </div>
-          {testStatus === "loading" && <div style={{ color: "var(--cyan)", fontSize: 12, marginTop: 8 }}>⏳ Probando conexión...</div>}
-          {testStatus === "ok" && <div style={{ color: "var(--green)", fontSize: 12, marginTop: 8 }}>✅ Conexión exitosa con el servidor Traccar</div>}
-          {testStatus === "error" && <div style={{ color: "var(--red)", fontSize: 12, marginTop: 8 }}>❌ No se pudo conectar. Verifica la URL y credenciales.</div>}
+  // ══════════════════════════════════════════════════════════════
+  //  9. ANÁLISIS DE VIAJES
+  // ══════════════════════════════════════════════════════════════
+  const VistaViajes = () => {
+    const destMap = {};
+    fTrips.forEach(t=>{ const d=t.destino||"Sin destino"; if (!destMap[d]) destMap[d]={n:0,ing:0}; destMap[d].n++; destMap[d].ing+=(Number(t.costoOfrecido)||0); });
+    const destArr    = Object.entries(destMap).sort((a,b)=>b[1].ing-a[1].ing).slice(0,10);
+    const maxDest    = Math.max(...destArr.map(([,v])=>v.ing),1);
+
+    const maxViajMes = Math.max(...meses12.map(m=>m.viajes+m.ext),1);
+    const maxIngMes  = Math.max(...meses12.map(m=>m.ing),1);
+
+    return (
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <div className="stats">
+          <KR icon="🚛" lbl="Viajes propios" val={fTripsProp.length} sub={fmt$(fTripsProp.reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0))} c="var(--cyan)"/>
+          <KR icon="🔄" lbl="Logística externa" val={fTripsExt.length} sub={fmt$(fTripsExt.reduce((a,t)=>a+(Number(t.costoPagar)||0),0))} c="var(--purple)"/>
+          <KR icon="📦" lbl="Total viajes" val={fTrips.length} sub={fmt$(totIngresos)} c="var(--green)"/>
+          <KR icon="📍" lbl="Destinos únicos" val={[...new Set(fTrips.map(t=>t.destino).filter(Boolean))].length} c="var(--orange)"/>
+          <KR icon="📈" lbl="Ingreso promedio" val={fTrips.length>0?fmt$(totIngresos/fTrips.length):"—"} c="var(--yellow)"/>
         </div>
-        <div className="mftr">
-          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-ghost" onClick={doTest}>🔌 Probar conexión</button>
-          <button className="btn btn-cyan" onClick={() => { onSave(f); onClose(); }}>💾 Guardar</button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-// ── Vista mapa general (todos los vehículos) ──────────────────────────────────
-function MapaFlota({ devices, positions, units, onSelectDevice }) {
-  // Usamos un mapa OpenStreetMap con todos los markers via URL
-  const activos = devices.filter(d => positions[d.id]);
-
-  // Construir URL de mapa con múltiples markers (OpenStreetMap no soporta múltiples markers nativamente)
-  // Usamos el primero como centro y mostramos cards con mini-mapa por cada uno
-  if (activos.length === 0) return (
-    <div style={{ height: 200, background: "var(--bg2)", borderRadius: 12, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, border: "1px solid var(--border)" }}>
-      <span style={{ fontSize: 32 }}>📡</span>
-      <div style={{ color: "var(--muted)", fontSize: 13 }}>Sin vehículos con posición activa</div>
-    </div>
-  );
-
-  // Calcular centro del mapa
-  const lats = activos.map(d => positions[d.id].latitude).filter(Boolean);
-  const lngs = activos.map(d => positions[d.id].longitude).filter(Boolean);
-  const centerLat = lats.reduce((a, b) => a + b, 0) / lats.length;
-  const centerLng = lngs.reduce((a, b) => a + b, 0) / lngs.length;
-
-  // Calcular bbox para incluir todos los vehículos
-  const minLat = Math.min(...lats) - 0.05;
-  const maxLat = Math.max(...lats) + 0.05;
-  const minLng = Math.min(...lngs) - 0.08;
-  const maxLng = Math.max(...lngs) + 0.08;
-
-  const iframeSrc = `https://www.openstreetmap.org/export/embed.html?bbox=${minLng},${minLat},${maxLng},${maxLat}&layer=mapnik`;
-
-  return (
-    <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", position: "relative" }}>
-      <iframe src={iframeSrc} width="100%" height={320} style={{ border: "none", display: "block" }} title="Mapa flota" />
-      {/* Overlay con lista de unidades activas */}
-      <div style={{ position: "absolute", top: 10, right: 10, display: "flex", flexDirection: "column", gap: 4, maxHeight: 280, overflowY: "auto" }}>
-        {activos.slice(0, 8).map(d => {
-          const pos = positions[d.id];
-          const st = getVehicleStatus(pos);
-          return (
-            <button key={d.id} onClick={() => onSelectDevice(d)}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 8, background: "rgba(10,12,20,0.88)", border: `1px solid ${st.color}`, cursor: "pointer", color: "var(--text)", fontSize: 11, textAlign: "left", backdropFilter: "blur(4px)" }}>
-              <span>{st.icon}</span>
-              <span style={{ fontWeight: 700 }}>{d.name}</span>
-              <span style={{ color: st.color, fontSize: 10 }}>{Math.round(pos?.speed || 0)} km/h</span>
-            </button>
-          );
-        })}
-        {activos.length > 8 && <div style={{ fontSize: 10, color: "var(--muted)", padding: "4px 8px", background: "rgba(10,12,20,.8)", borderRadius: 6 }}>+{activos.length - 8} más</div>}
-      </div>
-      <div style={{ padding: "6px 12px", background: "var(--bg2)", fontSize: 11, color: "var(--muted)" }}>
-        Mostrando área general — haz clic en una unidad para ver su posición exacta
-      </div>
-    </div>
-  );
-}
-
-// ── Página principal GPS ──────────────────────────────────────────────────────
-function GeocercaModal({ geocerca, devices, onSave, onClose }) {
-  const COLORS = ["#0099CC","#00C864","#FF6B35","#C41E3A","#9B59B6","#F39C12","#1ABC9C","#E74C3C"];
-  const [f, setF] = useState(geocerca || {
-    id: "gc_"+Date.now(), nombre: "", lat: 25.6866, lng: -100.3161, radio: 500,
-    deviceIds: [], alertEntrada: true, alertSalida: true, color: COLORS[0]
-  });
-  const upd = (k,v) => setF(p=>({...p,[k]:v}));
-  const toggleDevice = id => setF(p=>({...p,deviceIds:p.deviceIds.includes(id)?p.deviceIds.filter(x=>x!==id):[...p.deviceIds,id]}));
-  const inp = {padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",fontSize:13,width:"100%"};
-  return (
-    <div className="modal-ov" onClick={onClose}>
-      <div className="modal wide" style={{maxWidth:560}} onClick={e=>e.stopPropagation()}>
-        <div className="mhdr"><h3>🛡️ {geocerca?"Editar":"Nueva"} Geocerca</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
-        <div className="mbody" style={{display:"flex",flexDirection:"column",gap:14}}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-            <div style={{gridColumn:"1/-1"}}>
-              <label style={{fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",display:"block",marginBottom:4}}>Nombre de la Geocerca *</label>
-              <input value={f.nombre} onChange={e=>upd("nombre",e.target.value)} placeholder="Ej: Patio central, Bodega cliente A..." style={inp}/>
-            </div>
-            <div>
-              <label style={{fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",display:"block",marginBottom:4}}>Latitud</label>
-              <input type="number" step="0.0001" value={f.lat} onChange={e=>upd("lat",Number(e.target.value))} style={inp}/>
-            </div>
-            <div>
-              <label style={{fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",display:"block",marginBottom:4}}>Longitud</label>
-              <input type="number" step="0.0001" value={f.lng} onChange={e=>upd("lng",Number(e.target.value))} style={inp}/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+          {/* viajes y ingresos por mes */}
+          <div className="card">
+            <div className="card-hdr"><h3>📅 Viajes e Ingresos por Mes — {filtroAnio}</h3></div>
+            <div style={{padding:"16px 20px"}}>
+              {meses12.map((m,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                  <div style={{width:28,fontSize:10,color:"var(--muted)",fontWeight:700}}>{MESES[i].slice(0,3)}</div>
+                  <div style={{flex:1,display:"flex",flexDirection:"column",gap:2}}>
+                    <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                      <HBar v={m.viajes} max={maxViajMes} c="var(--cyan)" h={7}/>
+                      <span style={{width:36,fontSize:9,color:"var(--cyan)"}}>{m.viajes>0?`${m.viajes}P`:""}</span>
+                      <HBar v={m.ext} max={maxViajMes} c="var(--purple)" h={7}/>
+                      <span style={{width:30,fontSize:9,color:"var(--purple)"}}>{m.ext>0?`${m.ext}E`:""}</span>
+                    </div>
+                    <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                      <HBar v={m.ing} max={maxIngMes} c="var(--green)" h={6}/>
+                      <span style={{width:66,textAlign:"right",fontSize:9,color:"var(--green)",fontWeight:700}}>{m.ing>0?fmt$(m.ing):"—"}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div style={{display:"flex",gap:10,marginTop:4}}>
+                <span style={{fontSize:10,color:"var(--cyan)"}}>■ Propios</span>
+                <span style={{fontSize:10,color:"var(--purple)"}}>■ Externos</span>
+                <span style={{fontSize:10,color:"var(--green)"}}>■ Ingresos</span>
+              </div>
             </div>
           </div>
 
-          <div>
-            <label style={{fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",display:"block",marginBottom:4}}>Radio de la zona: <strong style={{color:"var(--cyan)"}}>{f.radio} metros</strong></label>
-            <input type="range" min="100" max="10000" step="100" value={f.radio} onChange={e=>upd("radio",Number(e.target.value))} style={{width:"100%",accentColor:"var(--cyan)"}}/>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"var(--muted)"}}>
-              <span>100m</span><span>1km</span><span>5km</span><span>10km</span>
-            </div>
-          </div>
-
-          <div style={{padding:"12px 14px",background:"var(--bg2)",borderRadius:8,border:"1px solid var(--border)"}}>
-            <div style={{fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",marginBottom:8}}>Vista previa en mapa</div>
-            <iframe
-              title="geocerca-preview"
-              width="100%" height="200"
-              style={{border:"none",borderRadius:8}}
-              src={`https://www.openstreetmap.org/export/embed.html?bbox=${f.lng-.02},${f.lat-.015},${f.lng+.02},${f.lat+.015}&layer=mapnik&marker=${f.lat},${f.lng}`}
-            />
-            <div style={{fontSize:11,color:"var(--muted)",marginTop:6}}>📍 Centro: {f.lat.toFixed(4)}, {f.lng.toFixed(4)} · Radio visual aproximado</div>
-          </div>
-
-          <div>
-            <label style={{fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",display:"block",marginBottom:8}}>Color de identificación</label>
-            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-              {COLORS.map(c=>(
-                <button key={c} onClick={()=>upd("color",c)}
-                  style={{width:28,height:28,borderRadius:"50%",background:c,border:f.color===c?"3px solid var(--text)":"2px solid transparent",cursor:"pointer"}}/>
+          {/* top destinos */}
+          <div className="card">
+            <div className="card-hdr"><h3>🗺️ Top 10 Destinos por Ingreso</h3></div>
+            <div style={{padding:"16px 20px"}}>
+              {destArr.length===0 ? <div className="empty"><div className="empty-icon">🗺️</div><p>Sin viajes en el período</p></div>
+              : destArr.map(([dest,{n,ing}],i)=>(
+                <div key={dest} style={{marginBottom:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:12}}>
+                    <span style={{fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:150}}>📍 {dest}</span>
+                    <span style={{color:"var(--green)",fontWeight:700,flexShrink:0,marginLeft:8}}>{fmt$(ing)}</span>
+                  </div>
+                  <HBar v={ing} max={maxDest} c={PAL[i%PAL.length]} h={8}/>
+                  <div style={{fontSize:9,color:"var(--muted)",marginTop:2}}>{n} viaje{n!==1?"s":""} · {totIngresos>0?`${((ing/totIngresos)*100).toFixed(0)}% del ingreso`:""}</div>
+                </div>
               ))}
             </div>
           </div>
-
-          <div>
-            <label style={{fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",display:"block",marginBottom:8}}>Alertas</label>
-            <div style={{display:"flex",gap:16}}>
-              <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13}}>
-                <input type="checkbox" checked={f.alertEntrada} onChange={e=>upd("alertEntrada",e.target.checked)} style={{width:16,height:16,accentColor:"var(--green)"}}/>
-                ⬇️ Alerta al <strong>entrar</strong>
-              </label>
-              <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13}}>
-                <input type="checkbox" checked={f.alertSalida} onChange={e=>upd("alertSalida",e.target.checked)} style={{width:16,height:16,accentColor:"var(--orange)"}}/>
-                ⬆️ Alerta al <strong>salir</strong>
-              </label>
-            </div>
-          </div>
-
-          <div>
-            <label style={{fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",display:"block",marginBottom:8}}>Unidades asignadas a esta geocerca</label>
-            <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-              {devices.length===0
-                ? <span style={{fontSize:12,color:"var(--muted)"}}>Sin dispositivos GPS conectados</span>
-                : devices.map(d=>{
-                  const sel = f.deviceIds.includes(d.id);
-                  return (
-                    <button key={d.id} onClick={()=>toggleDevice(d.id)}
-                      style={{padding:"6px 12px",borderRadius:8,border:`1.5px solid ${sel?"var(--cyan)":"var(--border)"}`,background:sel?"rgba(0,153,204,.12)":"var(--bg2)",color:sel?"var(--cyan)":"var(--text)",fontSize:12,cursor:"pointer",fontWeight:sel?700:400}}>
-                      {sel?"✅ ":""}{d.name}
-                    </button>
-                  );
-                })
-              }
-            </div>
-          </div>
-
-          <div style={{padding:"10px 14px",background:"rgba(0,153,204,.07)",borderRadius:8,border:"1px solid var(--cyan)",fontSize:11,color:"var(--muted)"}}>
-            💡 <strong>Nota:</strong> La detección de geocercas se procesa en Fleet Pro usando las coordenadas de Traccar. Para que Traccar envíe alertas nativas, también puedes configurar las geocercas directamente en tu servidor Traccar. El historial de Fleet Pro se registra automáticamente durante el auto-refresh.
-          </div>
-        </div>
-        <div className="mftr">
-          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-cyan" onClick={()=>{ if(!f.nombre.trim()) return alert("El nombre es requerido"); onSave(f); }}>💾 Guardar Geocerca</button>
         </div>
       </div>
+    );
+  };
+
+  // ══════════════════════════════════════════════════════════════
+  //  10. PROVEEDORES
+  // ══════════════════════════════════════════════════════════════
+  const VistaProveedores = () => {
+    const porProv = proveedores.map(p=>{
+      const gm   = maints.filter(m=>m.proveedorId===p.id).reduce((a,m)=>a+(Number(m.costoRef)||0)+(Number(m.costoMO)||0),0);
+      const gg   = gastos.filter(g=>g.proveedorId===p.id).reduce((a,g)=>a+(Number(g.monto)||0),0);
+      const ge   = externos.filter(e=>e.proveedorId===p.id).reduce((a,e)=>a+(Number(e.costoPagar)||0),0);
+      const total= gm+gg+ge;
+      const pend = externos.filter(e=>e.proveedorId===p.id&&e.pagoStatus!=="pagado").reduce((a,e)=>a+(Number(e.costoPagar)||0),0)
+                 + maints.filter(m=>m.proveedorId===p.id&&m.pagoStatus!=="pagado").reduce((a,m)=>a+(Number(m.costoRef)||0)+(Number(m.costoMO)||0),0);
+      return { ...p, gm, gg, ge, total, pend };
+    }).filter(p=>p.total>0).sort((a,b)=>b.total-a.total);
+
+    const maxProv  = Math.max(...porProv.map(p=>p.total),1);
+    const totGastProv = porProv.reduce((a,p)=>a+p.total,0);
+    const totPend  = porProv.reduce((a,p)=>a+p.pend,0);
+
+    return (
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <div className="stats">
+          <KR icon="🏪" lbl="Proveedores activos" val={porProv.length} c="var(--cyan)"/>
+          <KR icon="💵" lbl="Gasto total" val={fmt$(totGastProv)} c="var(--red)"/>
+          <KR icon="⏳" lbl="Cuentas pendientes" val={fmt$(totPend)} c="var(--orange)"/>
+          <KR icon="🏆" lbl="Mayor proveedor" val={porProv[0]?.nombre||"—"} sub={porProv[0]?fmt$(porProv[0].total):"—"} c="var(--yellow)"/>
+        </div>
+
+        {/* barras por proveedor */}
+        <div className="card">
+          <div className="card-hdr"><h3>🏪 Gasto por Proveedor — {lblPeriodo()}</h3></div>
+          <div style={{padding:"16px 20px"}}>
+            {porProv.length===0 ? <div className="empty"><div className="empty-icon">🏪</div><p>Sin datos de proveedores</p></div>
+            : porProv.map((p,i)=>(
+              <div key={p.id} style={{marginBottom:14}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:12}}>
+                  <span style={{fontWeight:700}}>{p.nombre} <span style={{color:"var(--muted)",fontWeight:400,fontSize:10}}>{p.tipoProv||p.categoria||""}</span></span>
+                  <span style={{color:"var(--red)",fontWeight:700}}>{fmt$(p.total)}</span>
+                </div>
+                <SegBar items={[{v:p.gm,c:"var(--orange)",lbl:"Mant"},{v:p.gg,c:"var(--purple)",lbl:"Gastos"},{v:p.ge,c:"var(--cyan)",lbl:"Transport"}]} h={10}/>
+                <div style={{display:"flex",gap:12,marginTop:3,fontSize:10,color:"var(--muted)"}}>
+                  {p.gm>0&&<span style={{color:"var(--orange)"}}>🔧 {fmt$(p.gm)}</span>}
+                  {p.gg>0&&<span style={{color:"var(--purple)"}}>💸 {fmt$(p.gg)}</span>}
+                  {p.ge>0&&<span style={{color:"var(--cyan)"}}>🚛 {fmt$(p.ge)}</span>}
+                  {p.pend>0&&<span style={{color:"var(--orange)"}}>⏳ Pend: {fmt$(p.pend)}</span>}
+                  <span>{totGastProv>0?`${((p.total/totGastProv)*100).toFixed(0)}% del total`:""}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ══════════════════════════════════════════════════════════════
+  //  RENDER PRINCIPAL
+  // ══════════════════════════════════════════════════════════════
+  const TABS = [
+    ["resumen",        "📊 Resumen"],
+    ["rendimiento",    "🚛 Unidades"],
+    ["operadores",     "👨‍✈️ Operadores"],
+    ["combustible",    "⛽ Combustible"],
+    ["mantenimientos", "🔧 Mantenimiento"],
+    ["facturas",       "🧾 Facturación"],
+    ["gastos",         "💸 Gastos"],
+    ["nominas",        "👷 Nóminas"],
+    ["viajes",         "🗺️ Viajes"],
+    ["proveedores_chart","🏪 Proveedores"],
+  ];
+
+  return (
+    <div>
+      <ControlPer/>
+      <div style={{marginBottom:16,overflowX:"auto"}}>
+        <div className="ftabs" style={{fontSize:12,display:"flex",flexWrap:"nowrap"}}>
+          {TABS.map(([k,l])=>(
+            <button key={k} className={`ftab${vistaTab===k?" on":""}`} onClick={()=>setVistaTab(k)} style={{padding:"8px 12px",whiteSpace:"nowrap"}}>{l}</button>
+          ))}
+        </div>
+      </div>
+      {vistaTab==="resumen"            && <VistaResumen/>}
+      {vistaTab==="rendimiento"        && <VistaRendimiento/>}
+      {vistaTab==="operadores"         && <VistaOperadores/>}
+      {vistaTab==="combustible"        && <VistaCombustible/>}
+      {vistaTab==="mantenimientos"     && <VistaMantenimientos/>}
+      {vistaTab==="facturas"           && <VistaFacturas/>}
+      {vistaTab==="gastos"             && <VistaGastos/>}
+      {vistaTab==="nominas"            && <VistaNominas/>}
+      {vistaTab==="viajes"             && <VistaViajes/>}
+      {vistaTab==="proveedores_chart"  && <VistaProveedores/>}
     </div>
   );
 }
+
 
 
 function GpsPage({ units, traccarConfig, onOpenConfig }) {
@@ -8227,7 +7573,7 @@ function CotizacionModal({ cotizacion, clientes, tabulador, extrasTabulador, fol
     estatus: "pendiente",
   });
 
-  const upd = (f, v) => setForm(p => ({...p, [f]:v}));
+  const upd = (field, v) => setForm(p => ({...p, [field]:v}));
 
   // Calcular subtotal desde conceptos + extras
   const subtotalConceptos = form.conceptos.reduce((s,c) => s + (c.precioTotal||0), 0);
@@ -8292,11 +7638,11 @@ function CotizacionModal({ cotizacion, clientes, tabulador, extrasTabulador, fol
       {children}
     </div>
   );
-  const inp = { padding:"8px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--bg0)", color:"var(--text)", fontSize:13, width:"100%" };
+  const inp = { padding:"8px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--bg0)", color:"var(--text)", fontSize:13, width:"100%", boxSizing:"border-box", outline:"none" };
 
   return (
-    <div className="modal-ov" onClick={onClose}>
-      <div className="modal wide" style={{ maxWidth:720, maxHeight:"92vh", overflowY:"auto" }} onClick={e=>e.stopPropagation()}>
+    <div className="modal-ov" onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
+      <div className="modal wide" style={{ maxWidth:720, maxHeight:"92vh", overflowY:"auto" }} onMouseDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
         <div className="mhdr">
           <h3>📄 {cotizacion ? "Editar" : "Nueva"} Cotización — Folio #{form.folio}</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
@@ -9008,40 +8354,34 @@ export default function App() {
   useEffect(() => {
     (async () => {
       const pairs = [
-        [setUnits,               "fp6:units",         D_UNITS],
-        [setDrivers,             "fp6:drivers",        D_DRIVERS],
-        [setDocs,                "fp6:docs",           D_DOCS],
-        [setMaints,              "fp6:maints",         D_MAINTS],
-        [setFuels,               "fp6:fuels",          D_FUELS],
-        [setTrips,               "fp6:trips",          D_TRIPS],
-        [setGastos,              "fp6:gastos",         D_GASTOS],
-        [setExternos,            "fp6:externos",       D_EXTERNOS],
-        [setClientes,            "fp6:clientes",       D_CLIENTES],
-        [setFacturas,            "fp6:facturas",       D_FACTURAS],
-        [setProveedores,         "fp6:proveedores",    D_PROVEEDORES],
-        [setTiposPersonalizados, "fp6:tipos",          []],
-        [setBranding,            "fp6:branding",       { nombre: "Mi Empresa", slogan: "Sistema de Flota", logo: "" }],
-        [setNominasAdmin,        "fp6:nominasAdmin",   D_NOMINAS_ADMIN],
-        [setRoles,               "fp6:roles",          D_ROLES],
-        [setTraccarConfig,       "fp6:traccarConfig",  null],
-        [setUsuarios,            "fp6:usuarios",       D_USUARIOS],
-        [setFacturApiKey,        "fp6:facturApiKey",   ""],
-        [setTabulador,           "fp6:tabulador",      D_TABULADOR],
-        [setExtrasTabulador,     "fp6:extrasTabulador",D_EXTRAS_TABULADOR],
-        [setCotizaciones,        "fp6:cotizaciones",   []]
+        [setUnits,               "fp6:units",          D_UNITS],
+        [setDrivers,             "fp6:drivers",         D_DRIVERS],
+        [setDocs,                "fp6:docs",            D_DOCS],
+        [setMaints,              "fp6:maints",          D_MAINTS],
+        [setFuels,               "fp6:fuels",           D_FUELS],
+        [setTrips,               "fp6:trips",           D_TRIPS],
+        [setGastos,              "fp6:gastos",          D_GASTOS],
+        [setExternos,            "fp6:externos",        D_EXTERNOS],
+        [setClientes,            "fp6:clientes",        D_CLIENTES],
+        [setFacturas,            "fp6:facturas",        D_FACTURAS],
+        [setProveedores,         "fp6:proveedores",     D_PROVEEDORES],
+        [setTiposPersonalizados, "fp6:tipos",           []],
+        [setBranding,            "fp6:branding",        { nombre: "Mi Empresa", slogan: "Sistema de Flota", logo: "" }],
+        [setNominasAdmin,        "fp6:nominasAdmin",    D_NOMINAS_ADMIN],
+        [setRoles,               "fp6:roles",           D_ROLES],
+        [setTraccarConfig,       "fp6:traccarConfig",   null],
+        [setUsuarios,            "fp6:usuarios",        D_USUARIOS],
+        [setFacturApiKey,        "fp6:facturApiKey",    ""],
+        [setTabulador,           "fp6:tabulador",       D_TABULADOR],
+        [setExtrasTabulador,     "fp6:extrasTabulador", D_EXTRAS_TABULADOR],
+        [setCotizaciones,        "fp6:cotizaciones",    []]
       ];
-
       // Cargar tema
       try {
         const temaVal = await fsGet("fp6:tema");
-        if (temaVal) {
-          setTema(temaVal);
-          if (temaVal === "light") document.documentElement.removeAttribute("data-theme");
-          else document.documentElement.setAttribute("data-theme", temaVal);
-        }
-      } catch(e) {}
-
-      // Cargar todos los datos desde Firebase
+        if (temaVal) { setTema(temaVal); if (temaVal==="light") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme",temaVal); }
+      } catch(e){}
+      // Cargar datos desde Firebase
       await Promise.all(pairs.map(async ([setter, key, defaultVal]) => {
         try {
           const val = await fsGet(key);
@@ -9049,13 +8389,9 @@ export default function App() {
           else setter(defaultVal);
         } catch { setter(defaultVal); }
       }));
-
       setLoading(false);
-
-      // Escuchar cambios en tiempo real (sincronización entre máquinas)
-      const unsubs = pairs.map(([setter, key]) =>
-        fsListen(key, (val) => { if (val !== null && val !== undefined) setter(val); })
-      );
+      // Escuchar cambios en tiempo real
+      const unsubs = pairs.map(([setter, key]) => fsListen(key, (val) => { if (val !== null && val !== undefined) setter(val); }));
       return () => unsubs.forEach(u => u && u());
     })();
   }, []);
@@ -9429,7 +8765,7 @@ export default function App() {
               else if (tipo === "gasto") GC.save(updated);
             }}
           />}
-          {tab === "charts" && (isAdmin || userCan("verReportes")) && <ChartsPage units={units} maints={maints} fuels={fuels} gastos={gastos} trips={trips} facturas={facturas} clientes={clientes} drivers={drivers} />}
+          {tab === "charts" && (isAdmin || userCan("verReportes")) && <ChartsPage units={units} maints={maints} fuels={fuels} gastos={gastos} trips={trips} facturas={facturas} clientes={clientes} drivers={drivers} proveedores={proveedores} externos={externos} nominasAdmin={nominasAdmin} />}
           {tab === "gps" && (
             <GpsPage
               units={units}
@@ -9462,7 +8798,7 @@ export default function App() {
           onClose={() => setModal(null)}
         />;
       })()}
-      {modal?.type === "unit" && <UnitModal unit={modal.data} drivers={drivers} onSave={u => UC.save({ ...u, id: u.id || uid() })} onClose={() => setModal(null)} />}
+      {modal?.type === "unit" && <UnitModal unit={modal.data} drivers={drivers} tiposPersonalizados={tiposPersonalizados} onAddTipo={async (t) => { const newTipos = [...tiposPersonalizados, t]; setTiposPersonalizados(newTipos); await sv("fp6:tipos", newTipos); }} onSave={u => UC.save({ ...u, id: u.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "doc" && <DocModal doc={modal.data} units={units} drivers={drivers} onSave={d => DoC.save({ ...d, id: d.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "maint" && <MaintModal maint={modal.data} units={units} proveedores={proveedores} onSave={m => MC.save({ ...m, id: m.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "fuel" && <FuelModal fuel={modal.data} units={units} onSave={f => FC.save({ ...f, id: f.id || uid() })} onClose={() => setModal(null)} onUpdateUnit={UC.save} />}
