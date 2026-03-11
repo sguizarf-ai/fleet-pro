@@ -450,7 +450,7 @@ const D_USUARIOS = [
 // Permisos base por rol (se pueden sobreescribir individualmente por usuario)
 const PERMS_BASE = {
   admin: {
-    verFinanciero: true, editarFacturas: true, cobrarFacturas: true,
+    verFinanciero: true, editarFacturas: true,
     verNominas: true, verNominasAdmin: true, verReportes: true, verCostos: true,
     editarUnidades: true, editarConductores: true, editarProveedores: true,
     crearViajes: true, editarViajes: true, crearMantenimientos: true,
@@ -7034,8 +7034,8 @@ function GpsPage({ units, traccarConfig, onOpenConfig }) {
                   return (
                     <div key={d.id} onClick={() => setSelectedDevice(d)}
                       style={{ padding:"12px 14px", background:"var(--bg2)", border:`1.5px solid ${tieneAlerta ? "var(--red)" : st.color+"33"}`, borderRadius:10, cursor:"pointer" }}
-                      onMouseEnter={e => e.currentTarget.style.borderColor = tieneAlerta ? "var(--red)" : st.color}
-                      onMouseLeave={e => e.currentTarget.style.borderColor = tieneAlerta ? "var(--red)" : `${st.color}33`}>
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = tieneAlerta ? "var(--red)" : st.color; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = tieneAlerta ? "var(--red)" : `${st.color}33`; }}>
                       <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
                         <div style={{ fontWeight:700, fontSize:13 }}>{d.name}</div>
                         <span>{tieneAlerta ? "🚨" : st.icon}</span>
@@ -8411,8 +8411,8 @@ function HelpPage({ currentUser }) {
         </div>
         {/* Buscador */}
         <div style={{ display:"flex", alignItems:"center", gap:10, background:"var(--bg0)", border:"2px solid var(--border)", borderRadius:10, padding:"10px 16px", maxWidth:500, transition:"border-color .2s" }}
-          onFocus={e=>e.currentTarget.style.borderColor="var(--cyan)"}
-          onBlur={e=>e.currentTarget.style.borderColor="var(--border)"}>
+          onFocus={e=>{ e.currentTarget.style.borderColor="var(--cyan)"; }}
+          onBlur={e=>{ e.currentTarget.style.borderColor="var(--border)"; }}>
           <span style={{ fontSize:18 }}>🔍</span>
           <input
             value={busqueda}
