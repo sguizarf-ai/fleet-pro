@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { fsGet, fsSet, fsListen } from "./firebaseDB";
 
 /* ═══════════════════════════════════════════════════════════════
    FLEET PRO v6.0 — Sistema Integral de Gestión de Flota
@@ -6557,17 +6558,18 @@ function FacturacionPage({ facturas, clientes, viajes, onAdd, onEdit, onDelete, 
   const [sf, setSf] = useState("TODOS");
   const [cf, setCf] = useState("TODOS");
 
-  // Actualizar status basado en vencimiento — solo una vez al montar
-  const autoVencidaRef = useRef(false);
+  // Actualizar status basado en vencimiento
   useEffect(() => {
-    if (autoVencidaRef.current) return;
-    autoVencidaRef.current = true;
-    facturas.filter(f => {
-      if (f.status !== "PENDIENTE") return false;
-      const days = daysUntil(f.fechaVencimiento);
-      return days !== null && days < 0;
-    }).forEach(f => onEdit({ ...f, status: "VENCIDA" }));
-  }, []); // solo al montar
+    facturas.forEach(f => {
+      if (f.status === "PENDIENTE") {
+        const days = daysUntil(f.fechaVencimiento);
+        if (days !== null && days < 0) {
+          // Auto-cambiar a VENCIDA
+          onEdit({ ...f, status: "VENCIDA" });
+        }
+      }
+    });
+  }, [facturas, onEdit]);
 
   const fil = facturas.filter(f => {
     const cli = clientes.find(c => c.id === f.clienteId);
@@ -8988,7 +8990,7 @@ export default function App() {
   useEffect(() => {
     if (tema === "light") document.documentElement.removeAttribute("data-theme");
     else document.documentElement.setAttribute("data-theme", tema);
-    window.storage?.set("fp6:tema", tema).catch(()=>{});
+    fsSet("fp6:tema", tema).catch(()=>{});
   }, [tema]);
   const [tabulador, setTabulador] = useState([]);
   const [extrasTabulador, setExtrasTabulador] = useState([]);
@@ -9006,43 +9008,59 @@ export default function App() {
   useEffect(() => {
     (async () => {
       const pairs = [
-        [setUnits, "fp6:units", D_UNITS],
-        [setDrivers, "fp6:drivers", D_DRIVERS],
-        [setDocs, "fp6:docs", D_DOCS],
-        [setMaints, "fp6:maints", D_MAINTS],
-        [setFuels, "fp6:fuels", D_FUELS],
-        [setTrips, "fp6:trips", D_TRIPS],
-        [setGastos, "fp6:gastos", D_GASTOS],
-        [setExternos, "fp6:externos", D_EXTERNOS],
-        [setClientes, "fp6:clientes", D_CLIENTES],
-        [setFacturas, "fp6:facturas", D_FACTURAS],
-        [setProveedores, "fp6:proveedores", D_PROVEEDORES],
-        [setTiposPersonalizados, "fp6:tipos", []],
-        [setBranding, "fp6:branding", { nombre: "Mi Empresa", slogan: "Sistema de Flota", logo: "" }],
-        [setNominasAdmin, "fp6:nominasAdmin", D_NOMINAS_ADMIN],
-        [setRoles, "fp6:roles", D_ROLES],
-        [setTraccarConfig, "fp6:traccarConfig", null],
-        [setUsuarios, "fp6:usuarios", D_USUARIOS],
-        [setFacturApiKey, "fp6:facturApiKey", ""],
-        [setTabulador, "fp6:tabulador", D_TABULADOR],
-        [setExtrasTabulador, "fp6:extrasTabulador", D_EXTRAS_TABULADOR],
-        [setCotizaciones, "fp6:cotizaciones", []]
+        [setUnits,               "fp6:units",         D_UNITS],
+        [setDrivers,             "fp6:drivers",        D_DRIVERS],
+        [setDocs,                "fp6:docs",           D_DOCS],
+        [setMaints,              "fp6:maints",         D_MAINTS],
+        [setFuels,               "fp6:fuels",          D_FUELS],
+        [setTrips,               "fp6:trips",          D_TRIPS],
+        [setGastos,              "fp6:gastos",         D_GASTOS],
+        [setExternos,            "fp6:externos",       D_EXTERNOS],
+        [setClientes,            "fp6:clientes",       D_CLIENTES],
+        [setFacturas,            "fp6:facturas",       D_FACTURAS],
+        [setProveedores,         "fp6:proveedores",    D_PROVEEDORES],
+        [setTiposPersonalizados, "fp6:tipos",          []],
+        [setBranding,            "fp6:branding",       { nombre: "Mi Empresa", slogan: "Sistema de Flota", logo: "" }],
+        [setNominasAdmin,        "fp6:nominasAdmin",   D_NOMINAS_ADMIN],
+        [setRoles,               "fp6:roles",          D_ROLES],
+        [setTraccarConfig,       "fp6:traccarConfig",  null],
+        [setUsuarios,            "fp6:usuarios",       D_USUARIOS],
+        [setFacturApiKey,        "fp6:facturApiKey",   ""],
+        [setTabulador,           "fp6:tabulador",      D_TABULADOR],
+        [setExtrasTabulador,     "fp6:extrasTabulador",D_EXTRAS_TABULADOR],
+        [setCotizaciones,        "fp6:cotizaciones",   []]
       ];
-      // Load theme
-      try { const tr = await window.storage.get("fp6:tema"); if (tr?.value) { setTema(tr.value); if (tr.value==="light") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme",tr.value); } } catch(e){}
 
-      await Promise.all(pairs.map(async ([s, k, d]) => {
+      // Cargar tema
+      try {
+        const temaVal = await fsGet("fp6:tema");
+        if (temaVal) {
+          setTema(temaVal);
+          if (temaVal === "light") document.documentElement.removeAttribute("data-theme");
+          else document.documentElement.setAttribute("data-theme", temaVal);
+        }
+      } catch(e) {}
+
+      // Cargar todos los datos desde Firebase
+      await Promise.all(pairs.map(async ([setter, key, defaultVal]) => {
         try {
-          const r = await window.storage.get(k);
-          if (!r) { s(d); return; }
-          try { s(JSON.parse(r.value)); } catch { s(r.value || d); }
-        } catch { s(d); }
+          const val = await fsGet(key);
+          if (val !== null && val !== undefined) setter(val);
+          else setter(defaultVal);
+        } catch { setter(defaultVal); }
       }));
+
       setLoading(false);
+
+      // Escuchar cambios en tiempo real (sincronización entre máquinas)
+      const unsubs = pairs.map(([setter, key]) =>
+        fsListen(key, (val) => { if (val !== null && val !== undefined) setter(val); })
+      );
+      return () => unsubs.forEach(u => u && u());
     })();
   }, []);
 
-  const sv = useCallback(async (k, v) => { try { await window.storage.set(k, JSON.stringify(v)) } catch { } }, []);
+  const sv = useCallback(async (k, v) => { try { await fsSet(k, v); } catch { } }, []);
   const notify = (msg, type = "success") => setToast({ msg, type });
 
   const uRef = useRef(units); uRef.current = units;
