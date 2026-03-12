@@ -1236,10 +1236,31 @@ function DocModal({ doc, units, drivers, onSave, onClose }) {
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const docList = f.entidadTipo === "operador" ? DOCS_LIST_OPERADOR : DOCS_LIST_UNIDAD;
 
-  const ok = () => { 
+  const ok = async () => { 
     if (uploading) return alert("⏳ Espera a que termine de subir la foto...");
     if (f.entidadTipo === "unidad" && !f.unidadId) return alert("Selecciona una unidad");
     if (f.entidadTipo === "operador" && !f.operadorId) return alert("Selecciona un operador");
+    // Si hay fotos en base64, intentar subirlas a Cloudinary antes de guardar
+    const fotos = f.fotos || [];
+    const hayBase64 = fotos.some(v => typeof v === "string" && v.startsWith("data:image"));
+    if (hayBase64) {
+      setUploading(true);
+      try {
+        const fotasOk = await Promise.all(fotos.map(v =>
+          (typeof v === "string" && v.startsWith("data:image"))
+            ? uploadToCloudinary(v, "fleet-pro/fotos")
+            : Promise.resolve(v)
+        ));
+        setF(p => ({ ...p, fotos: fotasOk }));
+        const nombreFinal = (f.nombre && f.nombre.trim()) ? f.nombre : docList[0];
+        setUploading(false);
+        onSave({ ...f, fotos: fotasOk, nombre: nombreFinal, id: f.id || uid() });
+        return;
+      } catch(e) {
+        setUploading(false);
+        return alert("❌ Error subiendo foto a Cloudinary: " + e.message + "\nVerifica tu conexión.");
+      }
+    }
     const nombreFinal = (f.nombre && f.nombre.trim()) ? f.nombre : docList[0];
     onSave({ ...f, nombre: nombreFinal, id: f.id || uid() });
   };
