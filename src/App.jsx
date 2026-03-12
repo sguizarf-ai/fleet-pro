@@ -4518,7 +4518,10 @@ function printAndDownloadDoc(doc, unit, driver) {
     <div class="field"><label>Fecha Vencimiento</label><span style="color:${statusColor};font-weight:700">${doc.vence || "Sin fecha"}</span></div>
   </div>
   ${doc.notas ? `<div class="field" style="margin-bottom:12px"><label>Notas</label>${doc.notas}</div>` : ""}
-  ${doc.foto ? `<img src="${doc.foto}" class="photo" alt="Documento"/>` : ""}
+  ${(() => {
+    const fotos = doc.fotos?.length ? doc.fotos : doc.foto ? [doc.foto] : [];
+    return fotos.map((src,i) => `<img src="${src}" class="photo" alt="Foto ${i+1}" style="margin-bottom:8px"/>`).join('\n');
+  })()}
   <div class="btn-row"><button class="print-btn" onclick="window.print()">🖨️ Imprimir</button><button class="close-btn" onclick="window.close()">✕ Cerrar</button></div>
   <p style="margin-top:16px;font-size:10px;color:#999">Generado: ${new Date().toLocaleDateString("es-MX",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p>
   </body></html>`;
@@ -4545,28 +4548,25 @@ function openDocPrint(doc, unit, driver) {
   setTimeout(() => w.print(), 500);
 }
 
-// ── Modal de envío de documentos por WhatsApp ─────────────────────────────────
+// ── Modal de envío de documentos por WhatsApp ────────────────────────────────
 function DocEnvioModal({ docs, clientes, onClose }) {
-  const [tel, setTel] = useState("");
+  const [tel, setTel]         = useState("");
   const [clienteId, setClienteId] = useState("");
-  const [msg, setMsg] = useState("");
+  const [msg, setMsg]         = useState("");
+  const [lightbox, setLightbox] = useState(null); // { src, label }
 
-  // Al seleccionar cliente del catálogo, rellenar teléfono
   const handleCliente = (id) => {
     setClienteId(id);
     if (id) {
       const cli = clientes.find(c => c.id === id);
       if (cli?.telefono) setTel(cli.telefono.replace(/\D/g, ""));
-    } else {
-      setTel("");
-    }
+    } else { setTel(""); }
   };
 
-  // Construir texto del mensaje
   const buildMsg = () => {
-    const lineas = ["📋 *Documentos solicitados — Fleet Pro*\n"];
+    const lineas = ["📋 *Documentos — Fleet Pro*\n"];
     docs.forEach(d => {
-      lineas.push(`*${d.nombre}*`);
+      lineas.push(`✅ *${d.nombre}*`);
       if (d.numero)  lineas.push(`  N°: ${d.numero}`);
       if (d.vence)   lineas.push(`  Vence: ${d.vence}`);
       if (d.empresa) lineas.push(`  Emisor: ${d.empresa}`);
@@ -4577,138 +4577,249 @@ function DocEnvioModal({ docs, clientes, onClose }) {
     return lineas.join("\n");
   };
 
-  const fotosTotal = docs.reduce((s, d) => s + (d.fotos?.length || (d.foto ? 1 : 0)), 0);
+  // Todas las fotos agrupadas por documento
+  const gruposFotos = docs.map(d => ({
+    docId: d.id,
+    docNombre: d.nombre,
+    fotos: d.fotos?.length ? d.fotos : d.foto ? [d.foto] : [],
+  })).filter(g => g.fotos.length > 0);
+
+  const fotosTotal = gruposFotos.reduce((s, g) => s + g.fotos.length, 0);
 
   const enviarWhatsapp = () => {
     const numero = tel.replace(/\D/g, "");
-    if (!numero || numero.length < 10) return alert("Ingresa un número de teléfono válido (10 dígitos mínimo)");
+    if (!numero || numero.length < 10) return alert("Ingresa un número válido (10 dígitos mínimo)");
     const texto = msg || buildMsg();
-    const url = `https://wa.me/52${numero}?text=${encodeURIComponent(texto)}`;
-    window.open(url, "_blank");
+    window.open(`https://wa.me/52${numero}?text=${encodeURIComponent(texto)}`, "_blank");
   };
 
   const copiarTexto = () => {
-    const texto = msg || buildMsg();
-    navigator.clipboard.writeText(texto).then(() => alert("✅ Texto copiado al portapapeles"));
+    navigator.clipboard.writeText(msg || buildMsg())
+      .then(() => alert("✅ Texto copiado al portapapeles"));
   };
 
-  // Previsualizar fotos de todos los documentos seleccionados
-  const todasFotos = docs.flatMap(d => {
-    const arr = d.fotos?.length ? d.fotos : d.foto ? [d.foto] : [];
-    return arr.map(src => ({ src, docNombre: d.nombre }));
-  });
-
   return (
-    <div className="modal-ov" onClick={onClose}>
-      <div className="modal wide" style={{ maxWidth: 620, maxHeight: "92vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
-        <div className="mhdr">
-          <h3>📲 Enviar Documentos por WhatsApp</h3>
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+    <>
+      {/* Lightbox para ver foto completa */}
+      {lightbox && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.88)", zIndex:9999,
+          display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}
+          onClick={() => setLightbox(null)}>
+          <div style={{ fontSize:11, color:"#aaa", marginBottom:8 }}>{lightbox.label} · clic para cerrar</div>
+          <img src={lightbox.src} alt={lightbox.label}
+            style={{ maxWidth:"92vw", maxHeight:"82vh", borderRadius:10, border:"3px solid #0099CC", objectFit:"contain" }} />
         </div>
-        <div className="mbody" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      )}
 
-          {/* Resumen de docs seleccionados */}
-          <div style={{ padding: "10px 14px", background: "rgba(0,153,204,.07)", border: "1px solid var(--cyan)", borderRadius: 10 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: "var(--cyan)" }}>
-              📋 {docs.length} documento{docs.length !== 1 ? "s" : ""} seleccionado{docs.length !== 1 ? "s" : ""}
-              {fotosTotal > 0 && <span style={{ marginLeft: 8, fontSize: 11, color: "var(--muted)" }}>· {fotosTotal} foto{fotosTotal !== 1 ? "s" : ""}</span>}
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {docs.map(d => (
-                <span key={d.id} style={{ padding: "3px 9px", borderRadius: 8, background: "var(--bg2)", border: "1px solid var(--border)", fontSize: 11, fontWeight: 600 }}>
-                  {d.nombre}
-                </span>
-              ))}
-            </div>
+      <div className="modal-ov" onClick={onClose}>
+        <div className="modal wide" style={{ maxWidth:650, maxHeight:"92vh", overflowY:"auto" }}
+          onClick={e => e.stopPropagation()}>
+          <div className="mhdr">
+            <h3>📲 Enviar Documentos por WhatsApp</h3>
+            <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
           </div>
+          <div className="mbody" style={{ display:"flex", flexDirection:"column", gap:16 }}>
 
-          {/* Fotos preview */}
-          {todasFotos.length > 0 && (
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", marginBottom: 8 }}>
-                Vista previa de fotos ({todasFotos.length})
+            {/* Resumen docs */}
+            <div style={{ padding:"10px 14px", background:"rgba(0,153,204,.07)",
+              border:"1px solid var(--cyan)", borderRadius:10 }}>
+              <div style={{ fontWeight:700, fontSize:13, marginBottom:8, color:"var(--cyan)" }}>
+                📋 {docs.length} documento{docs.length!==1?"s":""} seleccionado{docs.length!==1?"s":""}
+                {fotosTotal > 0 && <span style={{ marginLeft:8, fontSize:11, color:"var(--muted)" }}>· {fotosTotal} foto{fotosTotal!==1?"s":""}</span>}
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8 }}>
-                {todasFotos.map((f, i) => (
-                  <div key={i} style={{ position: "relative" }}>
-                    <img src={f.src} alt={f.docNombre}
-                      style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)", cursor: "pointer" }}
-                      onClick={() => window.open(f.src, "_blank")}
-                    />
-                    <div style={{ fontSize: 9, color: "var(--muted)", textAlign: "center", marginTop: 2, lineHeight: 1.2 }}>{f.docNombre}</div>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                {docs.map(d => (
+                  <span key={d.id} style={{ padding:"3px 9px", borderRadius:8,
+                    background:"var(--bg2)", border:"1px solid var(--border)", fontSize:11, fontWeight:600 }}>
+                    {d.nombre}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Vista previa de fotos agrupadas por documento */}
+            {gruposFotos.length > 0 && (
+              <div>
+                <div style={{ fontSize:11, fontWeight:700, color:"var(--muted)",
+                  textTransform:"uppercase", marginBottom:10 }}>
+                  Vista previa de fotos ({fotosTotal})
+                </div>
+                {gruposFotos.map(g => (
+                  <div key={g.docId} style={{ marginBottom:14 }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:"var(--text)", marginBottom:6,
+                      padding:"4px 10px", background:"var(--bg2)", borderRadius:6,
+                      borderLeft:"3px solid var(--cyan)", display:"inline-block" }}>
+                      📄 {g.docNombre} <span style={{ fontSize:10, color:"var(--muted)", fontWeight:400 }}>({g.fotos.length} foto{g.fotos.length!==1?"s":""})</span>
+                    </div>
+                    <div style={{ display:"grid",
+                      gridTemplateColumns:`repeat(${Math.min(g.fotos.length, 4)}, 1fr)`, gap:8 }}>
+                      {g.fotos.map((src, i) => (
+                        <div key={i} style={{ position:"relative", cursor:"pointer" }}
+                          onClick={() => setLightbox({ src, label:`${g.docNombre} — Foto ${i+1}` })}>
+                          <img src={src}
+                            style={{ width:"100%", height:90, objectFit:"cover", borderRadius:8,
+                              border:"2px solid var(--border)", transition:"border-color .15s" }}
+                            onMouseEnter={e => e.currentTarget.style.borderColor="var(--cyan)"}
+                            onMouseLeave={e => e.currentTarget.style.borderColor="var(--border)"}
+                            alt={`${g.docNombre} foto ${i+1}`}
+                          />
+                          <div style={{ position:"absolute", bottom:4, right:4, background:"rgba(0,0,0,.55)",
+                            borderRadius:4, padding:"1px 5px", fontSize:9, color:"#fff" }}>
+                            🔍 ampliar
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))}
+                <div style={{ fontSize:11, color:"var(--muted)", padding:"8px 12px",
+                  background:"var(--bg2)", borderRadius:8, marginTop:4 }}>
+                  💡 Clic en cada foto para ampliarla. Para enviarlas por WhatsApp: guárdalas desde aquí y adjúntalas en la conversación.
+                </div>
               </div>
-              <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 6, padding: "8px 12px", background: "var(--bg2)", borderRadius: 8 }}>
-                💡 <strong>Importante:</strong> WhatsApp no permite enviar imágenes por URL directa. Después de abrir la conversación, deberás enviar las fotos manualmente desde esta vista previa (clic en cada foto → guardar → adjuntar en WhatsApp).
-              </div>
-            </div>
-          )}
+            )}
 
-          {/* Destinatario */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div className="field">
-              <label>Cliente del catálogo (opcional)</label>
-              <select value={clienteId} onChange={e => handleCliente(e.target.value)}
-                style={{ background: "var(--bg0)", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 12px", color: "var(--text)", fontSize: 13 }}>
-                <option value="">— Seleccionar cliente registrado —</option>
-                {clientes.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}{c.telefono ? ` · ${c.telefono}` : " · (sin tel)"}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label>Número de WhatsApp *</label>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <span style={{ padding: "9px 12px", background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, color: "var(--muted)", flexShrink: 0 }}>🇲🇽 +52</span>
-                <input value={tel} onChange={e => setTel(e.target.value.replace(/\D/g, ""))}
-                  placeholder="8181234567 (10 dígitos)"
-                  maxLength={10}
-                  style={{ flex: 1, background: "var(--bg0)", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 12px", color: "var(--text)", fontSize: 13 }}
-                />
+            {/* Destinatario */}
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <div className="field">
+                <label>Cliente registrado (opcional — autocompleta teléfono)</label>
+                <select value={clienteId} onChange={e => handleCliente(e.target.value)}
+                  style={{ background:"var(--bg0)", border:"1px solid var(--border)", borderRadius:8,
+                    padding:"9px 12px", color:"var(--text)", fontSize:13 }}>
+                  <option value="">— Seleccionar del catálogo —</option>
+                  {clientes.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.nombre}{c.telefono ? ` · ${c.telefono}` : " · (sin tel)"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label>Número de WhatsApp *</label>
+                <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                  <span style={{ padding:"9px 12px", background:"var(--bg2)", border:"1px solid var(--border)",
+                    borderRadius:8, fontSize:13, color:"var(--muted)", flexShrink:0 }}>🇲🇽 +52</span>
+                  <input value={tel} onChange={e => setTel(e.target.value.replace(/\D/g,""))}
+                    placeholder="8181234567" maxLength={10}
+                    style={{ flex:1, background:"var(--bg0)", border:"1px solid var(--border)",
+                      borderRadius:8, padding:"9px 12px", color:"var(--text)", fontSize:13 }} />
+                </div>
               </div>
             </div>
+
+            {/* Mensaje */}
+            <div className="field">
+              <label>Mensaje (opcional — si está vacío se genera automáticamente)</label>
+              <textarea value={msg} onChange={e => setMsg(e.target.value)} rows={5}
+                placeholder={buildMsg()}
+                style={{ background:"var(--bg0)", border:"1px solid var(--border)", borderRadius:8,
+                  padding:"10px 12px", color:"var(--text)", fontSize:12, resize:"vertical", fontFamily:"monospace" }} />
+            </div>
+
+            {/* Preview mensaje automático */}
+            {!msg && (
+              <div style={{ padding:"12px 14px", background:"var(--bg2)", borderRadius:8, border:"1px solid var(--border)" }}>
+                <div style={{ fontSize:10, fontWeight:700, color:"var(--muted)", marginBottom:6, textTransform:"uppercase" }}>
+                  Vista previa del mensaje automático
+                </div>
+                <pre style={{ fontSize:11, margin:0, whiteSpace:"pre-wrap", fontFamily:"inherit",
+                  color:"var(--text)", lineHeight:1.6 }}>{buildMsg()}</pre>
+              </div>
+            )}
           </div>
 
-          {/* Mensaje editable */}
-          <div className="field">
-            <label>Mensaje personalizado (opcional — si lo dejas vacío se genera automáticamente)</label>
-            <textarea value={msg} onChange={e => setMsg(e.target.value)} rows={5}
-              placeholder={buildMsg()}
-              style={{ background: "var(--bg0)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", color: "var(--text)", fontSize: 12, resize: "vertical", fontFamily: "monospace" }}
-            />
-          </div>
-
-          {/* Preview del mensaje generado */}
-          {!msg && (
-            <div style={{ padding: "12px 14px", background: "var(--bg2)", borderRadius: 8, border: "1px solid var(--border)" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase" }}>Vista previa del mensaje</div>
-              <pre style={{ fontSize: 11, margin: 0, whiteSpace: "pre-wrap", fontFamily: "inherit", color: "var(--text)", lineHeight: 1.6 }}>{buildMsg()}</pre>
+          <div className="mftr" style={{ justifyContent:"space-between" }}>
+            <button className="btn btn-ghost" onClick={copiarTexto}>📋 Copiar texto</button>
+            <div style={{ display:"flex", gap:10 }}>
+              <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+              <button className="btn" style={{ background:"#25D366", color:"#fff", fontWeight:700 }}
+                onClick={enviarWhatsapp}>
+                📲 Abrir en WhatsApp
+              </button>
             </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+
+
+
+// ── DocCard — fuera de DocsPage para evitar re-mount en cada render ───────────
+function DocCard({ d, entity, isUnit, selected, onToggle, onEdit, onDelete }) {
+  const dy    = daysUntil(d.vence);
+  const dc    = dy === null ? "var(--muted)" : dy < 0 ? "var(--red)" : dy <= 30 ? "var(--yellow)" : "var(--green)";
+  const fotos = d.fotos?.length ? d.fotos : d.foto ? [d.foto] : [];
+  return (
+    <div className="doc-card"
+      style={{ "--dc": dc, outline: selected ? "2.5px solid var(--cyan)" : "none",
+        position:"relative", cursor:"pointer", userSelect:"none" }}
+      onClick={() => onToggle(d.id)}>
+      {/* Checkbox */}
+      <div style={{ position:"absolute", top:8, right:8, width:20, height:20, borderRadius:5,
+        background: selected ? "var(--cyan)" : "var(--bg3)",
+        border:`2px solid ${selected ? "var(--cyan)" : "var(--border)"}`,
+        display:"flex", alignItems:"center", justifyContent:"center",
+        fontSize:12, color:"#fff", zIndex:1, flexShrink:0 }}>
+        {selected ? "✓" : ""}
+      </div>
+      <div className="doc-name" style={{ paddingRight:26 }}>{d.nombre}</div>
+      <div className="doc-date">{d.vence || "Sin fecha"}</div>
+      <div style={{ marginTop:5 }}>{docBdg(dy)}</div>
+      {d.numero  && <div style={{ fontSize:10, color:"var(--muted)", marginTop:4 }}>N°: {d.numero}</div>}
+      {d.empresa && <div style={{ fontSize:10, color:"var(--muted)" }}>{d.empresa}</div>}
+      {/* Galería de fotos — cada una abre lightbox */}
+      {fotos.length > 0 && (
+        <div style={{ display:"grid",
+          gridTemplateColumns:`repeat(${Math.min(fotos.length,3)},1fr)`, gap:4, marginTop:8 }}>
+          {fotos.map((src, i) => (
+            <div key={i} style={{ position:"relative" }}>
+              <img src={src}
+                style={{ width:"100%", height: fotos.length===1 ? 80 : 55,
+                  objectFit:"cover", borderRadius:5, border:"1px solid var(--border)",
+                  cursor:"zoom-in" }}
+                alt={`foto ${i+1}`}
+                onClick={e => { e.stopPropagation();
+                  // Abrir lightbox temporal con data URI (funciona offline y en Vercel)
+                  const w = window.open("", "_blank", "width=900,height=700");
+                  w.document.write(`<html><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh">
+                    <img src="${src}" style="max-width:98vw;max-height:96vh;object-fit:contain;border-radius:8px"/>
+                    </body></html>`);
+                  w.document.close();
+                }}
+                title="Clic para ver completo"
+              />
+              {fotos.length > 1 && (
+                <div style={{ position:"absolute", bottom:2, right:2, background:"rgba(0,0,0,.5)",
+                  borderRadius:3, padding:"0 4px", fontSize:9, color:"#fff" }}>{i+1}</div>
+              )}
+            </div>
+          ))}
+          {fotos.length > 1 && (
+            <div style={{ fontSize:9, color:"var(--muted)", gridColumn:"1/-1",
+              textAlign:"right", marginTop:2 }}>{fotos.length} fotos · clic para ampliar</div>
           )}
         </div>
-
-        <div className="mftr" style={{ justifyContent: "space-between" }}>
-          <button className="btn btn-ghost" onClick={copiarTexto}>📋 Copiar texto</button>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-            <button className="btn" style={{ background: "#25D366", color: "#fff", fontWeight: 700 }} onClick={enviarWhatsapp}>
-              📲 Abrir en WhatsApp
-            </button>
-          </div>
-        </div>
+      )}
+      {/* Acciones — stopPropagation para no activar toggle */}
+      <div className="acts" style={{ marginTop:8 }} onClick={e => e.stopPropagation()}>
+        <button className="btn btn-ghost btn-xs" title="Imprimir"
+          onClick={() => isUnit ? openDocPrint(d, entity, null) : openDocPrint(d, null, entity)}>🖨️</button>
+        <button className="btn btn-ghost btn-xs" title="Descargar"
+          onClick={() => isUnit ? downloadDocAsHtml(d, entity, null) : downloadDocAsHtml(d, null, entity)}>⬇️</button>
+        <button className="btn btn-ghost btn-xs" onClick={() => onEdit(d)}>✏️</button>
+        <button className="btn btn-red btn-xs" onClick={() => onDelete(d.id)}>🗑</button>
       </div>
     </div>
   );
 }
 
-
 function DocsPage({ units, drivers, docs, clientes, onAdd, onEdit, onDelete }) {
   const [viewMode, setViewMode]   = useState("unidad");
   const [uf, setUf]               = useState("TODOS");
-  const [selDocs, setSelDocs]     = useState([]); // ids seleccionados
+  const [selDocs, setSelDocs]     = useState([]); // ids de docs seleccionados individualmente
   const [showEnvio, setShowEnvio] = useState(false);
 
   const docsUnidad   = docs.filter(d => !d.entidadTipo || d.entidadTipo === "unidad");
@@ -4720,110 +4831,93 @@ function DocsPage({ units, drivers, docs, clientes, onAdd, onEdit, onDelete }) {
   const clearSel  = () => setSelDocs([]);
   const docsSelObj = docs.filter(d => selDocs.includes(d.id));
 
-  const DocCard = ({ d, entity, isUnit }) => {
-    const dy  = daysUntil(d.vence);
-    const dc  = dy === null ? "var(--muted)" : dy < 0 ? "var(--red)" : dy <= 30 ? "var(--yellow)" : "var(--green)";
-    const sel = selDocs.includes(d.id);
-    const fotos = d.fotos?.length ? d.fotos : d.foto ? [d.foto] : [];
-    return (
-      <div className="doc-card" style={{ "--dc": dc, outline: sel ? "2.5px solid var(--cyan)" : "none", position: "relative", cursor: "pointer" }}
-        onClick={() => toggleSel(d.id)}>
-        {/* Checkbox de selección */}
-        <div style={{ position: "absolute", top: 8, right: 8, width: 20, height: 20, borderRadius: 5,
-          background: sel ? "var(--cyan)" : "var(--bg3)", border: `2px solid ${sel ? "var(--cyan)" : "var(--border)"}`,
-          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#fff", zIndex: 1 }}>
-          {sel ? "✓" : ""}
-        </div>
-        <div className="doc-name" style={{ paddingRight: 24 }}>{d.nombre}</div>
-        <div className="doc-date">{d.vence || "Sin fecha"}</div>
-        <div style={{ marginTop: 5 }}>{docBdg(dy)}</div>
-        {d.numero  && <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>N°: {d.numero}</div>}
-        {d.empresa && <div style={{ fontSize: 10, color: "var(--muted)" }}>{d.empresa}</div>}
-        {/* Galería de fotos */}
-        {fotos.length > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(fotos.length, 3)}, 1fr)`, gap: 4, marginTop: 8 }}>
-            {fotos.map((src, i) => (
-              <img key={i} src={src}
-                style={{ width: "100%", height: fotos.length === 1 ? 80 : 55, objectFit: "cover", borderRadius: 5, border: "1px solid var(--border)" }}
-                alt={`foto ${i+1}`}
-                onClick={e => { e.stopPropagation(); window.open(src, "_blank"); }}
-                title="Clic para ver completo"
-              />
-            ))}
-            {fotos.length > 1 && <div style={{ fontSize: 9, color: "var(--muted)", gridColumn: "1/-1", textAlign: "right" }}>{fotos.length} fotos · clic para ampliar</div>}
-          </div>
-        )}
-        <div className="acts" style={{ marginTop: 8 }} onClick={e => e.stopPropagation()}>
-          <button className="btn btn-ghost btn-xs" title="Imprimir"
-            onClick={() => isUnit ? openDocPrint(d, entity, null) : openDocPrint(d, null, entity)}>🖨️</button>
-          <button className="btn btn-ghost btn-xs" title="Descargar"
-            onClick={() => isUnit ? downloadDocAsHtml(d, entity, null) : downloadDocAsHtml(d, null, entity)}>⬇️</button>
-          <button className="btn btn-ghost btn-xs" onClick={() => onEdit(d)}>✏️</button>
-          <button className="btn btn-red btn-xs" onClick={() => onDelete(d.id)}>🗑</button>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="card">
       <div className="card-hdr">
         <h3>📄 Documentos y Vencimientos ({docs.length})</h3>
         <div className="row-gap">
-          <div style={{ display: "flex", gap: 6 }}>
-            <button className={`btn btn-sm ${viewMode === "unidad" ? "btn-cyan" : "btn-ghost"}`}
+          <div style={{ display:"flex", gap:6 }}>
+            <button className={`btn btn-sm ${viewMode==="unidad"?"btn-cyan":"btn-ghost"}`}
               onClick={() => { setViewMode("unidad"); setUf("TODOS"); clearSel(); }}>🚛 Unidades</button>
-            <button className={`btn btn-sm ${viewMode === "operador" ? "btn-cyan" : "btn-ghost"}`}
+            <button className={`btn btn-sm ${viewMode==="operador"?"btn-cyan":"btn-ghost"}`}
               onClick={() => { setViewMode("operador"); setUf("TODOS"); clearSel(); }}>👤 Operadores</button>
           </div>
           <button className="btn btn-cyan btn-sm" onClick={onAdd}>+ Agregar</button>
         </div>
       </div>
 
-      {/* Barra de selección */}
-      {selDocs.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px",
-          background: "rgba(0,153,204,.1)", borderBottom: "2px solid var(--cyan)" }}>
-          <span style={{ fontWeight: 700, color: "var(--cyan)", fontSize: 13 }}>
-            ✅ {selDocs.length} documento{selDocs.length !== 1 ? "s" : ""} seleccionado{selDocs.length !== 1 ? "s" : ""}
+      {/* Barra de selección activa */}
+      {selDocs.length > 0 ? (
+        <div style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 16px",
+          background:"rgba(0,153,204,.1)", borderBottom:"2px solid var(--cyan)", flexWrap:"wrap" }}>
+          <span style={{ fontWeight:700, color:"var(--cyan)", fontSize:13 }}>
+            ✅ {selDocs.length} documento{selDocs.length!==1?"s":""} seleccionado{selDocs.length!==1?"s":""}
           </span>
-          <button className="btn btn-sm" style={{ background: "#25D366", color: "#fff", fontWeight: 700 }}
+          <button className="btn btn-sm" style={{ background:"#25D366", color:"#fff", fontWeight:700 }}
             onClick={() => setShowEnvio(true)}>
             📲 Enviar por WhatsApp
           </button>
           <button className="btn btn-ghost btn-sm" onClick={clearSel}>✕ Quitar selección</button>
         </div>
-      )}
-
-      {/* Instrucción de selección */}
-      {selDocs.length === 0 && (
-        <div style={{ padding: "7px 16px", fontSize: 11, color: "var(--muted)", background: "var(--bg2)", borderBottom: "1px solid var(--border)" }}>
-          💡 Clic en una tarjeta para seleccionarla y enviarla por WhatsApp al cliente
+      ) : (
+        <div style={{ padding:"7px 16px", fontSize:11, color:"var(--muted)",
+          background:"var(--bg2)", borderBottom:"1px solid var(--border)" }}>
+          💡 Clic en una tarjeta para seleccionarla · cada documento se selecciona individualmente
         </div>
       )}
 
       {viewMode === "unidad" && (
         <>
-          <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--border)" }}>
+          <div style={{ padding:"8px 16px", borderBottom:"1px solid var(--border)" }}>
             <div className="ftabs">
-              <button className={`ftab${uf === "TODOS" ? " on" : ""}`} onClick={() => setUf("TODOS")}>Todas</button>
-              {units.map(u => <button key={u.id} className={`ftab${uf === u.id ? " on" : ""}`} onClick={() => setUf(u.id)}>{u.num} {u.placas}</button>)}
+              <button className={`ftab${uf==="TODOS"?" on":""}`} onClick={() => setUf("TODOS")}>Todas</button>
+              {units.map(u => (
+                <button key={u.id} className={`ftab${uf===u.id?" on":""}`}
+                  onClick={() => setUf(u.id)}>{u.num} {u.placas}</button>
+              ))}
             </div>
           </div>
-          {units.filter(u => uf === "TODOS" || u.id === uf).map(u => {
+          {units.filter(u => uf==="TODOS" || u.id===uf).map(u => {
             const ud = fdUnidad.filter(d => d.unidadId === u.id);
             return (
-              <div key={u.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                <div style={{ padding: "10px 16px 4px", fontSize: 13, fontWeight: 700, color: "var(--cyan)" }}>
-                  🚛 {u.num} — {u.placas}
-                  <span style={{ fontSize: 11, fontWeight: 400, color: "var(--muted)", marginLeft: 8 }}>{ud.length} doc{ud.length !== 1 ? "s" : ""}</span>
+              <div key={u.id} style={{ borderBottom:"1px solid var(--border)" }}>
+                <div style={{ padding:"10px 16px 4px", display:"flex", alignItems:"center",
+                  justifyContent:"space-between" }}>
+                  <span style={{ fontSize:13, fontWeight:700, color:"var(--cyan)" }}>
+                    🚛 {u.num} — {u.placas}
+                    <span style={{ fontSize:11, fontWeight:400, color:"var(--muted)", marginLeft:8 }}>
+                      {ud.length} doc{ud.length!==1?"s":""}
+                    </span>
+                  </span>
+                  {ud.length > 0 && (
+                    <button className="btn btn-ghost btn-xs" style={{ fontSize:10 }}
+                      onClick={() => {
+                        const ids = ud.map(d=>d.id);
+                        const todos = ids.every(id => selDocs.includes(id));
+                        setSelDocs(s => todos
+                          ? s.filter(id => !ids.includes(id))
+                          : [...new Set([...s, ...ids])]);
+                      }}>
+                      {ud.every(d=>selDocs.includes(d.id)) ? "☑ Deseleccionar todos" : "☐ Seleccionar todos"}
+                    </button>
+                  )}
                 </div>
                 <div className="doc-grid">
-                  {ud.map(d => <DocCard key={d.id} d={d} entity={u} isUnit={true} />)}
+                  {ud.map(d => (
+                    <DocCard key={d.id} d={d} entity={u} isUnit={true}
+                      selected={selDocs.includes(d.id)}
+                      onToggle={toggleSel}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                    />
+                  ))}
                   {ud.length === 0 && (
                     <div className="doc-empty-card">
-                      <span style={{ fontSize: 12 }}>Sin documentos registrados</span>
-                      <button className="btn btn-cyan btn-xs" onClick={() => onAdd && onAdd({ unidadId: u.id, entidadTipo: "unidad" })}>✏️ Agregar doc</button>
+                      <span style={{ fontSize:12 }}>Sin documentos registrados</span>
+                      <button className="btn btn-cyan btn-xs"
+                        onClick={() => onAdd && onAdd({ unidadId:u.id, entidadTipo:"unidad" })}>
+                        ✏️ Agregar doc
+                      </button>
                     </div>
                   )}
                 </div>
@@ -4835,26 +4929,56 @@ function DocsPage({ units, drivers, docs, clientes, onAdd, onEdit, onDelete }) {
 
       {viewMode === "operador" && (
         <>
-          <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--border)" }}>
+          <div style={{ padding:"8px 16px", borderBottom:"1px solid var(--border)" }}>
             <div className="ftabs">
-              <button className={`ftab${uf === "TODOS" ? " on" : ""}`} onClick={() => setUf("TODOS")}>Todos</button>
-              {(drivers||[]).map(d => <button key={d.id} className={`ftab${uf === d.id ? " on" : ""}`} onClick={() => setUf(d.id)}>{d.nombre.split(" ")[0]}</button>)}
+              <button className={`ftab${uf==="TODOS"?" on":""}`} onClick={() => setUf("TODOS")}>Todos</button>
+              {(drivers||[]).map(d => (
+                <button key={d.id} className={`ftab${uf===d.id?" on":""}`}
+                  onClick={() => setUf(d.id)}>{d.nombre.split(" ")[0]}</button>
+              ))}
             </div>
           </div>
-          {(drivers||[]).filter(d => uf === "TODOS" || d.id === uf).map(driver => {
+          {(drivers||[]).filter(d => uf==="TODOS" || d.id===uf).map(driver => {
             const dd = fdOperador.filter(d => d.operadorId === driver.id);
             return (
-              <div key={driver.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                <div style={{ padding: "10px 16px 4px", fontSize: 13, fontWeight: 700, color: "var(--purple)" }}>
-                  👤 {driver.nombre}
-                  <span style={{ fontSize: 11, fontWeight: 400, color: "var(--muted)", marginLeft: 8 }}>{dd.length} doc{dd.length !== 1 ? "s" : ""}</span>
+              <div key={driver.id} style={{ borderBottom:"1px solid var(--border)" }}>
+                <div style={{ padding:"10px 16px 4px", display:"flex", alignItems:"center",
+                  justifyContent:"space-between" }}>
+                  <span style={{ fontSize:13, fontWeight:700, color:"var(--purple)" }}>
+                    👤 {driver.nombre}
+                    <span style={{ fontSize:11, fontWeight:400, color:"var(--muted)", marginLeft:8 }}>
+                      {dd.length} doc{dd.length!==1?"s":""}
+                    </span>
+                  </span>
+                  {dd.length > 0 && (
+                    <button className="btn btn-ghost btn-xs" style={{ fontSize:10 }}
+                      onClick={() => {
+                        const ids = dd.map(d=>d.id);
+                        const todos = ids.every(id => selDocs.includes(id));
+                        setSelDocs(s => todos
+                          ? s.filter(id => !ids.includes(id))
+                          : [...new Set([...s, ...ids])]);
+                      }}>
+                      {dd.every(d=>selDocs.includes(d.id)) ? "☑ Deseleccionar todos" : "☐ Seleccionar todos"}
+                    </button>
+                  )}
                 </div>
                 <div className="doc-grid">
-                  {dd.map(d => <DocCard key={d.id} d={d} entity={driver} isUnit={false} />)}
+                  {dd.map(d => (
+                    <DocCard key={d.id} d={d} entity={driver} isUnit={false}
+                      selected={selDocs.includes(d.id)}
+                      onToggle={toggleSel}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                    />
+                  ))}
                   {dd.length === 0 && (
                     <div className="doc-empty-card">
-                      <span style={{ fontSize: 12 }}>Sin documentos registrados</span>
-                      <button className="btn btn-cyan btn-xs" onClick={() => onAdd && onAdd({ operadorId: driver.id, entidadTipo: "operador" })}>✏️ Agregar doc</button>
+                      <span style={{ fontSize:12 }}>Sin documentos registrados</span>
+                      <button className="btn btn-cyan btn-xs"
+                        onClick={() => onAdd && onAdd({ operadorId:driver.id, entidadTipo:"operador" })}>
+                        ✏️ Agregar doc
+                      </button>
                     </div>
                   )}
                 </div>
