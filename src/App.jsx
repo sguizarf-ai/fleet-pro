@@ -4803,27 +4803,63 @@ function DocEnvioModal({ docs, clientes, remitentes, onClose }) {
                     <div style={{ display:"grid",
                       gridTemplateColumns:`repeat(${Math.min(g.fotos.length, 4)}, 1fr)`, gap:8 }}>
                       {g.fotos.map((src, i) => (
-                        <div key={i} style={{ position:"relative", cursor:"pointer" }}
-                          onClick={() => setLightbox({ src, label:`${g.docNombre} — Foto ${i+1}` })}>
+                        <div key={i} style={{ position:"relative" }}>
                           <img src={src}
                             style={{ width:"100%", height:90, objectFit:"cover", borderRadius:8,
-                              border:"2px solid var(--border)", transition:"border-color .15s" }}
+                              border:"2px solid var(--border)", transition:"border-color .15s", cursor:"zoom-in" }}
                             onMouseEnter={e => e.currentTarget.style.borderColor="var(--cyan)"}
                             onMouseLeave={e => e.currentTarget.style.borderColor="var(--border)"}
                             alt={`${g.docNombre} foto ${i+1}`}
+                            onClick={() => setLightbox({ src, label:`${g.docNombre} — Foto ${i+1}` })}
                           />
-                          <div style={{ position:"absolute", bottom:4, right:4, background:"rgba(0,0,0,.55)",
-                            borderRadius:4, padding:"1px 5px", fontSize:9, color:"#fff" }}>
-                            🔍 ampliar
+                          <div style={{ position:"absolute", bottom:4, left:0, right:0, display:"flex", gap:3, justifyContent:"center" }}>
+                            <button
+                              style={{ background:"rgba(0,0,0,.65)", border:"none", borderRadius:4,
+                                padding:"2px 7px", fontSize:10, color:"#fff", cursor:"pointer" }}
+                              onClick={e => { e.stopPropagation();
+                                const a = document.createElement("a");
+                                a.href = src;
+                                a.download = `${g.docNombre.replace(/[^a-zA-Z0-9]/g,"-")}-foto${i+1}.jpg`;
+                                a.click();
+                              }}>⬇️</button>
+                            <button
+                              style={{ background:"rgba(0,0,0,.65)", border:"none", borderRadius:4,
+                                padding:"2px 7px", fontSize:10, color:"#fff", cursor:"pointer" }}
+                              onClick={e => { e.stopPropagation();
+                                setLightbox({ src, label:`${g.docNombre} — Foto ${i+1}` });
+                              }}>🔍</button>
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
                 ))}
-                <div style={{ fontSize:11, color:"var(--muted)", padding:"8px 12px",
-                  background:"var(--bg2)", borderRadius:8, marginTop:4 }}>
-                  💡 Clic en cada foto para ampliarla. Para enviarlas por WhatsApp: guárdalas desde aquí y adjúntalas en la conversación.
+                <div style={{ padding:"10px 14px", background:"rgba(37,211,102,.08)",
+                  border:"1px solid #25D366", borderRadius:8, marginTop:4, fontSize:12 }}>
+                  <div style={{ fontWeight:700, color:"#25D366", marginBottom:6 }}>📲 ¿Cómo enviar las fotos?</div>
+                  <div style={{ color:"var(--text)", lineHeight:1.7 }}>
+                    <span style={{ background:"var(--bg2)", borderRadius:4, padding:"1px 6px", fontWeight:700, marginRight:4 }}>1</span>
+                    Descarga cada foto con el botón <strong>⬇️</strong><br/>
+                    <span style={{ background:"var(--bg2)", borderRadius:4, padding:"1px 6px", fontWeight:700, marginRight:4 }}>2</span>
+                    Abre WhatsApp → escribe al destinatario → adjunta las imágenes<br/>
+                    <span style={{ background:"var(--bg2)", borderRadius:4, padding:"1px 6px", fontWeight:700, marginRight:4 }}>3</span>
+                    Usa el botón <strong>📲 Abrir en WhatsApp</strong> abajo para enviar el texto
+                  </div>
+                  <button
+                    style={{ marginTop:8, padding:"6px 14px", background:"#25D366", color:"#fff",
+                      border:"none", borderRadius:8, fontWeight:700, cursor:"pointer", fontSize:12 }}
+                    onClick={() => {
+                      gruposFotos.forEach((g, gi) => {
+                        g.fotos.forEach((src, fi) => {
+                          const a = document.createElement("a");
+                          a.href = src;
+                          a.download = `${g.docNombre.replace(/[^a-zA-Z0-9]/g,"-")}-foto${fi+1}.jpg`;
+                          setTimeout(() => a.click(), (gi * g.fotos.length + fi) * 300);
+                        });
+                      });
+                    }}>
+                    ⬇️ Descargar todas las fotos ({fotosTotal})
+                  </button>
                 </div>
               </div>
             )}
@@ -8209,6 +8245,7 @@ function TabuladorPage({ tabulador, extrasTabulador, onSaveTabulador, onSaveExtr
           tabulador={tabulador}
           extrasTabulador={extrasTabulador}
           branding={branding}
+          remitentes={remitentes}
           onSave={onSaveCotizaciones}
         />
       )}
@@ -8351,7 +8388,7 @@ function ExtrasTab({ extras, onSave }) {
 }
 
 // ── Lista de cotizaciones ─────────────────────────────────────────────────────
-function CotizacionesTab({ cotizaciones, clientes, tabulador, extrasTabulador, branding, onSave }) {
+function CotizacionesTab({ cotizaciones, clientes, tabulador, extrasTabulador, branding, remitentes, onSave }) {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing]     = useState(null);
   const [preview, setPreview]     = useState(null);
@@ -8433,6 +8470,9 @@ function CotizacionesTab({ cotizaciones, clientes, tabulador, extrasTabulador, b
                   <td>
                     <div style={{ display:"flex", gap:4 }}>
                       <button className="btn btn-cyan btn-xs" title="Ver / Imprimir" onClick={() => setPreview(c)}>🖨️</button>
+                      <button className="btn btn-xs" style={{ background:"#25D366", color:"#fff", fontWeight:700 }}
+                        title="Enviar por WhatsApp"
+                        onClick={() => setPreview({ ...c, _quickWA: true })}>📲</button>
                       <button className="btn btn-ghost btn-xs" title="Editar" onClick={() => { setEditing(c); setShowModal(true); }}>✏️</button>
                       <button className="btn btn-ghost btn-xs" style={{ color:"var(--red)" }} title="Eliminar" onClick={() => del(c.id)}>🗑️</button>
                     </div>
@@ -8466,6 +8506,7 @@ function CotizacionesTab({ cotizaciones, clientes, tabulador, extrasTabulador, b
           branding={branding}
           clientes={clientes}
           remitentes={remitentes}
+          autoWA={preview._quickWA}
           onClose={() => setPreview(null)}
         />
       )}
@@ -8770,11 +8811,17 @@ function CotizacionModal({ cotizacion, clientes, tabulador, extrasTabulador, fol
 }
 
 // ── Preview / Imprimir / WhatsApp ─────────────────────────────────────────────
-function CotizacionPreviewModal({ cotizacion: c, branding, clientes, remitentes, onClose }) {
+function CotizacionPreviewModal({ cotizacion: c, branding, clientes, remitentes, autoWA, onClose }) {
   const cli = clientes.find(x => x.id === c.clienteId);
   const fiscal = calcFiscal(c.subtotal || 0, c.tipoPersona);
   const [remitenteId, setRemitenteId] = useState("");
   const remSel = remitentes?.find(r => r.id === remitenteId);
+  const waRef = useRef(null);
+  useEffect(() => {
+    if (autoWA && waRef.current) {
+      setTimeout(() => waRef.current?.scrollIntoView({ behavior:"smooth", block:"center" }), 200);
+    }
+  }, [autoWA]);
   const fmtMXN = n => "$" + (n||0).toLocaleString("es-MX",{minimumFractionDigits:2});
 
   const htmlContent = () => `<!DOCTYPE html>
@@ -8858,14 +8905,16 @@ ${c.notasImportantes&&c.notasImportantes.length>0 ? `
   ${c.notasImportantes.map(n=>`<p>${n}</p>`).join("")}
 </div>` : ""}
 
-<script>window.onload=()=>{window.print();}</script>
 </body>
 </html>`;
 
   const handleImprimir = () => {
-    const w = window.open("","_blank","width=800,height=700");
+    const w = window.open("","_blank","width=900,height=750");
+    if (!w) { alert("El navegador bloqueó la ventana emergente. Permite pop-ups para fleet-pro.vercel.app"); return; }
     w.document.write(htmlContent());
     w.document.close();
+    // Esperar a que cargue el DOM (incluyendo logo en base64) antes de imprimir
+    w.addEventListener("load", () => setTimeout(() => w.print(), 400));
   };
 
   const handleWhatsApp = () => {
@@ -8970,10 +9019,21 @@ _${branding?.nombre||"JL Transportaciones"}_`;
               {c.notasImportantes.map((n,i)=><div key={i}>{n}</div>)}
             </div>
           )}
+
+          {/* Remitente + WhatsApp */}
+          <div ref={waRef} style={{ marginTop:14, padding:"12px 14px", background:"rgba(37,211,102,.06)",
+            border:"1px solid rgba(37,211,102,.3)", borderRadius:10 }}>
+            <RemitenteSelector remitentes={remitentes||[]} selected={remitenteId} onChange={setRemitenteId}/>
+            <button className="btn" style={{ marginTop:10, width:"100%", background:"#25D366", color:"#fff",
+              fontWeight:700, fontSize:13, padding:"10px", display:"flex", alignItems:"center",
+              justifyContent:"center", gap:8 }}
+              onClick={handleWhatsApp}>
+              📱 Enviar por WhatsApp
+            </button>
+          </div>
         </div>
         <div className="mftr">
           <button className="btn btn-ghost" onClick={onClose}>Cerrar</button>
-          <button className="btn btn-ghost" style={{ color:"var(--green)", border:"1px solid var(--green)" }} onClick={handleWhatsApp}>💬 WhatsApp</button>
           <button className="btn btn-cyan" onClick={handleImprimir}>🖨️ Imprimir / PDF</button>
         </div>
       </div>
@@ -9056,8 +9116,14 @@ const AYUDA_DATA = [
         a: "Cualquier documento con fecha de vencimiento: verificaciones, seguros, permisos SCT, licencias de conductores, tarjetas de circulación, etc. El sistema alerta 30 días antes del vencimiento." },
       { q: "¿Con cuántos días de anticipación me avisa el sistema?",
         a: "Las alertas se activan 30 días antes del vencimiento. Aparecen en el módulo Alertas, en el Dashboard y en el badge de la campana en el sidebar." },
-      { q: "¿Puedo subir el PDF o imagen del documento?",
-        a: "Actualmente el sistema guarda los datos y fechas del documento. La funcionalidad de adjuntar archivos está en el roadmap de próximas versiones." },
+      { q: "¿Puedo subir fotos de los documentos?",
+        a: "Sí. Cada documento puede tener múltiples fotos (frente y reverso de licencia, póliza, etc.). Al agregar o editar un documento, usa el campo de fotos para subirlas desde tu dispositivo. Las fotos se comprimen automáticamente antes de guardarse." },
+      { q: "¿Cómo selecciono documentos para enviar por WhatsApp?",
+        a: "En el módulo Documentos, haz clic sobre cualquier tarjeta para seleccionarla (se marca con un borde azul y ✓). Puedes seleccionar varios documentos de distintas unidades. También hay un botón '☐ Seleccionar todos' por unidad. Una vez seleccionados, aparece la barra azul con el botón '📲 Enviar por WhatsApp'." },
+      { q: "¿Cómo envío las fotos de los documentos por WhatsApp?",
+        a: "WhatsApp Web no permite adjuntar archivos directamente desde un enlace. El flujo es: 1) En el modal de envío, descarga cada foto con el botón ⬇️ (o usa 'Descargar todas las fotos'). 2) Abre WhatsApp y escribe al destinatario. 3) Adjunta las imágenes descargadas manualmente. 4) Usa el botón '📲 Abrir en WhatsApp' del modal para enviar el texto de resumen por separado." },
+      { q: "¿Qué es un Remitente WhatsApp?",
+        a: "Son los números de tu empresa desde los que se envían los mensajes. Configúralos en el sidebar, botón '📱 Remitentes WhatsApp' (solo admin). Puedes agregar varios: Oficina MTY, Logística, un número por operador, etc. Al enviar, seleccionas cuál aparece como firma al pie del mensaje." },
     ]
   },
   {
@@ -9097,7 +9163,9 @@ const AYUDA_DATA = [
       { q: "¿Qué es el Tabulador?",
         a: "Es tu catálogo de tarifas por tipo de unidad: tarifa por viaje, tarifa por km y tarifa por día. Se configura en Finanzas → Cotizaciones → pestaña 'Tabulador'. Las cotizaciones toman automáticamente estas tarifas." },
       { q: "¿Cómo envío una cotización al cliente?",
-        a: "En la lista de cotizaciones, el botón '📄 PDF' abre la vista de impresión. El botón '📲 WhatsApp' genera un mensaje de texto listo para enviar con el resumen de la cotización." },
+        a: "Hay dos formas: 1) Desde la lista, el botón 📲 verde abre directo la vista de la cotización en el apartado de WhatsApp. 2) Desde el botón 🖨️ que abre la vista completa, desplázate hacia abajo para ver el panel verde de WhatsApp. Si tienes Remitentes configurados, puedes elegir cuál firma el mensaje antes de enviarlo." },
+      { q: "¿Cómo imprimo o genero PDF de una cotización?",
+        a: "En la lista de cotizaciones, haz clic en 🖨️. Se abre una ventana de vista previa. Haz clic en '🖨️ Imprimir / PDF', se abre el diálogo de impresión del navegador. Para guardar como PDF, elige 'Guardar como PDF' como destino en el diálogo de impresión." },
       { q: "¿Cómo configuro el folio de las cotizaciones?",
         a: "En Finanzas → Cotizaciones → pestaña Cotizaciones, en la parte superior hay un campo 'Prefijo de Folio'. Puedes escribir algo como 'COT-2026-' y el sistema numerará las cotizaciones a partir del número que definas." },
       { q: "¿Puedo agregar servicios adicionales a una cotización?",
