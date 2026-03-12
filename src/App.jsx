@@ -150,6 +150,11 @@ tbody tr:hover{background:var(--bg2)}
 .doc-name{font-weight:700;font-size:13px;color:var(--text);line-height:1.3}
 .doc-date{font-size:11px;color:var(--muted);margin-top:4px}
 .doc-empty-card{background:var(--bg2);border:2px dashed var(--border);border-radius:10px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted)}
+.photo-box{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:2px dashed var(--border);border-radius:10px;height:110px;cursor:pointer;background:var(--bg2);transition:all .2s;overflow:hidden;position:relative}
+.photo-box:hover{border-color:var(--cyan);background:rgba(0,153,204,.06)}
+.photo-box img{width:100%;height:100%;object-fit:cover;border-radius:8px;display:block}
+.photo-box.sm{height:80px}
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:8px}
 `;
 
 
@@ -442,14 +447,53 @@ function Confirm({ msg, onOk, onCancel }) {
   );
 }
 
+// Comprime imagen a base64 con ancho máx y calidad configurable
+// Evita el límite de 1MB de Firestore por documento
+const compressImage = (file, maxW = 800, quality = 0.72) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = ev => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width);
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
 function PhotoInput({ value, onChange, label = "Foto" }) {
   const ref = useRef();
-  const handle = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => onChange(ev.target.result); r.readAsDataURL(f) };
+  const [loading, setLoading] = useState(false);
+  const handle = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    setLoading(true);
+    try { onChange(await compressImage(f)); } catch { alert("No se pudo procesar la imagen"); }
+    setLoading(false);
+    e.target.value = "";
+  };
   return (
     <div className="field">
       <label>{label}</label>
-      <div className="photo-box" onClick={() => ref.current.click()}>
-        {value ? <img src={value} alt="" /> : <><span style={{ fontSize: 28, opacity: .4 }}>📷</span><span style={{ fontSize: 11, color: "var(--muted)" }}>Clic para subir</span></>}
+      <div className="photo-box" onClick={() => !loading && ref.current.click()}>
+        {loading
+          ? <span style={{ fontSize: 12, color: "var(--muted)" }}>⏳ Procesando...</span>
+          : value
+            ? <>
+                <img src={value} alt="" />
+                <button onClick={e => { e.stopPropagation(); onChange(""); }}
+                  style={{ position:"absolute", top:4, right:4, background:"rgba(0,0,0,.55)", border:"none", borderRadius:"50%", width:22, height:22, color:"#fff", fontSize:12, cursor:"pointer", lineHeight:"22px", textAlign:"center" }}>✕</button>
+              </>
+            : <><span style={{ fontSize: 28, opacity: .4 }}>📷</span><span style={{ fontSize: 11, color: "var(--muted)" }}>Clic para subir foto</span></>
+        }
         <input ref={ref} type="file" accept="image/*" onChange={handle} style={{ display: "none" }} />
       </div>
     </div>
@@ -458,12 +502,28 @@ function PhotoInput({ value, onChange, label = "Foto" }) {
 
 function PhotoInputSm({ value, onChange, label = "Foto" }) {
   const ref = useRef();
-  const handle = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => onChange(ev.target.result); r.readAsDataURL(f) };
+  const [loading, setLoading] = useState(false);
+  const handle = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    setLoading(true);
+    try { onChange(await compressImage(f, 600, 0.70)); } catch { alert("No se pudo procesar la imagen"); }
+    setLoading(false);
+    e.target.value = "";
+  };
   return (
     <div className="field">
       <label>{label}</label>
-      <div className="photo-box sm" onClick={() => ref.current.click()}>
-        {value ? <img src={value} alt="" /> : <><span style={{ fontSize: 22, opacity: .4 }}>📷</span><span style={{ fontSize: 10, color: "var(--muted)" }}>Clic</span></>}
+      <div className="photo-box sm" onClick={() => !loading && ref.current.click()}>
+        {loading
+          ? <span style={{ fontSize: 11, color: "var(--muted)" }}>⏳</span>
+          : value
+            ? <>
+                <img src={value} alt="" />
+                <button onClick={e => { e.stopPropagation(); onChange(""); }}
+                  style={{ position:"absolute", top:3, right:3, background:"rgba(0,0,0,.55)", border:"none", borderRadius:"50%", width:18, height:18, color:"#fff", fontSize:10, cursor:"pointer", lineHeight:"18px", textAlign:"center" }}>✕</button>
+              </>
+            : <><span style={{ fontSize: 22, opacity: .4 }}>📷</span><span style={{ fontSize: 10, color: "var(--muted)" }}>Clic</span></>
+        }
         <input ref={ref} type="file" accept="image/*" onChange={handle} style={{ display: "none" }} />
       </div>
     </div>
@@ -472,18 +532,26 @@ function PhotoInputSm({ value, onChange, label = "Foto" }) {
 
 function MultiPhotoInput({ values = [], onChange, label = "Evidencias Fotográficas" }) {
   const ref = useRef();
-  const handle = e => {
-    const files = Array.from(e.target.files);
-    const readers = files.map(f => new Promise(res => { const r = new FileReader(); r.onload = ev => res(ev.target.result); r.readAsDataURL(f) }));
-    Promise.all(readers).then(results => onChange([...values, ...results]));
+  const [loading, setLoading] = useState(false);
+  const handle = async e => {
+    const files = Array.from(e.target.files); if (!files.length) return;
+    setLoading(true);
+    try {
+      const compressed = await Promise.all(files.map(f => compressImage(f, 900, 0.72)));
+      onChange([...values, ...compressed]);
+    } catch { alert("No se pudo procesar alguna imagen"); }
+    setLoading(false);
+    e.target.value = "";
   };
   const remove = i => onChange(values.filter((_, idx) => idx !== i));
   return (
     <div className="field s2">
       <label>{label} ({values.length})</label>
-      <div className="photo-box" onClick={() => ref.current.click()} style={{ height: 60, flexDirection: "row", gap: 8 }}>
-        <span style={{ fontSize: 24, opacity: .4 }}>📸</span>
-        <span style={{ fontSize: 11, color: "var(--muted)" }}>Clic para subir (múltiples)</span>
+      <div className="photo-box" onClick={() => !loading && ref.current.click()} style={{ height: 64, flexDirection: "row", gap: 10 }}>
+        {loading
+          ? <span style={{ fontSize: 12, color: "var(--muted)" }}>⏳ Procesando imágenes...</span>
+          : <><span style={{ fontSize: 24, opacity: .4 }}>📸</span><span style={{ fontSize: 11, color: "var(--muted)" }}>Clic para subir (puedes elegir varias)</span></>
+        }
         <input ref={ref} type="file" accept="image/*" multiple onChange={handle} style={{ display: "none" }} />
       </div>
       {values.length > 0 && (
@@ -491,7 +559,8 @@ function MultiPhotoInput({ values = [], onChange, label = "Evidencias Fotográfi
           {values.map((v, i) => (
             <div key={i} style={{ position: "relative" }}>
               <img src={v} style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)" }} alt={`ev${i}`} />
-              <button className="btn btn-red btn-xs" onClick={e => { e.stopPropagation(); remove(i) }} style={{ position: "absolute", top: 4, right: 4 }}>✕</button>
+              <button onClick={e => { e.stopPropagation(); remove(i); }}
+                style={{ position:"absolute", top:4, right:4, background:"rgba(0,0,0,.55)", border:"none", borderRadius:"50%", width:20, height:20, color:"#fff", fontSize:11, cursor:"pointer", lineHeight:"20px", textAlign:"center" }}>✕</button>
             </div>
           ))}
         </div>
