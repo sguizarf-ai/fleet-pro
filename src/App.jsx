@@ -7,379 +7,145 @@ import { fsGet, fsSet, fsListen } from "./firebaseDB";
    consolidados financieros y reportes avanzados
 ═══════════════════════════════════════════════════════════════ */
 
-const FONT_LINK = `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@600;700;800;900&display=swap');`;
+const FONT_LINK = `@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');`;
 
 const CSS = `
 ${FONT_LINK}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-
-/* ── TEMA CLARO ── */
 :root{
-  --bg0:#F0F4F8;
-  --bg1:#FFFFFF;
-  --bg2:#E8EEF4;
-  --bg3:#D6E0EA;
-  --bg4:#C4D2E0;
-  --text:#0F1923;
-  --muted:#5A6E82;
-  --border:#CBD8E4;
-  --cyan:#0070F3;
-  --cyan2:#3B8BFF;
-  --green:#00C56E;
-  --orange:#FF5C1A;
-  --red:#E5173C;
-  --yellow:#F5A800;
-  --purple:#7C3AED;
-  --pink:#DB2777;
-  --font-hd:'Orbitron',sans-serif;
-  --font-bd:'Inter',sans-serif;
-  --glow-cyan:rgba(0,112,243,.18);
-  --glow-green:rgba(0,197,110,.18);
-  --glow-purple:rgba(124,58,237,.18);
-  --glow-orange:rgba(255,92,26,.18);
-  --sb-bg:#0F1923;
-  --sb-text:#94A3B8;
-  --sb-active:#0070F3;
-  --sb-border:#1E2D3D;
-  --sb-logo1:#38BDF8;
-  --sb-logo2:#7C3AED;
+  --bg0:#F5F7FA;--bg1:#FFFFFF;--bg2:#E8EDF2;--bg3:#D4DCE6;--bg4:#C0CAD8;
+  --cyan:#0099CC;--cyan2:#00B8E6;--orange:#FF6B2B;--green:#00C896;
+  --red:#E63946;--yellow:#FFB800;--purple:#7B61FF;
+  --text:#1A2332;--muted:#6B7A8F;--border:#D0D8E0;
+  --font-hd:'Rajdhani',sans-serif;--font-bd:'DM Sans',sans-serif;
 }
-
-/* ── TEMA OSCURO ── */
 [data-theme="dark"]{
-  --bg0:#0B0F18;
-  --bg1:#111827;
-  --bg2:#1A2235;
-  --bg3:#22304A;
-  --bg4:#2A3E5E;
-  --text:#E8F0FE;
-  --muted:#6E8BAA;
-  --border:#1E3050;
-  --cyan:#38BDF8;
-  --cyan2:#7DD3FC;
-  --green:#34D399;
-  --orange:#FB923C;
-  --red:#F87171;
-  --yellow:#FBBF24;
-  --purple:#A78BFA;
-  --pink:#F472B6;
-  --glow-cyan:rgba(56,189,248,.2);
-  --glow-green:rgba(52,211,153,.2);
-  --glow-purple:rgba(167,139,250,.2);
-  --glow-orange:rgba(251,146,60,.2);
-  --sb-bg:#070C14;
-  --sb-text:#4A6B8A;
-  --sb-active:#38BDF8;
-  --sb-border:#0F1E2F;
-  --sb-logo1:#38BDF8;
-  --sb-logo2:#A78BFA;
+  --bg0:#0D1117;--bg1:#161B22;--bg2:#1C2430;--bg3:#243042;--bg4:#2D3B52;
+  --text:#E2E8F0;--muted:#8899AA;--border:#2D3B52;
+  --cyan:#00BFFF;--cyan2:#33CFFF;--orange:#FF7A40;--green:#00E5A8;
+  --red:#FF4D5A;--yellow:#FFD000;--purple:#9D87FF;
 }
-
-/* ── TEMA NOCHE ── */
 [data-theme="blue"]{
-  --bg0:#020817;
-  --bg1:#0A1628;
-  --bg2:#0F2040;
-  --bg3:#152A55;
-  --bg4:#1C3468;
-  --text:#BAD4F5;
-  --muted:#4A6B99;
-  --border:#0F2A50;
-  --cyan:#60A5FA;
-  --cyan2:#93C5FD;
-  --green:#4ADE80;
-  --orange:#FDA855;
-  --red:#FC8181;
-  --yellow:#FDE68A;
-  --purple:#C4B5FD;
-  --pink:#F9A8D4;
-  --glow-cyan:rgba(96,165,250,.25);
-  --glow-green:rgba(74,222,128,.25);
-  --glow-purple:rgba(196,181,253,.25);
-  --glow-orange:rgba(253,168,85,.25);
-  --sb-bg:#030D1F;
-  --sb-text:#2A4870;
-  --sb-active:#60A5FA;
-  --sb-border:#071528;
-  --sb-logo1:#60A5FA;
-  --sb-logo2:#C4B5FD;
+  --bg0:#0A0F1E;--bg1:#0F172A;--bg2:#1E293B;--bg3:#263548;--bg4:#2E4060;
+  --text:#CBD5E1;--muted:#64748B;--border:#1E3A5F;
+  --cyan:#38BDF8;--cyan2:#7DD3FC;--orange:#FB923C;--green:#34D399;
+  --red:#F87171;--yellow:#FBBF24;--purple:#A78BFA;
 }
-
-body{background:var(--bg0);color:var(--text);font-family:var(--font-bd);font-size:13px;min-height:100vh;-webkit-font-smoothing:antialiased}
-::-webkit-scrollbar{width:5px;height:5px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
-::-webkit-scrollbar-thumb:hover{background:var(--muted)}
-
-/* ── LAYOUT ── */
+body{background:var(--bg0);color:var(--text);font-family:var(--font-bd);font-size:13px;min-height:100vh}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--muted);border-radius:3px}
 .app{display:flex;min-height:100vh}
-.main{margin-left:250px;flex:1;padding:24px 30px;min-height:100vh;background:var(--bg0)}
-
-/* ── SIDEBAR ── */
-.sidebar{
-  width:250px;min-height:100vh;
-  background:var(--sb-bg);
-  border-right:1px solid var(--sb-border);
-  display:flex;flex-direction:column;
-  position:fixed;left:0;top:0;bottom:0;z-index:200;overflow-y:auto;
-  box-shadow:4px 0 24px rgba(0,0,0,.35);
-}
-.sb-logo{padding:20px 18px 16px;border-bottom:1px solid var(--sb-border);flex-shrink:0;position:relative}
-.sb-logo::after{content:'';position:absolute;bottom:0;left:18px;right:18px;height:1px;background:linear-gradient(90deg,transparent,var(--sb-active),transparent);opacity:.4}
-.sb-logo-title{
-  font-family:var(--font-hd);font-size:20px;font-weight:800;letter-spacing:.08em;
-  background:linear-gradient(135deg,var(--sb-logo1),var(--sb-logo2));
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-  text-shadow:none;
-}
-.sb-logo-sub{font-size:9px;color:var(--sb-text);text-transform:uppercase;letter-spacing:.16em;margin-top:3px}
-.sb-sect{padding:14px 18px 4px;font-size:9px;font-weight:700;color:var(--sb-text);text-transform:uppercase;letter-spacing:.14em;opacity:.6}
-.nav-btn{
-  display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;
-  margin:2px 8px;border-radius:8px;
-  transition:all .2s;color:var(--sb-text);font-size:12px;font-weight:500;
-  border:1px solid transparent;position:relative;
-}
-.nav-btn:hover{background:rgba(255,255,255,.04);color:#C8D8E8;border-color:rgba(255,255,255,.06)}
-.nav-btn.on{
-  background:linear-gradient(135deg,rgba(0,112,243,.15),rgba(124,58,237,.08));
-  color:#fff;font-weight:600;
-  border-color:rgba(56,189,248,.2);
-  box-shadow:0 0 12px rgba(0,112,243,.12),inset 0 0 12px rgba(0,112,243,.04);
-}
-.nav-btn.on::before{content:'';position:absolute;left:0;top:20%;bottom:20%;width:3px;border-radius:0 3px 3px 0;background:var(--sb-active);box-shadow:0 0 8px var(--sb-active)}
-.nav-icon{font-size:15px;width:18px;text-align:center;flex-shrink:0}
-.sb-footer{padding:12px 14px;border-top:1px solid var(--sb-border);flex-shrink:0;margin-top:auto}
-
-/* ── TOPBAR ── */
-.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:26px;gap:14px;flex-wrap:wrap}
-.topbar-title{font-family:var(--font-hd);font-size:26px;font-weight:800;letter-spacing:.05em;color:var(--text)}
-.topbar-sub{font-size:11px;color:var(--muted);margin-top:2px;letter-spacing:.02em}
-
-/* ── CARDS ── */
-.card{
-  background:var(--bg1);
-  border:1px solid var(--border);
-  border-radius:14px;overflow:hidden;margin-bottom:16px;
-  box-shadow:0 2px 8px rgba(0,0,0,.06);
-  transition:box-shadow .2s;
-}
-.card:hover{box-shadow:0 4px 20px rgba(0,0,0,.1)}
-.card-hdr{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:14px 20px;border-bottom:1px solid var(--border);
-  background:var(--bg2);gap:12px;flex-wrap:wrap;
-}
-.card-hdr h3{font-family:var(--font-hd);font-size:14px;font-weight:700;letter-spacing:.04em;white-space:nowrap;color:var(--text)}
+.sidebar{width:250px;min-height:100vh;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;left:0;top:0;bottom:0;z-index:200;overflow-y:auto;box-shadow:2px 0 8px rgba(0,0,0,.04)}
+.main{margin-left:250px;flex:1;padding:24px 28px;min-height:100vh}
+.sb-logo{padding:18px 16px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-logo-title{font-family:var(--font-hd);font-size:24px;font-weight:700;letter-spacing:.06em;background:linear-gradient(135deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sb-logo-sub{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;margin-top:2px}
+.sb-sect{padding:10px 14px 4px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+.nav-btn{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;border-left:3px solid transparent;border-radius:0 8px 8px 0;margin:2px 10px 2px 0;transition:all .2s;color:var(--muted);font-size:13px;font-weight:500}
+.nav-btn:hover{background:var(--bg2);color:var(--text)}
+.nav-btn.on{border-left-color:var(--cyan);background:linear-gradient(90deg,var(--bg2),transparent);color:var(--cyan);font-weight:600}
+.nav-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+.sb-footer{padding:12px 14px;border-top:1px solid var(--border);flex-shrink:0;margin-top:auto}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;gap:14px;flex-wrap:wrap}
+.topbar-title{font-family:var(--font-hd);font-size:30px;font-weight:700;letter-spacing:.04em;color:var(--text)}
+.topbar-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.card{background:var(--bg1);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.card-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);background:var(--bg2);gap:12px;flex-wrap:wrap}
+.card-hdr h3{font-family:var(--font-hd);font-size:17px;font-weight:600;letter-spacing:.03em;white-space:nowrap;color:var(--text)}
 .card-body{overflow-x:auto}
-
-/* ── STATS / KPI CARDS ── */
-.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:14px;margin-bottom:20px}
-.stat{
-  background:var(--bg1);
-  border:1px solid var(--border);
-  border-radius:14px;padding:18px 20px;
-  position:relative;overflow:hidden;cursor:pointer;
-  transition:all .25s;
-}
-.stat::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:2px;
-  background:var(--c,var(--cyan));
-  box-shadow:0 0 10px var(--c,var(--cyan));
-  opacity:.8;
-}
-.stat::after{
-  content:'';position:absolute;top:0;right:0;width:80px;height:80px;
-  background:radial-gradient(circle at top right,var(--c,var(--cyan)),transparent 70%);
-  opacity:.06;pointer-events:none;
-}
-.stat:hover{transform:translateY(-3px);border-color:var(--c,var(--cyan));box-shadow:0 8px 24px rgba(0,0,0,.12),0 0 0 1px var(--c,var(--cyan)),0 0 20px var(--glow-cyan)}
-.stat-icon{font-size:20px;margin-bottom:8px;opacity:.85;position:relative;z-index:1}
-.stat-val{font-family:var(--font-hd);font-size:28px;font-weight:800;line-height:1;color:var(--text);position:relative;z-index:1;letter-spacing:.02em}
-.stat-val.sm{font-size:17px;letter-spacing:.01em}
-.stat-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-top:6px;font-weight:700;position:relative;z-index:1}
-.stat-sub{font-size:11px;color:var(--muted);margin-top:3px;position:relative;z-index:1}
-
-/* ── TABLAS ── */
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:20px}
+.stat{background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden;cursor:pointer;transition:all .2s;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.stat:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.08)}
+.stat::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--c)}
+.stat-icon{font-size:22px;margin-bottom:6px;opacity:.9}
+.stat-val{font-family:var(--font-hd);font-size:30px;font-weight:700;line-height:1;color:var(--text)}
+.stat-val.sm{font-size:18px}
+.stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:5px;font-weight:600}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:3px}
 table{width:100%;border-collapse:collapse}
 thead tr{background:var(--bg2)}
-th{padding:10px 14px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);white-space:nowrap;border-bottom:1px solid var(--border)}
-td{padding:12px 14px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:middle}
+th{padding:10px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);white-space:nowrap;border-bottom:1px solid var(--border)}
+td{padding:11px 14px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:middle}
 tr:last-child td{border-bottom:none}
-tbody tr{transition:background .15s}
 tbody tr:hover{background:var(--bg2)}
-
-/* ── BADGES ── */
-.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:.04em;white-space:nowrap}
-.bg{background:rgba(0,197,110,.12);color:#00C56E;border:1px solid rgba(0,197,110,.2)}
-.br{background:rgba(229,23,60,.1);color:#E5173C;border:1px solid rgba(229,23,60,.2)}
-.by{background:rgba(245,168,0,.12);color:#B87800;border:1px solid rgba(245,168,0,.2)}
-.bb{background:rgba(0,112,243,.1);color:#0070F3;border:1px solid rgba(0,112,243,.2)}
-.bp{background:rgba(124,58,237,.1);color:#7C3AED;border:1px solid rgba(124,58,237,.2)}
-.bm{background:var(--bg2);color:var(--muted);border:1px solid var(--border)}
-.bo{background:rgba(255,92,26,.1);color:#CC3300;border:1px solid rgba(255,92,26,.2)}
-[data-theme="dark"] .bg{background:rgba(52,211,153,.12);color:#34D399;border-color:rgba(52,211,153,.2)}
-[data-theme="dark"] .br{background:rgba(248,113,113,.1);color:#F87171;border-color:rgba(248,113,113,.2)}
-[data-theme="dark"] .by{background:rgba(251,191,36,.1);color:#FBBF24;border-color:rgba(251,191,36,.2)}
-[data-theme="dark"] .bb{background:rgba(56,189,248,.1);color:#38BDF8;border-color:rgba(56,189,248,.2)}
-[data-theme="dark"] .bp{background:rgba(167,139,250,.1);color:#A78BFA;border-color:rgba(167,139,250,.2)}
-[data-theme="dark"] .bo{background:rgba(251,146,60,.1);color:#FB923C;border-color:rgba(251,146,60,.2)}
-[data-theme="blue"] .bg{background:rgba(74,222,128,.1);color:#4ADE80;border-color:rgba(74,222,128,.2)}
-[data-theme="blue"] .br{background:rgba(252,129,129,.1);color:#FC8181;border-color:rgba(252,129,129,.2)}
-[data-theme="blue"] .by{background:rgba(253,230,138,.1);color:#FDE68A;border-color:rgba(253,230,138,.2)}
-[data-theme="blue"] .bb{background:rgba(96,165,250,.1);color:#60A5FA;border-color:rgba(96,165,250,.2)}
-[data-theme="blue"] .bp{background:rgba(196,181,253,.1);color:#C4B5FD;border-color:rgba(196,181,253,.2)}
-[data-theme="blue"] .bo{background:rgba(253,168,85,.1);color:#FDA855;border-color:rgba(253,168,85,.2)}
-
-/* ── BOTONES ── */
-.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 16px;border-radius:8px;border:none;cursor:pointer;font-family:var(--font-bd);font-size:12px;font-weight:600;transition:all .2s;white-space:nowrap;line-height:1;letter-spacing:.01em}
-.btn:active{transform:scale(.97)}
-.btn-cyan{background:var(--cyan);color:#fff;box-shadow:0 2px 8px var(--glow-cyan)}
-.btn-cyan:hover{background:var(--cyan2);box-shadow:0 4px 16px var(--glow-cyan),0 0 0 1px rgba(255,255,255,.1)}
-.btn-orange{background:var(--orange);color:#fff;box-shadow:0 2px 8px var(--glow-orange)}
-.btn-orange:hover{box-shadow:0 4px 16px var(--glow-orange)}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.04em;white-space:nowrap}
+.bg{background:#D4F4DD;color:#00864E}
+.br{background:#FFE5E8;color:#C41E3A}
+.by{background:#FFF3CD;color:#997404}
+.bb{background:#D4EDFF;color:#006699}
+.bp{background:#E8E0FF;color:#5A3DB8}
+.bm{background:#E8EDF2;color:#6B7A8F}
+.bo{background:#FFE4D6;color:#CC4400}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 15px;border-radius:8px;border:none;cursor:pointer;font-family:var(--font-bd);font-size:12px;font-weight:600;transition:all .2s;white-space:nowrap;line-height:1}
+.btn:active{transform:scale(.98)}
+.btn-cyan{background:var(--cyan);color:#fff;box-shadow:0 2px 6px rgba(0,153,204,.25)}
+.btn-cyan:hover{background:var(--cyan2);box-shadow:0 4px 12px rgba(0,153,204,.35)}
+.btn-orange{background:var(--orange);color:#fff;box-shadow:0 2px 6px rgba(255,107,43,.25)}
+.btn-orange:hover{box-shadow:0 4px 12px rgba(255,107,43,.35)}
 .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
 .btn-ghost:hover{background:var(--bg2);color:var(--text);border-color:var(--muted)}
-.btn-red{background:rgba(229,23,60,.1);color:var(--red);border:1px solid rgba(229,23,60,.2)}
-.btn-red:hover{background:rgba(229,23,60,.18)}
-.btn-green{background:rgba(0,197,110,.1);color:var(--green);border:1px solid rgba(0,197,110,.2)}
-.btn-green:hover{background:rgba(0,197,110,.18)}
-.btn-purple{background:rgba(124,58,237,.1);color:var(--purple);border:1px solid rgba(124,58,237,.2)}
-.btn-purple:hover{background:rgba(124,58,237,.18)}
-.btn-sm{padding:5px 12px;font-size:11px}
-.btn-xs{padding:3px 9px;font-size:10px;border-radius:6px}
-
-/* ── MODALES ── */
-.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
-.modal{
-  background:var(--bg1);border:1px solid var(--border);
-  border-radius:18px;width:100%;max-width:700px;max-height:92vh;overflow-y:auto;
-  animation:mUp .22s cubic-bezier(.22,1,.36,1);
-  box-shadow:0 24px 80px rgba(0,0,0,.35),0 0 0 1px rgba(255,255,255,.04);
-}
+.btn-red{background:#FFE5E8;color:var(--red);border:1px solid #FFD0D5}
+.btn-red:hover{background:#FFD0D5}
+.btn-green{background:#D4F4DD;color:#00864E;border:1px solid #B8EDCA}
+.btn-green:hover{background:#B8EDCA}
+.btn-purple{background:#E8E0FF;color:#5A3DB8;border:1px solid #D4C7FF}
+.btn-purple:hover{background:#D4C7FF}
+.btn-sm{padding:5px 11px;font-size:11px}
+.btn-xs{padding:3px 9px;font-size:10px}
+.modal-ov{position:fixed;inset:0;background:rgba(26,35,50,.65);backdrop-filter:blur(6px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--bg1);border:1px solid var(--border);border-radius:16px;width:100%;max-width:700px;max-height:92vh;overflow-y:auto;animation:mUp .25s ease;box-shadow:0 20px 60px rgba(0,0,0,.15)}
 .modal.wide{max-width:920px}
 .modal.xwide{max-width:1200px}
-@keyframes mUp{from{opacity:0;transform:translateY(28px) scale(.97)}to{opacity:1;transform:none}}
-.mhdr{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:18px 24px;border-bottom:1px solid var(--border);
-  background:var(--bg2);position:sticky;top:0;z-index:2;
-  border-radius:18px 18px 0 0;
-}
-.mhdr h3{font-family:var(--font-hd);font-size:16px;font-weight:700;color:var(--text);letter-spacing:.04em}
-.mbody{padding:24px}
-.mftr{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;background:var(--bg2);position:sticky;bottom:0;border-radius:0 0 18px 18px}
-
-/* ── FORMULARIOS ── */
+@keyframes mUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+.mhdr{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--border);background:var(--bg2);position:sticky;top:0;z-index:2}
+.mhdr h3{font-family:var(--font-hd);font-size:19px;font-weight:700;color:var(--text)}
+.mbody{padding:22px}
+.mftr{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;background:var(--bg2);position:sticky;bottom:0}
 .fg{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .fg .s2{grid-column:1/-1}
 .field{display:flex;flex-direction:column;gap:6px}
-.field label{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
-.field input,.field select,.field textarea{
-  background:var(--bg0);border:1px solid var(--border);color:var(--text);
-  padding:9px 12px;border-radius:8px;font-family:var(--font-bd);font-size:12px;
-  transition:all .2s;outline:none;
-}
-.field input:focus,.field select:focus,.field textarea:focus{
-  border-color:var(--cyan);
-  box-shadow:0 0 0 3px var(--glow-cyan);
-  background:var(--bg1);
-}
+.field label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.field input,.field select,.field textarea{background:var(--bg0);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:8px;font-family:var(--font-bd);font-size:12px;transition:all .2s}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 3px rgba(0,153,204,.1);background:var(--bg1)}
 .field select option{background:var(--bg1)}
 .field textarea{resize:vertical;min-height:75px}
-.sec-lbl{
-  font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;
-  color:var(--cyan);padding:16px 0 10px;
-  border-bottom:1px solid var(--border);
-  margin-bottom:14px;
-  background:linear-gradient(90deg,var(--cyan),var(--purple));
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-  display:block;
-}
-
-/* ── SEARCH / FILTROS ── */
-.sw{display:flex;align-items:center;gap:10px;background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:0 12px;min-width:200px;transition:all .2s}
-.sw:focus-within{border-color:var(--cyan);box-shadow:0 0 0 3px var(--glow-cyan)}
-.sw input{background:none;border:none;outline:none;color:var(--text);font-family:var(--font-bd);font-size:12px;padding:9px 0;width:100%}
-
-/* ── FILTER TABS ── */
-.ftabs{display:flex;gap:6px;flex-wrap:wrap}
-.ftab{
-  padding:6px 14px;border-radius:6px;
-  border:1px solid var(--border);
-  background:var(--bg1);color:var(--muted);
-  cursor:pointer;font-size:11px;font-weight:600;
-  transition:all .2s;letter-spacing:.02em;
-}
-.ftab.on{
-  background:var(--cyan);color:#fff;border-color:var(--cyan);
-  box-shadow:0 2px 8px var(--glow-cyan);
-}
-.ftab:hover:not(.on){border-color:var(--cyan);color:var(--cyan);background:var(--glow-cyan)}
-
-/* ── SEARCH BAR ── */
-.sbar{display:flex;gap:16px;padding:10px 18px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center}
-.sbar span{font-size:11px;color:var(--muted);font-weight:500}
-.sbar strong{color:var(--text);margin-left:4px;font-weight:700}
-
-/* ── EMPTY STATE ── */
-.empty{text-align:center;padding:56px;color:var(--muted)}
-.empty-icon{font-size:40px;opacity:.3;margin-bottom:14px}
-
-/* ── ALERTS ── */
-.acts{display:flex;gap:5px;align-items:center}
-.ab{display:flex;align-items:flex-start;gap:11px;padding:12px 16px;border-radius:10px;margin-bottom:10px;font-size:12px;border:1px solid}
-.ab-r{background:rgba(229,23,60,.07);border-color:rgba(229,23,60,.2);color:var(--red)}
-.ab-y{background:rgba(245,168,0,.07);border-color:rgba(245,168,0,.2);color:var(--yellow)}
-.ab-g{background:rgba(0,197,110,.07);border-color:rgba(0,197,110,.2);color:var(--green)}
-
-/* ── PHOTO INPUT ── */
-.photo-box{width:100%;height:140px;background:var(--bg2);border:1.5px dashed var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
-.photo-box.sm{height:100px}
-.photo-box:hover{border-color:var(--cyan);background:var(--bg1);box-shadow:inset 0 0 16px var(--glow-cyan)}
-.photo-box img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:10px}
-
-/* ── CHARTS ── */
-.chart-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.chart-lbl{width:90px;font-size:10px;color:var(--muted);text-align:right;flex-shrink:0;font-weight:600}
-.bar-bg{flex:1;height:18px;background:var(--bg3);border-radius:4px;overflow:hidden;display:flex}
-.bar-fill{height:100%;transition:width .5s ease;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;border-radius:4px}
-
-/* ── DOCS ── */
-.doc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:10px;padding:14px}
-.doc-card{background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:13px 15px;position:relative;transition:all .2s}
-.doc-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.1);transform:translateY(-1px)}
-.doc-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:10px 0 0 10px;background:var(--dc)}
-.doc-name{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
-.doc-date{font-size:14px;font-weight:700;color:var(--text)}
-.km-meter{height:5px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-top:4px;width:70px}
-.km-fill{height:100%;border-radius:3px;transition:width .3s}
-
-/* ── TOASTS ── */
-.toast{position:fixed;top:20px;right:20px;z-index:9999;padding:12px 18px;border-radius:12px;font-size:13px;font-weight:600;animation:mUp .25s ease;max-width:320px;box-shadow:0 12px 40px rgba(0,0,0,.2);display:flex;align-items:center;gap:10px;border:1px solid;backdrop-filter:blur(8px)}
-.km-alert{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:10px;background:rgba(245,168,0,.08);border:1px solid rgba(245,168,0,.2);color:var(--yellow);margin-bottom:8px}
-.km-alert.critical{background:rgba(229,23,60,.08);border-color:rgba(229,23,60,.2);color:var(--red)}
-.t-ok{background:rgba(0,197,110,.1);border-color:rgba(0,197,110,.25);color:var(--green)}
-.t-err{background:rgba(229,23,60,.1);border-color:rgba(229,23,60,.25);color:var(--red)}
-.t-info{background:rgba(0,112,243,.1);border-color:rgba(0,112,243,.25);color:var(--cyan)}
-
-/* ── MISCELÁNEOS ── */
-.row-gap{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.lock-icon{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:rgba(245,168,0,.15);color:var(--yellow);font-size:10px;margin-left:6px}
-.profit-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:12px}
-.profit-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
-.profit-row:last-child{border:none;font-weight:700;font-size:16px;margin-top:6px;padding-top:12px;border-top:2px solid var(--cyan)}
-.profit-lbl{font-size:12px;color:var(--muted);font-weight:500}
-.profit-val{font-family:var(--font-hd);font-size:17px;font-weight:700}
-.percentage-card{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--bg1);border:1px solid var(--border);border-radius:12px;margin-bottom:10px}
-.perc-circle{width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-hd);font-size:22px;font-weight:700;position:relative;flex-shrink:0}
-.perc-info{flex:1}
-.perc-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px}
-.perc-val{font-family:var(--font-hd);font-size:24px;font-weight:700}
+.sec-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--cyan);padding:16px 0 10px;border-bottom:2px solid var(--cyan);margin-bottom:14px}
+.sw{display:flex;align-items:center;gap:8px;background:var(--bg0);border:1px solid var(--border);border-radius:8px;padding:6px 12px}
+.sw input{background:none;border:none;outline:none;color:var(--text);font-family:var(--font-bd);font-size:12px;min-width:160px}
+.row-gap{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.acts{display:flex;gap:6px;align-items:center}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 20px;color:var(--muted)}
+.empty-icon{font-size:40px;margin-bottom:12px;opacity:.5}
+.sbar{display:flex;align-items:center;gap:20px;padding:8px 16px;background:var(--bg2);border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);flex-wrap:wrap}
+.ftabs{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.ftab{background:transparent;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:10px;font-weight:600;cursor:pointer;color:var(--muted);transition:all .2s}
+.ftab.on{background:var(--cyan);color:#fff;border-color:var(--cyan)}
+.ftab:hover:not(.on){background:var(--bg2);color:var(--text)}
+.ab{display:flex;align-items:flex-start;gap:14px;padding:12px 18px;border-left:4px solid;border-radius:0 8px 8px 0;margin-bottom:10px}
+.ab-r{background:#FFF0F1;border-left-color:var(--red)}
+.ab-y{background:#FFFBF0;border-left-color:var(--yellow)}
+[data-theme="dark"] .ab-r{background:#2A1820}
+[data-theme="dark"] .ab-y{background:#2A2010}
+[data-theme="blue"] .ab-r{background:#2A1020}
+[data-theme="blue"] .ab-y{background:#1A2030}
+.kpi-card{background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:8px;cursor:pointer;transition:all .2s;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.kpi-card:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.1)}
+.chart-row{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.chart-lbl{width:90px;font-size:11px;color:var(--muted);font-weight:600;text-align:right;flex-shrink:0}
+.bar-bg{background:var(--bg2);border-radius:4px;flex:1;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;display:flex;align-items:center;padding:0 6px;min-width:4px;transition:width .4s ease}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg0)}
+.login-card{background:var(--bg1);border:1px solid var(--border);border-radius:20px;padding:40px;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.1)}
+.tema-btn{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;color:var(--muted);transition:all .2s;display:flex;align-items:center;gap:6px}
+.tema-btn:hover{background:var(--bg3);color:var(--text)}
+.hv-section{margin-bottom:24px}
+.hv-title{font-family:var(--font-hd);font-size:18px;font-weight:700;color:var(--cyan);margin-bottom:8px;padding-bottom:8px;border-bottom:2px solid var(--border)}
+.pdf-preview{background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px;font-family:'DM Sans',sans-serif;font-size:12px;color:#1A2332;max-width:800px;margin:0 auto}
 .tools-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-top:10px}
 .tool-chip{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:11px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px}
 `;
+
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const fmt$ = v => v > 0 ? `$${Number(v).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00";
@@ -8263,31 +8029,47 @@ const AYUDA_DATA = [
     color: "var(--cyan)",
     preguntas: [
       { q: "¿Cómo empiezo a usar el sistema?",
-        a: "El flujo básico es: 1) Registra tus unidades (camiones) en el módulo Flota → Unidades. 2) Da de alta a tus conductores en Flota → Conductores. 3) Asigna cada conductor a su unidad. 4) Ya puedes registrar viajes en Flota → Viajes." },
+        a: "El flujo básico es: 1) Registra tus unidades en Flota → Unidades. 2) Da de alta conductores en Flota → Conductores. 3) Asigna conductores a unidades. 4) Registra viajes en Flota → Viajes. 5) Controla combustible y mantenimientos en el módulo Control." },
       { q: "¿Cómo configuro el logo y nombre de mi empresa?",
-        a: "En el sidebar inferior, haz clic en '⚙️ Ajustes de empresa'. Ahí puedes subir tu logo (aparecerá en el sistema y en documentos impresos) y cambiar el nombre y slogan." },
+        a: "Haz clic en el logo de la empresa en la parte superior del sidebar (aparece el ícono ✏️). Ahí puedes subir tu logo, cambiar el nombre de empresa y slogan. El logo aparece en documentos impresos y cotizaciones." },
       { q: "¿Los datos se guardan automáticamente?",
-        a: "Sí. Cada vez que guardas un registro, se almacena automáticamente en este dispositivo. No necesitas hacer nada extra. Nota: si cambias de navegador o computadora, los datos no se transfieren (son locales por ahora)." },
+        a: "Sí. Cada registro se guarda automáticamente en Firebase y sincroniza en tiempo real entre todos los dispositivos conectados. No necesitas hacer copias manuales." },
+      { q: "¿Puedo usar el sistema en múltiples computadoras al mismo tiempo?",
+        a: "Sí. Firebase sincroniza los datos en tiempo real. Si alguien registra un viaje desde una PC, aparece de inmediato en los demás dispositivos sin recargar la página." },
+      { q: "¿Cómo instalo la app en mi computadora o celular?",
+        a: "En Chrome, busca el ícono de instalación en la barra de URL (⊕) y haz clic en 'Instalar'. En iPhone: desde Safari, presiona Compartir → 'Agregar a pantalla de inicio'. Funciona como app nativa sin necesidad de tiendas." },
       { q: "¿Qué hago si olvidé mi contraseña?",
         a: "Pide al Administrador del sistema que la resetee desde Gestión de Usuarios → botón 🔒 Reset en tu fila." },
     ]
   },
   {
-    id: "flota", icono: "🚛", titulo: "Flota y Operaciones",
+    id: "flota", icono: "🚛", titulo: "Flota y Unidades",
     color: "var(--orange)",
     preguntas: [
       { q: "¿Cómo registro una unidad nueva?",
-        a: "Ve a Flota → Unidades → botón '➕ Nueva Unidad'. Llena los datos básicos: número económico, placas, marca, modelo, año. Los campos de documentos (verificación, seguro, etc.) puedes agregarlos después." },
+        a: "Ve a Flota → Unidades → '➕ Nueva Unidad'. Llena número económico, placas, tipo, marca, modelo y año. También puedes cargar una fotografía. Los KM actuales y el intervalo de mantenimiento se usan para calcular cuándo toca el próximo servicio." },
+      { q: "¿Cómo agrego un nuevo tipo de unidad?",
+        a: "Al crear o editar una unidad, en el campo 'Tipo' hay un selector con tipos predefinidos. Selecciona '✏️ Agregar tipo nuevo...' al final del menú, escribe el nombre y presiona Enter o haz clic fuera del campo. El tipo nuevo queda guardado y disponible para todas las unidades." },
       { q: "¿Cómo asigno un conductor a una unidad?",
-        a: "En Flota → Unidades, abre la unidad y busca la sección 'Conductor asignado'. También puedes hacerlo desde el perfil del conductor en Flota → Conductores." },
+        a: "En el formulario de la unidad, busca el campo 'Operador' y selecciona el conductor del menú desplegable. También puedes hacerlo desde el perfil del conductor en Flota → Conductores." },
       { q: "¿Cómo registro un viaje?",
-        a: "Ve a Flota → Viajes → '➕ Nuevo Viaje'. Selecciona la unidad, origen, destino, cliente y tarifa. Una vez completado el viaje, cambia el status a COMPLETADO para que se refleje en reportes y nóminas." },
+        a: "Ve a Flota → Viajes → '➕ Nuevo Viaje'. Selecciona unidad o logística externa, origen, destino, cliente y tarifa. Una vez completado, cambia el status a COMPLETADO para que se refleje en reportes y nóminas." },
       { q: "¿Qué es la Hoja de Viaje?",
-        a: "Es un documento con instrucciones para el operador: ruta, cliente, datos de contacto, observaciones. Se genera desde Flota → Conductores o desde el viaje. Puedes descargarla como HTML o enviarla por WhatsApp directamente." },
-      { q: "¿Qué diferencia hay entre un viaje propio y un externo?",
-        a: "Un viaje propio usa tus unidades y conductores. Un viaje externo es subcontratado a un tercero (otro transportista). Los viajes externos no se cuentan en las nóminas de tus operadores." },
-      { q: "¿Cómo registro el combustible?",
-        a: "En Control → Combustible → '➕ Registrar'. Selecciona la unidad, litros cargados, precio por litro y la estación. El sistema calcula el costo total automáticamente." },
+        a: "Es un documento con instrucciones para el operador: ruta, cliente, datos de contacto, observaciones. Se genera desde Flota → Conductores o desde el viaje. Puedes descargarla como HTML o enviarla por WhatsApp." },
+      { q: "¿Qué diferencia hay entre un viaje propio y logística externa?",
+        a: "Un viaje propio usa tus unidades y conductores. La logística externa es subcontratada a un tercero. Los viajes externos no se cuentan en las nóminas de tus operadores pero sí en tus ingresos y en las gráficas de rentabilidad." },
+    ]
+  },
+  {
+    id: "conductores", icono: "👤", titulo: "Conductores",
+    color: "var(--cyan)",
+    preguntas: [
+      { q: "¿Cómo registro un conductor?",
+        a: "Ve a Flota → Conductores → '➕ Nuevo Conductor'. Los datos básicos son: nombre, licencia (tipo y vigencia), teléfono. En la sección de Nómina define el sueldo base y % de comisión por viaje." },
+      { q: "¿Qué es la Hoja de Viaje del conductor?",
+        a: "Es un resumen de los viajes asignados al conductor con detalles de ruta, cliente y observaciones. Se genera desde el botón '🗺️ H.Viaje' en la lista de conductores. Se puede descargar o enviar por WhatsApp." },
+      { q: "¿Cómo configuro el sueldo y comisión de un operador?",
+        a: "Abre el perfil del conductor en Flota → Conductores y busca la sección '💵 Nómina'. Define sueldo base mensual y porcentaje de comisión por viaje completado." },
     ]
   },
   {
@@ -8295,11 +8077,13 @@ const AYUDA_DATA = [
     color: "var(--yellow)",
     preguntas: [
       { q: "¿Cómo programo un mantenimiento?",
-        a: "Ve a Control → Mantenimientos → '➕ Nuevo'. Selecciona la unidad, tipo de servicio, fecha programada y proveedor. Cuando se realice, cambia el status a COMPLETADO e ingresa el costo real." },
+        a: "Ve a Control → Mantenimientos → '➕ Nuevo'. Selecciona la unidad, tipo de servicio (preventivo/correctivo), fecha programada y proveedor. Cuando se realice, cambia el status a COMPLETADO e ingresa el costo real." },
       { q: "¿Cómo sé qué unidades necesitan mantenimiento pronto?",
-        a: "El Dashboard muestra alertas de mantenimientos próximos. También en el módulo Alertas (campana 🔔 en el sidebar) verás todas las unidades con mantenimiento vencido o por vencer en los próximos 30 días." },
+        a: "El Dashboard muestra alertas de mantenimientos próximos. En el módulo Alertas (🔔 en el sidebar) verás todas las unidades con mantenimiento vencido o por vencer." },
+      { q: "¿Cómo funciona el seguimiento por KM?",
+        a: "En cada unidad defines los KM actuales y el intervalo de mantenimiento (ej: 5,000 km). Al registrar combustible con los KM recorridos, el sistema calcula automáticamente cuántos KM faltan para el próximo servicio." },
       { q: "¿Puedo registrar mantenimientos correctivos (emergencias)?",
-        a: "Sí. Al crear el mantenimiento, en el tipo selecciona 'Correctivo'. Puedes dejar la fecha programada como el mismo día del incidente." },
+        a: "Sí. Al crear el mantenimiento, selecciona tipo 'Correctivo' y prioridad 'ALTA'. Puedes dejar la fecha programada como el mismo día del incidente." },
     ]
   },
   {
@@ -8307,11 +8091,21 @@ const AYUDA_DATA = [
     color: "var(--purple)",
     preguntas: [
       { q: "¿Qué documentos puedo rastrear?",
-        a: "Puedes registrar cualquier documento con fecha de vencimiento: verificaciones, seguros, permisos SCT, licencias de conductores, tarjetas de circulación, etc. El sistema te alertará cuando estén por vencer." },
+        a: "Cualquier documento con fecha de vencimiento: verificaciones, seguros, permisos SCT, licencias de conductores, tarjetas de circulación, etc. El sistema alerta 30 días antes del vencimiento." },
       { q: "¿Con cuántos días de anticipación me avisa el sistema?",
-        a: "Las alertas se activan 30 días antes del vencimiento. Aparecen en el módulo Alertas y en el Dashboard como KPI de documentos próximos a vencer." },
+        a: "Las alertas se activan 30 días antes del vencimiento. Aparecen en el módulo Alertas, en el Dashboard y en el badge de la campana en el sidebar." },
       { q: "¿Puedo subir el PDF o imagen del documento?",
         a: "Actualmente el sistema guarda los datos y fechas del documento. La funcionalidad de adjuntar archivos está en el roadmap de próximas versiones." },
+    ]
+  },
+  {
+    id: "combustible", icono: "⛽", titulo: "Combustible",
+    color: "var(--orange)",
+    preguntas: [
+      { q: "¿Cómo registro una carga de combustible?",
+        a: "Ve a Control → Combustible → '➕ Registrar'. Selecciona la unidad, fecha, litros cargados, precio por litro y estación. El sistema calcula el costo total y el rendimiento (km/L) automáticamente si ingresas los KM recorridos." },
+      { q: "¿Cómo veo el rendimiento de mis unidades?",
+        a: "En el módulo Combustible, cada registro muestra el rendimiento en km/L. En Gráficas → Combustible puedes ver el rendimiento histórico por unidad y comparar qué unidades consumen más." },
     ]
   },
   {
@@ -8319,15 +8113,33 @@ const AYUDA_DATA = [
     color: "var(--green)",
     preguntas: [
       { q: "¿Cómo creo una factura?",
-        a: "Ve a Finanzas → Facturación → '➕ Nueva Factura'. Selecciona el cliente, agrega los conceptos y el monto. La factura queda en status PENDIENTE hasta que la marques como cobrada." },
+        a: "Ve a Finanzas → Facturación → '➕ Nueva Factura'. Selecciona el cliente, agrega los conceptos y el monto. La factura queda en status PENDIENTE hasta que la marques como cobrada con el botón '✓ Pagar'." },
       { q: "¿Cómo timbro una factura (CFDI)?",
-        a: "El sistema está integrado con Facturapi para timbrado CFDI 4.0 con Complemento Carta Porte 3.1. Solo el Administrador puede timbrar. Necesitas configurar tu API Key de Facturapi en Ajustes. Sin key real, puedes hacer pruebas en modo simulación." },
+        a: "El sistema está integrado con Facturapi para timbrado CFDI 4.0 con Complemento Carta Porte 3.1. Solo el Administrador puede timbrar. Configura tu API Key de Facturapi en Ajustes → Facturapi. Sin key real, puedes hacer pruebas en modo simulación." },
       { q: "¿Qué es el Complemento Carta Porte?",
-        a: "Es el complemento fiscal obligatorio en México para facturas de servicios de transporte de carga. El sistema lo genera automáticamente con los datos del viaje: origen, destino, unidad, operador y mercancía." },
+        a: "Es el complemento fiscal obligatorio en México para facturas de servicios de transporte de carga. El sistema lo genera automáticamente con datos del viaje: origen, destino, unidad, operador y mercancía." },
       { q: "¿Cómo registro un cliente nuevo?",
-        a: "En Finanzas → Clientes → '➕ Nuevo Cliente'. Ingresa nombre, RFC, régimen fiscal, dirección fiscal y email. Estos datos se usan automáticamente al facturar." },
+        a: "Ve a Finanzas → Clientes → '➕ Nuevo Cliente'. Ingresa nombre, RFC, régimen fiscal, dirección fiscal y email. Estos datos se usan automáticamente al facturar." },
       { q: "¿Puedo ver el historial de facturas por cliente?",
-        a: "Sí. En Finanzas → Clientes, haz clic en cualquier cliente para ver todas sus facturas, el total facturado y el saldo pendiente." },
+        a: "Sí. En Finanzas → Clientes, cada cliente muestra el total facturado, el saldo pendiente y el % del límite de crédito usado." },
+      { q: "¿Cómo marco una factura como pagada?",
+        a: "En Finanzas → Facturación, las facturas con status PENDIENTE muestran el botón '✓ Pagar'. Al hacer clic, se marca como PAGADA y se actualiza el saldo del cliente." },
+    ]
+  },
+  {
+    id: "cotizaciones", icono: "📋", titulo: "Cotizaciones y Tabulador",
+    color: "var(--cyan)",
+    preguntas: [
+      { q: "¿Cómo creo una cotización?",
+        a: "Ve a Finanzas → Cotizaciones → pestaña 'Cotizaciones' → '➕ Nueva Cotización'. Selecciona el cliente, tipo de unidad del tabulador, origen, destino y los extras que apliquen. El sistema calcula el total automáticamente." },
+      { q: "¿Qué es el Tabulador?",
+        a: "Es tu catálogo de tarifas por tipo de unidad: tarifa por viaje, tarifa por km y tarifa por día. Se configura en Finanzas → Cotizaciones → pestaña 'Tabulador'. Las cotizaciones toman automáticamente estas tarifas." },
+      { q: "¿Cómo envío una cotización al cliente?",
+        a: "En la lista de cotizaciones, el botón '📄 PDF' abre la vista de impresión. El botón '📲 WhatsApp' genera un mensaje de texto listo para enviar con el resumen de la cotización." },
+      { q: "¿Cómo configuro el folio de las cotizaciones?",
+        a: "En Finanzas → Cotizaciones → pestaña Cotizaciones, en la parte superior hay un campo 'Prefijo de Folio'. Puedes escribir algo como 'COT-2026-' y el sistema numerará las cotizaciones a partir del número que definas." },
+      { q: "¿Puedo agregar servicios adicionales a una cotización?",
+        a: "Sí. En la sección 'Extras' del formulario de cotización aparecen los servicios adicionales configurados en el Tabulador (pestaña Extras). Puedes marcar cuáles aplican a esa cotización específica." },
     ]
   },
   {
@@ -8335,29 +8147,47 @@ const AYUDA_DATA = [
     color: "var(--cyan)",
     preguntas: [
       { q: "¿Cómo funciona la nómina de operadores?",
-        a: "Ve a Finanzas → Nóminas → pestaña Operadores. Haz clic en un conductor para generar su recibo. El sistema calcula automáticamente su sueldo base más la comisión por viajes completados (según el % configurado en su perfil). Puedes editar los montos antes de imprimir." },
-      { q: "¿Cómo configuro el sueldo y comisión de un operador?",
-        a: "En Flota → Conductores, abre el perfil del operador y busca la sección '💵 Nómina'. Ahí defines el sueldo base mensual y el porcentaje de comisión por viaje." },
+        a: "Ve a Finanzas → Nóminas → pestaña Operadores. Haz clic en un conductor para generar su recibo. El sistema calcula sueldo base más comisión por viajes completados (según % configurado en el perfil). Puedes editar los montos antes de imprimir." },
       { q: "¿Qué es la nómina administrativa?",
-        a: "Es para el personal de oficina: secretarias, gerentes, supervisores, contadores, etc. No tiene cálculo de viajes ni comisiones, solo sueldo base, bonos, otras percepciones y deducciones. Se gestiona en Finanzas → Nóminas → pestaña Administrativos." },
+        a: "Es para personal de oficina: secretarias, gerentes, supervisores, contadores, etc. No tiene cálculo de viajes ni comisiones, solo sueldo base, bonos y deducciones. Se gestiona en Finanzas → Nóminas → pestaña Administrativos." },
       { q: "¿Cómo agrego personal administrativo?",
-        a: "En Finanzas → Nóminas → Administrativos → '➕ Agregar Empleado'. El puesto es campo libre, puedes escribir cualquier cargo. Los montos son editables cada vez que generas el recibo." },
+        a: "En Finanzas → Nóminas → Administrativos → '➕ Agregar Empleado'. El puesto es campo libre, puedes escribir cualquier cargo." },
       { q: "¿Puedo imprimir los recibos de nómina?",
-        a: "Sí. Tanto la nómina de operadores como la administrativa tienen botón '🖨️ Imprimir Recibo' que genera un PDF listo para imprimir con el logo de tu empresa." },
+        a: "Sí. Ambas nóminas tienen botón '🖨️ Imprimir Recibo' que genera un PDF listo para imprimir con el logo de tu empresa." },
     ]
   },
   {
-    id: "reportes", icono: "📊", titulo: "Reportes e Indicadores",
+    id: "gastos", icono: "💵", titulo: "Gastos y Proveedores",
+    color: "var(--orange)",
+    preguntas: [
+      { q: "¿Cuál es la diferencia entre Gastos Generales y Costos de Viaje?",
+        a: "Los Gastos Generales (renta, telefonía, servicios) se registran en Control → Gastos. Los costos de viaje (casetas, estadías, combustible específico de un viaje) se registran directamente en el viaje al editarlo." },
+      { q: "¿Cómo registro un proveedor?",
+        a: "Ve a Control → Proveedores → '➕ Nuevo Proveedor'. Ingresa nombre, RFC, tipo de servicio que ofrece y datos de contacto. Luego puedes asignarlo a mantenimientos, gastos y logística externa." },
+      { q: "¿Cómo registro un pago a proveedor?",
+        a: "En Control → Proveedores, abre el perfil del proveedor y usa el botón '💳 Registrar Pago'. Puedes adjuntar referencia, forma de pago y notas." },
+    ]
+  },
+  {
+    id: "reportes", icono: "📊", titulo: "Gráficas y Reportes",
     color: "var(--purple)",
     preguntas: [
-      { q: "¿Qué reportes tiene el sistema?",
-        a: "En Finanzas → Reportes encontrarás 5 vistas: Resumen General (KPIs del período), Facturas (cobro y pendientes por cliente), Gastos & Costos (por categoría), Nóminas (resumen por operador) y Viajes (listado completo del período)." },
-      { q: "¿Cómo filtro por período?",
-        a: "En la parte superior de Reportes hay un selector de período: Semana, Mes, Trimestre, Año o Personalizado. Todos los datos se filtran automáticamente al cambiar el período." },
-      { q: "¿Puedo ver datos de años anteriores?",
-        a: "Sí. El selector de año detecta automáticamente qué años tienen datos registrados en el sistema. Selecciona el año y el período que quieras analizar." },
+      { q: "¿Qué gráficas tiene el sistema?",
+        a: "Finanzas → Gráficas incluye 10 vistas: Utilidades vs Gastos mensuales, Desglose de gastos, Split propio/externo, Viajes por unidad, Costos por unidad, Rendimiento de combustible, Top clientes, Resumen de nóminas, Análisis de proveedores y Análisis de conducores." },
       { q: "¿Qué muestran los KPIs del Dashboard?",
-        a: "El Dashboard muestra resumen en tiempo real: unidades activas, viajes del mes, facturación, combustible, mantenimientos pendientes y alertas. La mayoría son clickeables para ver el detalle." },
+        a: "El Dashboard muestra en tiempo real: unidades activas, viajes del mes, facturación, combustible, mantenimientos pendientes y alertas. La mayoría son clickeables para ver el detalle directamente." },
+    ]
+  },
+  {
+    id: "gps", icono: "📡", titulo: "GPS en Vivo",
+    color: "var(--green)",
+    preguntas: [
+      { q: "¿Cómo activo el módulo GPS?",
+        a: "Ve a GPS en Vivo en el sidebar. Haz clic en '⚙️ Configurar Traccar'. Necesitas una cuenta en Traccar (traccar.org) o un servidor propio. Ingresa la URL, usuario y contraseña de tu servidor Traccar." },
+      { q: "¿Qué información muestra el módulo GPS?",
+        a: "Muestra la posición en tiempo real de cada dispositivo GPS registrado en Traccar, velocidad actual, última actualización y el mapa con las posiciones." },
+      { q: "¿Traccar es gratis?",
+        a: "Traccar es una plataforma open source. Puedes usar el servidor público traccar.org gratis con limitaciones, o instalar tu propio servidor en un VPS para mayor privacidad y control." },
     ]
   },
   {
@@ -8369,7 +8199,7 @@ const AYUDA_DATA = [
       { q: "¿Cuáles son los roles disponibles?",
         a: "Por defecto hay 3 roles: Administrador (acceso total), Supervisor (operaciones + reportes básicos) y Capturista (solo captura viajes y combustible). El Administrador puede crear roles personalizados desde la pestaña '🎭 Roles'." },
       { q: "¿Cómo creo un rol personalizado?",
-        a: "En Gestión de Usuarios → pestaña Roles → '➕ Nuevo Rol'. Define el nombre (Finanzas, Logística, RH...), ícono, color y activa exactamente los permisos que necesita ese rol. El rol queda disponible para asignar a usuarios." },
+        a: "En Gestión de Usuarios → pestaña Roles → '➕ Nuevo Rol'. Define nombre, ícono, color y activa exactamente los permisos que necesita ese rol. El rol queda disponible para asignar a usuarios." },
       { q: "¿Puedo darle un permiso específico a un usuario sin cambiarle el rol?",
         a: "Sí. En la lista de usuarios, el botón '🔑 Permisos' abre un panel donde puedes activar o desactivar permisos individuales para ese usuario específico, sobreescribiendo lo que dicta su rol." },
       { q: "¿Qué pasa si desactivo un usuario?",
@@ -8377,6 +8207,250 @@ const AYUDA_DATA = [
     ]
   },
 ];
+
+
+function AlertsPage({ units, docs, maints }) {
+  const alerts = [];
+  docs.forEach(d => { const u = units.find(u => u.id === d.unidadId); const dy = daysUntil(d.vence); if (dy === null) return; if (dy < 0) alerts.push({ l: "r", title: `DOC VENCIDO — ${d.nombre}`, body: `${u?.num} ${u?.placas}: venció hace ${Math.abs(dy)} días (${d.vence})` }); else if (dy <= 30) alerts.push({ l: "y", title: `DOC PRÓXIMO A VENCER — ${d.nombre}`, body: `${u?.num} ${u?.placas}: vence en ${dy} días (${d.vence})` }) });
+  maints.filter(m => m.realizado === "NO" && m.prioridad === "ALTA").forEach(m => { const u = units.find(u => u.id === m.unidadId); alerts.push({ l: "r", title: "MANTENIMIENTO ALTA PRIORIDAD PENDIENTE", body: `${u?.num} ${u?.placas}: ${m.desc} — Prog: ${m.fechaProg}` }) });
+  units.filter(u => u.estado !== "ACTIVA").forEach(u => { alerts.push({ l: u.estado === "EN TALLER" ? "y" : "r", title: `UNIDAD ${u.estado}`, body: `${u.num} ${u.placas}` }) });
+  return (
+    <div>
+      <div className="stats" style={{ marginBottom: 18 }}>
+        <div className="stat" style={{ "--c": "var(--red)" }}><div className="stat-icon">🚨</div><div className="stat-val">{alerts.filter(a => a.l === "r").length}</div><div className="stat-lbl">Alertas Críticas</div></div>
+        <div className="stat" style={{ "--c": "var(--yellow)" }}><div className="stat-icon">⚠️</div><div className="stat-val">{alerts.filter(a => a.l === "y").length}</div><div className="stat-lbl">Preventivas</div></div>
+        <div className="stat" style={{ "--c": "var(--green)" }}><div className="stat-icon">✅</div><div className="stat-val">{units.filter(u => u.estado === "ACTIVA").length}</div><div className="stat-lbl">Unidades OK</div></div>
+      </div>
+      {alerts.length === 0 ? <div className="card"><div className="empty"><div className="empty-icon">✅</div><p style={{ fontSize: 16 }}>Sin alertas. ¡Flota en orden!</p></div></div> :
+        <div>{alerts.sort((a, b) => (a.l === "r" ? 0 : 1) - (b.l === "r" ? 0 : 1)).map((a, i) => (
+          <div key={i} className={`ab ab-${a.l}`}><span style={{ fontSize: 19, flexShrink: 0 }}>{a.l === "r" ? "🚨" : "⚠️"}</span><div><div style={{ fontWeight: 700, fontSize: 13 }}>{a.title}</div><div style={{ opacity: .9, marginTop: 3, fontSize: 12 }}>{a.body}</div></div></div>
+        ))}</div>}
+    </div>
+  );
+}
+
+function ClientesPage({ clientes, facturas, onAdd, onEdit, onDelete }) {
+  const [q, setQ] = useState("");
+  const [tf, setTf] = useState("TODOS");
+  const [sf, setSf] = useState("TODOS");
+
+  const fil = clientes.filter(c => {
+    const match = (c.nombre + c.rfc + (c.nombreCorto||"")).toLowerCase().includes(q.toLowerCase());
+    const tipoMatch = tf === "TODOS" || c.tipo === tf;
+    const statusMatch = sf === "TODOS" || c.status === sf;
+    return match && tipoMatch && statusMatch;
+  });
+
+  const getClienteStats = (clienteId) => {
+    const facsCli = facturas.filter(f => f.clienteId === clienteId);
+    const pendientes = facsCli.filter(f => f.status === "PENDIENTE");
+    const totalPendiente = pendientes.reduce((a, f) => a + (Number(f.total) || 0), 0);
+    const totalFacturado = facsCli.reduce((a, f) => a + (Number(f.total) || 0), 0);
+    return { totalFacturado, totalPendiente, numFacturas: facsCli.length };
+  };
+
+  const totales = {
+    activos: clientes.filter(c => c.status === "ACTIVO").length,
+    morales: clientes.filter(c => c.tipo === "MORAL").length,
+    fisicas: clientes.filter(c => c.tipo === "FISICA").length,
+  };
+
+  return (
+    <div>
+      <div className="card">
+        <div className="card-hdr">
+          <h3>👥 Clientes ({clientes.length})</h3>
+          <div className="row-gap">
+            <div className="sw">
+              <span style={{ color: "var(--muted)" }}>🔍</span>
+              <input placeholder="Buscar cliente..." value={q} onChange={e => setQ(e.target.value)} />
+            </div>
+            <button className="btn btn-cyan" onClick={onAdd}>+ Nuevo Cliente</button>
+          </div>
+        </div>
+        <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--border)", display: "flex", gap: 20, flexWrap: "wrap", alignItems: "center" }}>
+          <div className="ftabs">
+            <span style={{ fontSize: 10, color: "var(--muted)", marginRight: 4, fontWeight: 700 }}>TIPO:</span>
+            {["TODOS", "FISICA", "MORAL"].map(t => (
+              <button key={t} className={`ftab${tf === t ? " on" : ""}`} onClick={() => setTf(t)}>{t}</button>
+            ))}
+          </div>
+          <div className="ftabs">
+            <span style={{ fontSize: 10, color: "var(--muted)", marginRight: 4, fontWeight: 700 }}>STATUS:</span>
+            {["TODOS", "ACTIVO", "SUSPENDIDO", "BLOQUEADO"].map(s => (
+              <button key={s} className={`ftab${sf === s ? " on" : ""}`} onClick={() => setSf(s)}>{s}</button>
+            ))}
+          </div>
+        </div>
+        <div className="sbar">
+          <span>Total: <strong>{fil.length}</strong></span>
+          <span>Activos: <strong style={{ color: "var(--green)" }}>{totales.activos}</strong></span>
+          <span>Morales: <strong>{totales.morales}</strong></span>
+          <span>Físicas: <strong>{totales.fisicas}</strong></span>
+        </div>
+        <div className="card-body">
+          {fil.length === 0 ? (
+            <div className="empty"><div className="empty-icon">👥</div><p>Sin clientes encontrados</p></div>
+          ) : (
+            <table>
+              <thead><tr>
+                <th>Cliente</th><th>RFC</th><th>Tipo</th><th>Contacto</th>
+                <th>Crédito</th><th>Límite</th><th>Facturado</th><th>Pendiente</th><th>Status</th><th>Acciones</th>
+              </tr></thead>
+              <tbody>
+                {fil.map(c => {
+                  const stats = getClienteStats(c.id);
+                  const pctUsado = c.limiteCredito > 0 ? ((stats.totalPendiente / c.limiteCredito) * 100).toFixed(0) : 0;
+                  const colorLimite = pctUsado > 80 ? "var(--red)" : pctUsado > 60 ? "var(--yellow)" : "var(--green)";
+                  return (
+                    <tr key={c.id}>
+                      <td>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{c.nombreCorto || c.nombre}</div>
+                        {c.nombreCorto && <div style={{ fontSize: 10, color: "var(--muted)" }}>{c.nombre}</div>}
+                      </td>
+                      <td style={{ fontFamily: "monospace", fontSize: 11, color: "var(--muted)" }}>{c.rfc}</td>
+                      <td><Bdg c={c.tipo === "MORAL" ? "bp" : "bb"} t={c.tipo} /></td>
+                      <td style={{ fontSize: 11 }}>
+                        <div>{c.telefono || "—"}</div>
+                        <div style={{ color: "var(--muted)" }}>{c.email || "—"}</div>
+                      </td>
+                      <td style={{ fontSize: 12 }}>{c.diasCreditoDefault} días</td>
+                      <td>
+                        <div style={{ fontSize: 11, color: "var(--muted)" }}>{fmt$(c.limiteCredito)}</div>
+                        {c.limiteCredito > 0 && stats.totalPendiente > 0 && (
+                          <div style={{ fontSize: 10, color: colorLimite, fontWeight: 600 }}>{pctUsado}% usado</div>
+                        )}
+                      </td>
+                      <td style={{ color: "var(--cyan)", fontWeight: 700 }}>{fmt$(stats.totalFacturado)}</td>
+                      <td style={{ color: stats.totalPendiente > 0 ? "var(--orange)" : "var(--muted)", fontWeight: 700 }}>{fmt$(stats.totalPendiente)}</td>
+                      <td><Bdg c={c.status === "ACTIVO" ? "bg" : c.status === "SUSPENDIDO" ? "by" : "br"} t={c.status} /></td>
+                      <td>
+                        <div className="acts">
+                          <button className="btn btn-ghost btn-sm" onClick={() => onEdit(c)}>✏️</button>
+                          <button className="btn btn-red btn-sm" onClick={() => onDelete(c.id)}>🗑</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FacturacionPage({ facturas, clientes, viajes, onAdd, onEdit, onDelete, onMarcarPagada }) {
+  const [q, setQ] = useState("");
+  const [sf, setSf] = useState("TODOS");
+  const [cf, setCf] = useState("TODOS");
+
+  const fil = facturas.filter(f => {
+    const matchQ = (f.folio || f.serie + "-" + f.numeroFactura + (f.cliente||"") + (f.rfcCliente||"")).toLowerCase().includes(q.toLowerCase());
+    const matchS = sf === "TODOS" || f.status === sf;
+    const matchC = cf === "TODOS" || f.clienteId === cf;
+    return matchQ && matchS && matchC;
+  });
+
+  const pendientes = facturas.filter(f => f.status === "PENDIENTE");
+  const vencidas = facturas.filter(f => f.status === "VENCIDA");
+  const porVencer = pendientes.filter(f => { const days = daysUntil(f.fechaVencimiento); return days !== null && days >= 0 && days <= 5; });
+  const pagadas = facturas.filter(f => f.status === "PAGADA");
+  const totalPendiente = pendientes.reduce((a, f) => a + (Number(f.total) || 0), 0);
+  const totalVencido = vencidas.reduce((a, f) => a + (Number(f.total) || 0), 0);
+  const totalCobrado = pagadas.reduce((a, f) => a + (Number(f.total) || 0), 0);
+  const facturasConPago = pagadas.filter(f => f.fechaPago && f.fechaEmision);
+  const diasCobranza = facturasConPago.length > 0
+    ? facturasConPago.reduce((a, f) => { const dias = daysUntil(f.fechaEmision) * -1 - daysUntil(f.fechaPago) * -1; return a + dias; }, 0) / facturasConPago.length
+    : 0;
+
+  return (
+    <div>
+      <div className="stats">
+        <div className="stat" style={{ "--c": "var(--yellow)" }}><div className="stat-icon">🧾</div><div className="stat-val sm">{pendientes.length}</div><div className="stat-lbl">Pendientes</div><div className="stat-sub">{fmt$(totalPendiente)}</div></div>
+        <div className="stat" style={{ "--c": "var(--red)" }}><div className="stat-icon">⏰</div><div className="stat-val sm">{vencidas.length}</div><div className="stat-lbl">Vencidas</div><div className="stat-sub">{fmt$(totalVencido)}</div></div>
+        <div className="stat" style={{ "--c": "var(--orange)" }}><div className="stat-icon">📅</div><div className="stat-val sm">{porVencer.length}</div><div className="stat-lbl">Por Vencer (5d)</div><div className="stat-sub">{porVencer.reduce((a, f) => a + (f.total||0), 0).toLocaleString("es-MX", { style: "currency", currency: "MXN" })}</div></div>
+        <div className="stat" style={{ "--c": "var(--green)" }}><div className="stat-icon">💰</div><div className="stat-val sm">{pagadas.length}</div><div className="stat-lbl">Pagadas</div><div className="stat-sub">{fmt$(totalCobrado)}</div></div>
+        <div className="stat" style={{ "--c": "var(--cyan)" }}><div className="stat-icon">💳</div><div className="stat-val">{Math.round(diasCobranza)}</div><div className="stat-lbl">Días Prom. Cobranza</div><div className="stat-sub">DSO</div></div>
+      </div>
+      <div className="card">
+        <div className="card-hdr">
+          <h3>🧾 Facturación ({facturas.length})</h3>
+          <div className="row-gap">
+            <div className="sw"><span style={{ color: "var(--muted)" }}>🔍</span><input placeholder="Buscar factura..." value={q} onChange={e => setQ(e.target.value)} /></div>
+            <button className="btn btn-cyan" onClick={onAdd}>+ Nueva Factura</button>
+          </div>
+        </div>
+        <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--border)", display: "flex", gap: 20, flexWrap: "wrap" }}>
+          <div className="ftabs">
+            <span style={{ fontSize: 10, color: "var(--muted)", marginRight: 4, fontWeight: 700 }}>STATUS:</span>
+            {["TODOS", "PENDIENTE", "VENCIDA", "PAGADA", "CANCELADA"].map(s => (
+              <button key={s} className={`ftab${sf === s ? " on" : ""}`} onClick={() => setSf(s)}>{s}</button>
+            ))}
+          </div>
+          <div className="ftabs">
+            <span style={{ fontSize: 10, color: "var(--muted)", marginRight: 4, fontWeight: 700 }}>CLIENTE:</span>
+            <button className={`ftab${cf === "TODOS" ? " on" : ""}`} onClick={() => setCf("TODOS")}>TODOS</button>
+            {clientes.slice(0, 5).map(c => (
+              <button key={c.id} className={`ftab${cf === c.id ? " on" : ""}`} onClick={() => setCf(c.id)}>{c.nombreCorto || c.nombre}</button>
+            ))}
+          </div>
+        </div>
+        <div className="sbar">
+          <span>Total: <strong>{fil.length}</strong></span>
+          <span>Pendiente: <strong style={{ color: "var(--orange)" }}>{fmt$(totalPendiente)}</strong></span>
+          <span>Vencido: <strong style={{ color: "var(--red)" }}>{fmt$(totalVencido)}</strong></span>
+          <span>Cobrado: <strong style={{ color: "var(--green)" }}>{fmt$(totalCobrado)}</strong></span>
+        </div>
+        <div className="card-body">
+          {fil.length === 0 ? (
+            <div className="empty"><div className="empty-icon">🧾</div><p>Sin facturas encontradas</p></div>
+          ) : (
+            <table>
+              <thead><tr>
+                <th>Folio</th><th>Cliente</th><th>Tipo</th><th>Emisión</th><th>Vencimiento</th>
+                <th>Subtotal</th><th>IVA</th><th>Ret. IVA</th><th>Total</th><th>Status</th><th>Acciones</th>
+              </tr></thead>
+              <tbody>
+                {fil.map(f => {
+                  const days = daysUntil(f.fechaVencimiento);
+                  const statusColor = f.status === "PAGADA" ? "var(--green)" : f.status === "VENCIDA" ? "var(--red)" : (days !== null && days <= 5) ? "var(--orange)" : "var(--yellow)";
+                  return (
+                    <tr key={f.id}>
+                      <td style={{ fontFamily: "var(--font-hd)", fontSize: 14, fontWeight: 700 }}>{f.serie}-{f.numeroFactura}</td>
+                      <td>
+                        <div style={{ fontWeight: 600, fontSize: 12 }}>{f.cliente}</div>
+                        <div style={{ fontSize: 10, color: "var(--muted)", fontFamily: "monospace" }}>{f.rfcCliente}</div>
+                      </td>
+                      <td><Bdg c={f.tipoCliente === "MORAL" ? "bp" : "bb"} t={f.tipoCliente} /></td>
+                      <td style={{ fontSize: 12 }}>{f.fechaEmision}</td>
+                      <td style={{ fontSize: 12, fontWeight: 600, color: statusColor }}>{f.fechaVencimiento}</td>
+                      <td style={{ color: "var(--text)" }}>{fmt$(f.subtotal)}</td>
+                      <td style={{ color: "var(--cyan)" }}>{fmt$(f.iva)}</td>
+                      <td style={{ color: "var(--orange)" }}>{f.retIva > 0 ? fmt$(f.retIva) : "—"}</td>
+                      <td style={{ fontWeight: 700, color: "var(--text)" }}>{fmt$(f.total)}</td>
+                      <td><Bdg c={f.status === "PAGADA" ? "bg" : f.status === "VENCIDA" ? "br" : f.status === "CANCELADA" ? "bm" : "by"} t={f.status} /></td>
+                      <td>
+                        <div className="acts">
+                          {f.status === "PENDIENTE" && <button className="btn btn-green btn-xs" onClick={() => onMarcarPagada(f)}>✓ Pagar</button>}
+                          <button className="btn btn-ghost btn-sm" onClick={() => onEdit(f)}>✏️</button>
+                          <button className="btn btn-red btn-sm" onClick={() => onDelete(f.id)}>🗑</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function HelpPage({ currentUser }) {
   const [busqueda, setBusqueda] = useState("");
