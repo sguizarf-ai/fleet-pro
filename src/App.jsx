@@ -144,6 +144,12 @@ tbody tr:hover{background:var(--bg2)}
 .pdf-preview{background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px;font-family:'DM Sans',sans-serif;font-size:12px;color:#1A2332;max-width:800px;margin:0 auto}
 .tools-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-top:10px}
 .tool-chip{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:11px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px}
+.doc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding:14px 16px}
+.doc-card{background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:13px 14px;border-top:3px solid var(--dc,var(--border));box-shadow:0 1px 4px rgba(0,0,0,.05);transition:box-shadow .2s}
+.doc-card:hover{box-shadow:0 3px 10px rgba(0,0,0,.1)}
+.doc-name{font-weight:700;font-size:13px;color:var(--text);line-height:1.3}
+.doc-date{font-size:11px;color:var(--muted);margin-top:4px}
+.doc-empty-card{background:var(--bg2);border:2px dashed var(--border);border-radius:10px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted)}
 `;
 
 
@@ -1101,11 +1107,7 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
     if (!f.empresa || !f.origen) return alert("Empresa y origen requeridos");
     let finalForm = { ...f, id: f.id || uid(), pagoStatus: f.pagoStatus||"pendiente", pagoEvidencias: f.pagoEvidencias||[] };
     // Auto-create proveedor if new name entered
-    if (f.proveedorId === "__nuevo__" && f.empresa.trim() && onNuevoProveedor) {
-      const newPv = { id: "pv_"+Date.now(), nombre: f.empresa.trim(), tipoProv: "Transportista Externo", categoria: "Servicios", contacto: f.contacto||"", tel: f.tel||"", email:"", rfc:"", direccion:"", banco:"", cuenta:"", diasCredito:0, limiteCredito:0, saldoPendiente:0, ultimoPago:"", notas:"" };
-      onNuevoProveedor(newPv);
-      finalForm.proveedorId = newPv.id;
-    }
+
     onSave(finalForm);
   };
   const utilidad = (Number(f.precioCliente) || 0) - (Number(f.costoPagar) || 0) - (Number(f.costoEstadias) || 0);
@@ -1126,11 +1128,10 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
                 }} style={{ flex:1, padding:"9px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--bg0)", color:"var(--text)" }}>
                   <option value="">— Seleccionar del catálogo —</option>
                   {(proveedores||[]).filter(p=>p.tipoProv==="Transportista Externo"||!p.tipoProv).map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
-                  <option value="__nuevo__">✏️ Escribir nombre nuevo (se agrega al catálogo)</option>
-                </select>
+                  </select>
               </div>
             </div>
-            <div className="field s2"><label>Nombre de empresa {f.proveedorId&&f.proveedorId!=="__nuevo__"?"(del catálogo)":"*"}</label><input value={f.empresa} onChange={ch("empresa")} placeholder="Ej: Transportes del Norte SA" style={{background: f.proveedorId&&f.proveedorId!=="__nuevo__"?"var(--bg2)":"var(--bg0)"}}/></div>
+            <div className="field s2"><label>Nombre de empresa {f.proveedorId?"(del catálogo, editable)":"*"}</label><input value={f.empresa} onChange={ch("empresa")} placeholder="Ej: Transportes del Norte SA" style={{background: f.proveedorId?"var(--bg2)":"var(--bg0)"}}/></div>
             <div className="field"><label>Contacto</label><input value={f.contacto} onChange={ch("contacto")} /></div>
             <div className="field"><label>Teléfono</label><input value={f.tel} onChange={ch("tel")} /></div>
           </div>
@@ -3891,6 +3892,59 @@ function Dashboard({
                 </tr>)}</tbody>
               </table>;
         }
+        case "prov_credito": {
+          const todos = [
+            ...credVencidos.map(p => ({ ...p, _estado: "vencido" })),
+            ...credPorVencer.filter(p => !credVencidos.find(v => v.id === p.id)).map(p => ({ ...p, _estado: "por_vencer" }))
+          ];
+          const pendientesPago = [
+            ...externos.filter(e => e.pagoStatus !== "pagado" && (e.costoPagar||0) > 0).map(e => ({
+              tipo: "Logística externa", nombre: e.empresa || "Externo", monto: e.costoPagar||0,
+              status: e.pagoStatus||"pendiente", fecha: e.fecha, id: e.id
+            })),
+            ...maints.filter(m => m.pagoStatus !== "pagado" && ((m.costoRef||0)+(m.costoMO||0)) > 0 && m.proveedorId).map(m => ({
+              tipo: "Mantenimiento", nombre: proveedores.find(p=>p.id===m.proveedorId)?.nombre||"Proveedor", monto: (m.costoRef||0)+(m.costoMO||0),
+              status: m.pagoStatus||"pendiente", fecha: m.fechaProg||m.fecha, id: m.id
+            })),
+            ...gastos.filter(g => g.pagoStatus !== "pagado" && (g.monto||0) > 0 && g.proveedorId).map(g => ({
+              tipo: "Gasto", nombre: proveedores.find(p=>p.id===g.proveedorId)?.nombre||"Proveedor", monto: g.monto||0,
+              status: g.pagoStatus||"pendiente", fecha: g.fecha, id: g.id
+            }))
+          ];
+          return pendientesPago.length === 0
+            ? <div className="empty"><div className="empty-icon">✅</div><p>Sin pagos pendientes a proveedores</p></div>
+            : <table>
+                <thead><tr><th>Tipo</th><th>Proveedor / Descripción</th><th>Fecha</th><th>Monto</th><th>Status</th></tr></thead>
+                <tbody>{pendientesPago.map((p, i) => (
+                  <tr key={i}>
+                    <td><Bdg c="bb" t={p.tipo}/></td>
+                    <td style={{fontWeight:600}}>{p.nombre}</td>
+                    <td style={{fontSize:12}}>{p.fecha||"—"}</td>
+                    <td style={{fontWeight:700,color:"var(--orange)"}}>{fmt$(p.monto)}</td>
+                    <td><Bdg c={p.status==="parcial"?"bb":"by"} t={p.status}/></td>
+                  </tr>
+                ))}</tbody>
+              </table>;
+        }
+        case "operadores": {
+          return drivers.length === 0
+            ? <div className="empty"><div className="empty-icon">👨‍✈️</div><p>Sin conductores registrados</p></div>
+            : <table>
+                <thead><tr><th>Conductor</th><th>Licencia</th><th>Vence Lic.</th><th>Tel.</th><th>Status</th><th>Unidad Asignada</th></tr></thead>
+                <tbody>{drivers.filter(d=>d.status==="ACTIVO").map(d => {
+                  const u = units.find(u => u.operador === d.id);
+                  const dy = daysUntil(d.licVence);
+                  return <tr key={d.id}>
+                    <td><strong>{d.nombre}</strong></td>
+                    <td style={{fontSize:11,fontFamily:"monospace"}}>{d.licencia||"—"} <Bdg c="bb" t={d.licTipo}/></td>
+                    <td style={{fontSize:12,color:dy!==null&&dy<=30?"var(--red)":dy!==null&&dy<=60?"var(--orange)":"var(--text)"}}>{d.licVence||"—"}</td>
+                    <td style={{fontSize:12}}>{d.tel||"—"}</td>
+                    <td><Bdg c={d.status==="ACTIVO"?"bg":d.status==="VACACIONES"?"by":"bm"} t={d.status}/></td>
+                    <td style={{fontSize:12}}>{u?`${u.num} ${u.placas}`:<span style={{color:"var(--muted)"}}>Sin unidad</span>}</td>
+                  </tr>;
+                })}</tbody>
+              </table>;
+        }
         default: return null;
       }
     })();
@@ -4453,7 +4507,12 @@ function DocsPage({ units, drivers, docs, onAdd, onEdit, onDelete }) {
                       </div>
                     );
                   })}
-                  {ud.length === 0 && <div style={{ padding: "12px 16px", color: "var(--muted)", fontSize: 12 }}>Sin documentos registrados</div>}
+                  {ud.length === 0 && (
+                    <div className="doc-empty-card">
+                      <span style={{fontSize:12}}>Sin documentos registrados</span>
+                      <button className="btn btn-cyan btn-xs" onClick={() => onAdd && onAdd({ unidadId: u.id, entidadTipo: "unidad" })}>✏️ Agregar doc</button>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -4495,7 +4554,12 @@ function DocsPage({ units, drivers, docs, onAdd, onEdit, onDelete }) {
                       </div>
                     );
                   })}
-                  {dd.length === 0 && <div style={{ padding: "12px 16px", color: "var(--muted)", fontSize: 12 }}>Sin documentos registrados</div>}
+                  {dd.length === 0 && (
+                    <div className="doc-empty-card">
+                      <span style={{fontSize:12}}>Sin documentos registrados</span>
+                      <button className="btn btn-cyan btn-xs" onClick={() => onAdd && onAdd({ operadorId: driver.id, entidadTipo: "operador" })}>✏️ Agregar doc</button>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -7251,9 +7315,7 @@ function TabuladorPage({ tabulador, extrasTabulador, onSaveTabulador, onSaveExtr
           <h2 style={{ fontFamily:"var(--font-hd)", fontSize:22, fontWeight:800, marginBottom:2 }}>📋 Cotizaciones y Tabulador</h2>
           <div style={{ color:"var(--muted)", fontSize:13 }}>Tarifas base, extras y generador de cotizaciones</div>
         </div>
-        {tab === "cotizaciones" && (
-          <button className="btn btn-cyan" onClick={() => {}}>➕ Nueva Cotización</button>
-        )}
+
       </div>
 
       <div className="ftabs" style={{ marginBottom:16 }}>
@@ -8981,7 +9043,7 @@ export default function App() {
             onNomina={userCan("verNominas") ? d => setModal({ type: "nomina", data: d }) : null}
             branding={branding} />}
           {tab === "docs" && <DocsPage units={units} drivers={drivers} docs={docs}
-            onAdd={() => setModal({ type: "doc", data: null })}
+            onAdd={(prefill) => setModal({ type: "doc", data: prefill || null })}
             onEdit={d => setModal({ type: "doc", data: d })}
             onDelete={DoC.del} />}
           {tab === "maints" && <MaintPage units={units} maints={maints} proveedores={proveedores}
@@ -9093,6 +9155,7 @@ export default function App() {
           onClose={() => setModal(null)}
         />;
       })()}
+      {modal?.type === "driver" && <DriverModal driver={modal.data} units={units} onSave={d => DC.save({ ...d, id: d.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "unit" && <UnitModal unit={modal.data} drivers={drivers} tiposPersonalizados={tiposPersonalizados} onAddTipo={async (t) => { const newTipos = [...tiposPersonalizados, t]; setTiposPersonalizados(newTipos); await sv("fp6:tipos", newTipos); }} onSave={u => UC.save({ ...u, id: u.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "doc" && <DocModal doc={modal.data} units={units} drivers={drivers} onSave={d => DoC.save({ ...d, id: d.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "maint" && <MaintModal maint={modal.data} units={units} proveedores={proveedores} onSave={m => MC.save({ ...m, id: m.id || uid() })} onClose={() => setModal(null)} />}
