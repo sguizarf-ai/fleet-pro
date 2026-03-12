@@ -10255,7 +10255,7 @@ export default function App() {
       const pairs = [
         [setUnits,               "fp6:units",          D_UNITS],
         [setDrivers,             "fp6:drivers",         D_DRIVERS],
-        [setDocs,                "fp6:docs",            D_DOCS],
+        // fp6:docs cargado por separado abajo (per-item)
         [setMaints,              "fp6:maints",          D_MAINTS],
         [setFuels,               "fp6:fuels",           D_FUELS],
         [setTrips,               "fp6:trips",           D_TRIPS],
@@ -10289,6 +10289,25 @@ export default function App() {
           else setter(defaultVal);
         } catch { setter(defaultVal); }
       }));
+      // Cargar documentos per-item (fp6:doc:ID) — evita límite 1MB
+      try {
+        const ids = await fsGet("fp6:docs:index");
+        if (ids && ids.length > 0) {
+          const items = await Promise.all(ids.map(id => fsGet("fp6:doc:" + id)));
+          const valid = items.filter(Boolean);
+          if (valid.length > 0) setDocs(valid);
+        } else {
+          // Fallback: leer fp6:docs legacy
+          const legacy = await fsGet("fp6:docs");
+          if (legacy && legacy.length > 0) {
+            setDocs(legacy);
+            // Migrar automáticamente a per-item
+            for (const d of legacy) await fsSet("fp6:doc:" + d.id, d);
+            await fsSet("fp6:docs:index", legacy.map(d => d.id));
+          } else setDocs(D_DOCS);
+        }
+      } catch(e) { console.warn("Docs load:", e); setDocs(D_DOCS); }
+
       setLoading(false);
       // Escuchar cambios en tiempo real
       const unsubs = pairs.map(([setter, key]) => fsListen(key, (val) => { if (val !== null && val !== undefined) setter(val); }));
@@ -10319,7 +10338,39 @@ export default function App() {
 
   const UC = mkCRUD(() => uRef.current, setUnits, "fp6:units");
   const DC = mkCRUD(() => dRef.current, setDrivers, "fp6:drivers");
-  const DoC = mkCRUD(() => dcRef.current, setDocs, "fp6:docs");
+  // DoC — CRUD de documentos con guardado por item (evita límite 1MB de Firestore)
+  const DoC = {
+    save: async item => {
+      const cur = dcRef.current;
+      const next = cur.find(x => x.id === item.id)
+        ? cur.map(x => x.id === item.id ? item : x)
+        : [...cur, item];
+      setter_docs_ref.current = next;
+      setDocs(next);
+      // Guardar item individual en su propio doc Firestore
+      await sv("fp6:doc:" + item.id, item);
+      // También actualizar índice de IDs para poder reconstruir la lista al cargar
+      const ids = next.map(x => x.id);
+      await sv("fp6:docs:index", ids);
+      setModal(null);
+      notify("Guardado ✓");
+    },
+    del: id => setConfirm({
+      msg: "¿Eliminar este documento?",
+      onOk: async () => {
+        const next = dcRef.current.filter(x => x.id !== id);
+        setter_docs_ref.current = next;
+        setDocs(next);
+        await sv("fp6:doc:" + id, null);
+        const ids = next.map(x => x.id);
+        await sv("fp6:docs:index", ids);
+        setConfirm(null);
+        notify("Eliminado");
+      }
+    })
+  };
+  const setter_docs_ref = useRef(docs);
+  setter_docs_ref.current = docs;
   const MC = mkCRUD(() => mRef.current, setMaints, "fp6:maints");
   const FC = mkCRUD(() => fRef.current, setFuels, "fp6:fuels");
   const TC = mkCRUD(() => tRef.current, setTrips, "fp6:trips");
