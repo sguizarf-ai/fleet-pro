@@ -7596,6 +7596,17 @@ function CotizacionesTab({ cotizaciones, clientes, tabulador, extrasTabulador, b
   );
 }
 
+// ── Helpers para CotizacionModal (fuera del componente = estables) ────────────
+const CotFld = ({ label, children, required }) => (
+  <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+    <label style={{ fontSize:11, fontWeight:700, color:"var(--muted)", textTransform:"uppercase" }}>
+      {label}{required && <span style={{color:"var(--red)"}}>*</span>}
+    </label>
+    {children}
+  </div>
+);
+const cotInp = { padding:"8px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--bg0)", color:"var(--text)", fontSize:13, width:"100%", boxSizing:"border-box", outline:"none" };
+
 // ── Modal Nueva/Editar Cotización ─────────────────────────────────────────────
 function CotizacionModal({ cotizacion, clientes, tabulador, extrasTabulador, folioSig, onSave, onClose }) {
   const hoy = new Date().toISOString().slice(0,10);
@@ -7624,26 +7635,23 @@ function CotizacionModal({ cotizacion, clientes, tabulador, extrasTabulador, fol
 
   const upd = (field, v) => setForm(p => ({...p, [field]:v}));
 
-  // Calcular subtotal desde conceptos + extras
   const subtotalConceptos = form.conceptos.reduce((s,c) => s + (c.precioTotal||0), 0);
   const subtotalExtras    = form.extras.reduce((s,e) => s + (e.precioTotal||0), 0);
   const subtotal = subtotalConceptos + subtotalExtras;
   const fiscal = calcFiscal(subtotal, form.tipoPersona);
 
-  // Actualizar concepto
   const updConcepto = (id, field, val) => {
     setForm(p => ({...p, conceptos: p.conceptos.map(c => {
       if (c.id !== id) return c;
       const updated = {...c, [field]: field==="cant"||field==="precioUnit" ? Number(val) : val};
       if (field==="cant"||field==="precioUnit") updated.precioTotal = updated.cant * updated.precioUnit;
-      if (field==="precioTotal") { updated.precioTotal = Number(val); }
+      if (field==="precioTotal") updated.precioTotal = Number(val);
       return updated;
     })}));
   };
   const addConcepto = () => setForm(p => ({...p, conceptos:[...p.conceptos, { id:"c"+Date.now(), cant:1, desc:"", precioUnit:0, precioTotal:0 }]}));
   const delConcepto = id => setForm(p => ({...p, conceptos: p.conceptos.filter(c => c.id!==id)}));
 
-  // Autocompletar precio desde tabulador
   const aplicarTarifa = () => {
     const row = tabulador.find(r => r.tipo === form.unidadTipo);
     if (!row) return;
@@ -7654,7 +7662,6 @@ function CotizacionModal({ cotizacion, clientes, tabulador, extrasTabulador, fol
     setForm(p => ({...p, conceptos: p.conceptos.map((c,i) => i===0 ? {...c, precioUnit:precio, precioTotal:c.cant*precio} : c)}));
   };
 
-  // Manejar extras
   const toggleExtra = (extra) => {
     const ya = form.extras.find(e => e.id===extra.id);
     if (ya) setForm(p => ({...p, extras: p.extras.filter(e => e.id!==extra.id)}));
@@ -7662,32 +7669,23 @@ function CotizacionModal({ cotizacion, clientes, tabulador, extrasTabulador, fol
   };
   const updExtraPrecio = (id, val) => setForm(p => ({...p, extras: p.extras.map(e => e.id===id ? {...e, precioTotal:Number(val)} : e)}));
 
-  // Notas importantes
   const updNota = (i, v) => setForm(p => ({...p, notasImportantes: p.notasImportantes.map((n,j)=>j===i?v:n)}));
   const addNota = () => setForm(p => ({...p, notasImportantes:[...p.notasImportantes, "* "]}));
   const delNota = i => setForm(p => ({...p, notasImportantes: p.notasImportantes.filter((_,j)=>j!==i)}));
 
   const handleClienteChange = (id) => {
     const cli = clientes.find(c => c.id===id);
-    upd("clienteId", id);
-    if (cli) {
-      upd("clienteNombre", cli.nombre);
-      upd("tipoPersona", cli.tipoPersona || "moral");
-    }
+    setForm(p => ({
+      ...p,
+      clienteId: id,
+      clienteNombre: cli ? cli.nombre : p.clienteNombre,
+      tipoPersona: cli ? (cli.tipoPersona || "moral") : p.tipoPersona,
+    }));
   };
 
   const handleSave = () => {
-    const final = { ...form, subtotal };
-    onSave(final);
+    onSave({ ...form, subtotal });
   };
-
-  const F = ({ label, children, required }) => (
-    <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
-      <label style={{ fontSize:11, fontWeight:700, color:"var(--muted)", textTransform:"uppercase" }}>{label}{required&&<span style={{color:"var(--red)"}}>*</span>}</label>
-      {children}
-    </div>
-  );
-  const inp = { padding:"8px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--bg0)", color:"var(--text)", fontSize:13, width:"100%", boxSizing:"border-box", outline:"none" };
 
   return (
     <div className="modal-ov" onClick={onClose}>
@@ -7700,59 +7698,75 @@ function CotizacionModal({ cotizacion, clientes, tabulador, extrasTabulador, fol
 
           {/* Fila 1: Fecha, folio, tipo persona */}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
-            <F label="Fecha"><input type="date" value={form.fecha} onChange={e=>upd("fecha",e.target.value)} style={inp}/></F>
-            <F label="Folio"><input value={form.folio} onChange={e=>upd("folio",e.target.value)} style={inp}/></F>
-            <F label="Tipo de Persona">
-              <select value={form.tipoPersona} onChange={e=>upd("tipoPersona",e.target.value)} style={inp}>
+            <CotFld label="Fecha">
+              <input type="date" value={form.fecha} onChange={e=>upd("fecha",e.target.value)} style={cotInp}/>
+            </CotFld>
+            <CotFld label="Folio (editable)">
+              <input value={form.folio} onChange={e=>upd("folio",e.target.value)} style={cotInp} placeholder="Ej: COT-4187"/>
+            </CotFld>
+            <CotFld label="Tipo de Persona">
+              <select value={form.tipoPersona} onChange={e=>upd("tipoPersona",e.target.value)} style={cotInp}>
                 <option value="moral">🏢 Persona Moral (RET 4%)</option>
                 <option value="fisica">👤 Persona Física (Sin RET)</option>
               </select>
-            </F>
+            </CotFld>
           </div>
 
           {/* Fila 2: Cliente */}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-            <F label="Cliente">
-              <select value={form.clienteId} onChange={e=>handleClienteChange(e.target.value)} style={inp}>
+            <CotFld label="Cliente">
+              <select value={form.clienteId} onChange={e=>handleClienteChange(e.target.value)} style={cotInp}>
                 <option value="">— Seleccionar cliente —</option>
                 {clientes.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}
                 <option value="__nuevo__">✏️ Escribir nombre manual</option>
               </select>
-            </F>
-            <F label="Nombre cliente (manual o de catálogo)">
-              <input value={form.clienteNombre} onChange={e=>upd("clienteNombre",e.target.value)} placeholder="Nombre del cliente" style={inp}/>
-            </F>
+            </CotFld>
+            <CotFld label="Nombre cliente (manual o de catálogo)">
+              <input value={form.clienteNombre} onChange={e=>upd("clienteNombre",e.target.value)} placeholder="Nombre del cliente" style={cotInp}/>
+            </CotFld>
           </div>
+
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-            <F label="Atención (nombre del contacto)"><input value={form.atencion} onChange={e=>upd("atencion",e.target.value)} placeholder="Ing. / Lic. ..." style={inp}/></F>
-            <F label="Servicio"><input value={form.servicio} onChange={e=>upd("servicio",e.target.value)} placeholder="Transporte de..." style={inp}/></F>
+            <CotFld label="Atención (nombre del contacto)">
+              <input value={form.atencion} onChange={e=>upd("atencion",e.target.value)} placeholder="Ing. / Lic. ..." style={cotInp}/>
+            </CotFld>
+            <CotFld label="Servicio">
+              <input value={form.servicio} onChange={e=>upd("servicio",e.target.value)} placeholder="Transporte de..." style={cotInp}/>
+            </CotFld>
           </div>
+
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:12 }}>
-            <F label="Tipo de Unidad">
-              <select value={form.unidadTipo} onChange={e=>upd("unidadTipo",e.target.value)} style={inp}>
+            <CotFld label="Tipo de Unidad">
+              <select value={form.unidadTipo} onChange={e=>upd("unidadTipo",e.target.value)} style={cotInp}>
                 <option value="">— Tipo —</option>
                 {tabulador.filter(r=>r.activo).map(r=><option key={r.id} value={r.tipo}>{r.icono} {r.tipo}</option>)}
               </select>
-            </F>
-            <F label="Material / Carga"><input value={form.material} onChange={e=>upd("material",e.target.value)} style={inp}/></F>
-            <F label="Origen"><input value={form.origen} onChange={e=>upd("origen",e.target.value)} style={inp}/></F>
-            <F label="Destino"><input value={form.destino} onChange={e=>upd("destino",e.target.value)} style={inp}/></F>
+            </CotFld>
+            <CotFld label="Material / Carga">
+              <input value={form.material} onChange={e=>upd("material",e.target.value)} style={cotInp}/>
+            </CotFld>
+            <CotFld label="Origen">
+              <input value={form.origen} onChange={e=>upd("origen",e.target.value)} style={cotInp}/>
+            </CotFld>
+            <CotFld label="Destino">
+              <input value={form.destino} onChange={e=>upd("destino",e.target.value)} style={cotInp}/>
+            </CotFld>
           </div>
 
           {/* Auto-precio desde tabulador */}
           <div style={{ padding:"12px 16px", background:"rgba(0,153,204,.07)", borderRadius:10, border:"1px solid var(--cyan)", display:"flex", gap:12, alignItems:"flex-end", flexWrap:"wrap" }}>
             <div style={{ fontSize:12, fontWeight:700, color:"var(--cyan)", flex:"0 0 100%" }}>⚡ Aplicar tarifa desde tabulador</div>
-            <F label="Modalidad">
-              <select value={form.modalidadTarifa} onChange={e=>upd("modalidadTarifa",e.target.value)} style={{ ...inp, width:130 }}>
+            <CotFld label="Modalidad">
+              <select value={form.modalidadTarifa} onChange={e=>upd("modalidadTarifa",e.target.value)} style={{ ...cotInp, width:130 }}>
                 <option value="viaje">Por viaje</option>
                 <option value="km">Por km</option>
                 <option value="dia">Por día</option>
               </select>
-            </F>
+            </CotFld>
             {form.modalidadTarifa==="km" && (
-              <F label="Distancia (km)">
-                <input type="number" value={form.km} onChange={e=>upd("km",e.target.value)} placeholder="km" style={{ ...inp, width:90 }}/>
-              </F>
+              <CotFld label="Distancia (km)">
+                <input type="number" value={form.km} onChange={e=>upd("km",e.target.value)} placeholder="km" style={{ ...cotInp, width:90 }}/>
+              </CotFld>
             )}
             <button className="btn btn-cyan btn-sm" onClick={aplicarTarifa} disabled={!form.unidadTipo}>
               ⚡ Autocompletar precio
@@ -7771,7 +7785,13 @@ function CotizacionModal({ cotizacion, clientes, tabulador, extrasTabulador, fol
               <button className="btn btn-ghost btn-xs" onClick={addConcepto}>➕ Agregar línea</button>
             </div>
             <table style={{ marginBottom:0 }}>
-              <thead><tr><th style={{width:60}}>Cant.</th><th>Descripción</th><th style={{textAlign:"right",width:120}}>Precio Unit.</th><th style={{textAlign:"right",width:120}}>Total</th><th style={{width:36}}></th></tr></thead>
+              <thead><tr>
+                <th style={{width:60}}>Cant.</th>
+                <th>Descripción</th>
+                <th style={{textAlign:"right",width:120}}>Precio Unit.</th>
+                <th style={{textAlign:"right",width:120}}>Total</th>
+                <th style={{width:36}}></th>
+              </tr></thead>
               <tbody>
                 {form.conceptos.map(c => (
                   <tr key={c.id}>
@@ -7842,9 +7862,9 @@ function CotizacionModal({ cotizacion, clientes, tabulador, extrasTabulador, fol
           </div>
 
           {/* Observaciones */}
-          <F label="Observaciones">
-            <textarea value={form.observaciones} onChange={e=>upd("observaciones",e.target.value)} rows={2} placeholder="Condiciones especiales, aclaraciones..." style={{ ...inp, resize:"vertical" }}/>
-          </F>
+          <CotFld label="Observaciones">
+            <textarea value={form.observaciones} onChange={e=>upd("observaciones",e.target.value)} rows={2} placeholder="Condiciones especiales, aclaraciones..." style={{ ...cotInp, resize:"vertical" }}/>
+          </CotFld>
 
           {/* Notas importantes editables */}
           <div>
@@ -7855,7 +7875,7 @@ function CotizacionModal({ cotizacion, clientes, tabulador, extrasTabulador, fol
             <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
               {form.notasImportantes.map((n,i) => (
                 <div key={i} style={{ display:"flex", gap:8, alignItems:"center" }}>
-                  <input value={n} onChange={e=>updNota(i,e.target.value)} style={{ ...inp, fontSize:12 }}/>
+                  <input value={n} onChange={e=>updNota(i,e.target.value)} style={{ ...cotInp, fontSize:12 }}/>
                   <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0}} onClick={()=>delNota(i)}>✕</button>
                 </div>
               ))}
