@@ -43,8 +43,11 @@ export async function fsSet(key, value) {
   } catch (e) {
     console.warn("fsSet error:", e);
     const msg = e?.message || "";
-    // Mostrar error completo para diagnóstico
-    alert("⚠️ Error Firebase [" + key + "]\nCódigo: " + (e?.code || "?") + "\nMensaje: " + msg.slice(0, 200));
+    if (msg.includes("exceeds") || msg.includes("size") || msg.includes("large") || e?.code === "invalid-argument") {
+      alert("⚠️ No se pudo guardar: el documento supera el límite de Firebase.\nSi subiste fotos sin conexión a Cloudinary, elimínalas e intenta de nuevo.");
+    } else {
+      alert("⚠️ Error al guardar: " + msg + "\nRevisa tu conexión e intenta de nuevo.");
+    }
     return false;
   }
 }

@@ -772,7 +772,7 @@ function UnitModal({ unit, drivers, onSave, onClose, tiposPersonalizados = [], o
   
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   
-  const ok = () => { 
+  const ok = (_e) => { 
     if (!f.num || !f.placas) return alert("Número y placas requeridos"); 
     onSave({ ...f, id: f.id || uid() }) 
   };
@@ -957,7 +957,7 @@ function DriverModal({ driver, units, onSave, onClose }) {
   
   const [uploading, setUploading] = useState(false);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
-  const ok = () => { if (uploading) return alert("⏳ Espera a que termine de subir la foto..."); if (!f.nombre) return alert("Nombre requerido"); onSave({ ...f, id: f.id || uid() }) };
+  const ok = (_e) => { if (uploading) return alert("⏳ Espera a que termine de subir la foto..."); if (!f.nombre) return alert("Nombre requerido"); onSave({ ...f, id: f.id || uid() }) };
 
   return (
     <div className="modal-ov" onClick={onClose}>
@@ -1097,7 +1097,7 @@ function FuelModal({ fuel, units, onSave, onClose, onUpdateUnit }) {
   const costo = (Number(f.litros) || 0) * (Number(f.precio) || 0);
   const rend = f.kmRec && f.litros ? (Number(f.kmRec) / Number(f.litros)).toFixed(2) : null;
   
-  const ok = () => { 
+  const ok = (_e) => { 
     if (!f.unidadId || !f.litros) return alert("Unidad y litros requeridos"); 
     
     // NUEVO: Actualizar KM de la unidad automáticamente
@@ -1236,7 +1236,7 @@ function DocModal({ doc, units, drivers, onSave, onClose }) {
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const docList = f.entidadTipo === "operador" ? DOCS_LIST_OPERADOR : DOCS_LIST_UNIDAD;
 
-  const ok = async () => { 
+  const ok = async (_e) => { 
     if (uploading) return alert("⏳ Espera a que termine de subir la foto...");
     if (f.entidadTipo === "unidad" && !f.unidadId) return alert("Selecciona una unidad");
     if (f.entidadTipo === "operador" && !f.operadorId) return alert("Selecciona un operador");
@@ -1304,7 +1304,7 @@ function MaintModal({ maint, units, proveedores, onSave, onClose }) {
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const provs = (proveedores || []).filter(p => ["Talleres","Mano de Obra","Refacciones"].includes(p.categoria));
   const selectedProv = provs.find(p => p.id === f.proveedorId);
-  const ok = () => { if (!f.unidadId || !f.desc) return alert("Unidad y descripción requeridos"); onSave({ ...f, id: f.id || uid() }) };
+  const ok = (_e) => { if (!f.unidadId || !f.desc) return alert("Unidad y descripción requeridos"); onSave({ ...f, id: f.id || uid() }) };
   return (
     <div className="modal-ov" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
@@ -1355,7 +1355,7 @@ function TripModal({ trip, units, onSave, onClose }) {
   const [uploading, setUploading] = useState(false);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const dist = f.kmLlegada && f.kmSalida ? Number(f.kmLlegada) - Number(f.kmSalida) : null;
-  const ok = () => { if (!f.unidadId || !f.origen) return alert("Unidad y origen requeridos"); onSave({ ...f, id: f.id || uid() }) };
+  const ok = (_e) => { if (!f.unidadId || !f.origen) return alert("Unidad y origen requeridos"); onSave({ ...f, id: f.id || uid() }) };
   return (
     <div className="modal-ov" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
@@ -1399,7 +1399,7 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const toggleHerr = h => setF(p => ({ ...p, herramientas: p.herramientas.includes(h) ? p.herramientas.filter(x => x !== h) : [...p.herramientas, h] }));
   const addTipo = () => { if (nuevoTipo.trim()) { setF(p => ({ ...p, tipoUnidad: nuevoTipo.trim() })); setNuevoTipo("") } };
-  const ok = () => {
+  const ok = (_e) => {
     if (!f.empresa || !f.origen) return alert("Empresa y origen requeridos");
     let finalForm = { ...f, id: f.id || uid(), pagoStatus: f.pagoStatus||"pendiente", pagoEvidencias: f.pagoEvidencias||[] };
     // Auto-create proveedor if new name entered
@@ -1707,7 +1707,7 @@ _${branding?.nombre||"Fleet Pro"} — Comprobante de liquidación_`;
 function GastoModal({ gasto, proveedores, onSave, onClose }) {
   const [f, setF] = useState(gasto || { fecha: "", tipo: GASTO_TIPOS[0], descripcion: "", monto: 0, responsable: "", proveedorId: "" });
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
-  const ok = () => { if (!f.tipo || !f.monto) return alert("Tipo y monto requeridos"); onSave({ ...f, id: f.id || uid() }) };
+  const ok = (_e) => { if (!f.tipo || !f.monto) return alert("Tipo y monto requeridos"); onSave({ ...f, id: f.id || uid() }) };
   const selectedProv = (proveedores||[]).find(p => p.id === f.proveedorId);
   return (
     <div className="modal-ov" onClick={onClose}>
@@ -2579,7 +2579,7 @@ function BrandingModal({ branding, onSave, onClose }) {
     reader.readAsDataURL(file);
   };
 
-  const ok = () => {
+  const ok = (_e) => {
     if (!f.nombre.trim()) return alert("El nombre de la empresa es requerido");
     onSave(f);
     onClose();
@@ -2707,7 +2707,7 @@ function ProveedorModal({ proveedor, onSave, onClose }) {
   const [f, setF] = useState(proveedor || { nombre: "", categoria: PROVEEDOR_CATS[0], tipoProv: TIPO_PROVEEDOR_CATS[0], contacto: "", tel: "", email: "", rfc: "", direccion: "", banco: "", cuenta: "", diasCredito: 0, limiteCredito: 0, saldoPendiente: 0, ultimoPago: "", notas: "" });
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const chN = k => e => setF(p => ({ ...p, [k]: Number(e.target.value) }));
-  const ok = () => { if (!f.nombre) return alert("Nombre requerido"); onSave({ ...f, id: f.id || uid() }) };
+  const ok = (_e) => { if (!f.nombre) return alert("Nombre requerido"); onSave({ ...f, id: f.id || uid() }) };
   // Días vencidos de crédito
   const diasUsados = f.ultimoPago ? Math.floor((Date.now() - new Date(f.ultimoPago)) / 86400000) : null;
   const creditoVencido = diasUsados != null && diasUsados > (f.diasCredito || 0);
@@ -3160,7 +3160,7 @@ function ClienteModal({ cliente, onSave, onClose }) {
 
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
 
-  const ok = () => {
+  const ok = (_e) => {
     if (!f.nombre || !f.rfc) return alert("Nombre y RFC requeridos");
     onSave({ ...f, id: f.id || uid() });
   };
@@ -3332,7 +3332,7 @@ function FacturaModal({ factura, clientes, viajes, onSave, onClose }) {
     }
   }, [f.viajeId, viajes, f.subtotal]);
 
-  const ok = () => {
+  const ok = (_e) => {
     if (!f.clienteId || !f.numeroFactura || !f.subtotal) {
       return alert("Cliente, número de factura y subtotal son requeridos");
     }
@@ -5747,7 +5747,7 @@ function SelectorNominaModal({ tipo, personas, preselId, onConfirm, onClose }) {
     setInicio(fmt(lunes)); setFin(fmt(fin));
   };
 
-  const ok = () => {
+  const ok = (_e) => {
     if (!personaId) return alert("Selecciona un " + (tipo === "operador" ? "operador" : "administrativo"));
     if (!inicio || !fin) return alert("Ingresa el período de pago");
     const persona = personas.find(p => p.id === personaId);
@@ -5942,7 +5942,7 @@ function NominaAdminModal({ persona, onSave, onClose, companyLogo, companyName, 
 function EmpleadoAdminModal({ persona, onSave, onClose }) {
   const [f, setF] = useState(persona || { nombre:"", puesto:"", sueldoBase:0, deducciones:0, descripcionDeducciones:"", bonos:0, otrasPercepciones:0, activo:true, notas:"" });
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
-  const ok = () => {
+  const ok = (_e) => {
     if (!f.nombre.trim()) return alert("El nombre es requerido");
     onSave({ ...f, id: f.id || uid() });
   };
@@ -8006,7 +8006,7 @@ function GeocercaModal({ geocerca, devices, onSave, onClose }) {
     ...p,
     deviceIds: p.deviceIds.includes(id) ? p.deviceIds.filter(x => x !== id) : [...p.deviceIds, id]
   }));
-  const ok = () => {
+  const ok = (_e) => {
     if (!f.nombre || !f.lat || !f.lng) return alert("Nombre, latitud y longitud son requeridos");
     onSave({ ...f, lat: Number(f.lat), lng: Number(f.lng), radio: Number(f.radio) });
   };
