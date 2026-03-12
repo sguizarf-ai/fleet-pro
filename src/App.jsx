@@ -6638,6 +6638,300 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
 }
 
 
+// ─── GPS helpers ───────────────────────────────────────────────────────────────
+
+const getVehicleStatus = (pos) => {
+  if (!pos) return { icon:"⚫", lbl:"Sin señal", color:"var(--muted)" };
+  const speed = pos.speed || 0;
+  const ign   = pos.attributes?.ignition;
+  if (speed > 5)  return { icon:"🟢", lbl:`En ruta ${Math.round(speed)} km/h`, color:"var(--green)" };
+  if (ign === true)  return { icon:"🟡", lbl:"Motor encendido", color:"var(--yellow)" };
+  if (ign === false) return { icon:"🔴", lbl:"Motor apagado",   color:"var(--red)" };
+  return { icon:"🟡", lbl:"Detenido", color:"var(--yellow)" };
+};
+
+const fmtTime = (ts) => {
+  if (!ts) return "—";
+  try {
+    const d = new Date(ts);
+    const ahora = Date.now();
+    const diff = Math.round((ahora - d.getTime()) / 60000);
+    if (diff < 1)   return "Ahora mismo";
+    if (diff < 60)  return `Hace ${diff} min`;
+    if (diff < 1440) return `Hace ${Math.round(diff/60)}h`;
+    return d.toLocaleDateString("es-MX", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
+  } catch { return "—"; }
+};
+
+function FuelGauge({ pct, litros, capacidad }) {
+  const p = Math.min(Math.max(pct || 0, 0), 100);
+  const color = p > 50 ? "var(--green)" : p > 25 ? "var(--yellow)" : "var(--red)";
+  return (
+    <div style={{ minWidth: 80 }}>
+      <div style={{ height: 10, background: "var(--bg3)", borderRadius: 5, overflow: "hidden", marginBottom: 3 }}>
+        <div style={{ height: "100%", width: `${p}%`, background: color, borderRadius: 5, transition: "width .4s" }} />
+      </div>
+      <div style={{ fontSize: 11, display: "flex", justifyContent: "space-between", color: "var(--muted)" }}>
+        <span style={{ fontWeight: 700, color }}>{Math.round(p)}%</span>
+        {litros != null && capacidad && (
+          <span>{Math.round(litros)}L / {capacidad}L</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MapaFlota({ devices, positions, units, onSelectDevice }) {
+  const conPos = devices.filter(d => positions[d.id]);
+  if (conPos.length === 0) {
+    return (
+      <div style={{ padding: "32px 20px", textAlign: "center", background: "var(--bg2)", borderRadius: 10, margin: "0 0 12px" }}>
+        <div style={{ fontSize: 40, marginBottom: 8 }}>🗺️</div>
+        <div style={{ fontWeight: 700, marginBottom: 4 }}>Sin posiciones disponibles</div>
+        <div style={{ fontSize: 12, color: "var(--muted)" }}>
+          Los dispositivos aparecerán aquí cuando reporten su ubicación.
+          <br/>
+          <a href="https://www.google.com/maps" target="_blank" rel="noreferrer"
+            style={{ color: "var(--cyan)", fontSize: 12, marginTop: 8, display: "inline-block" }}>
+            Ver Google Maps ↗
+          </a>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ background: "var(--bg2)", borderRadius: 10, overflow: "hidden", marginBottom: 12, border: "1px solid var(--border)" }}>
+      <div style={{ padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--border)" }}>
+        <span style={{ fontSize: 13, fontWeight: 700 }}>📍 {conPos.length} dispositivo{conPos.length !== 1 ? "s" : ""} con posición</span>
+        {conPos.length > 0 && (
+          <a
+            href={`https://www.google.com/maps?q=${positions[conPos[0].id]?.latitude},${positions[conPos[0].id]?.longitude}`}
+            target="_blank" rel="noreferrer"
+            style={{ fontSize: 11, color: "var(--cyan)", textDecoration: "none" }}>
+            Abrir en Google Maps ↗
+          </a>
+        )}
+      </div>
+      <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+        {conPos.map(d => {
+          const pos = positions[d.id];
+          const st  = getVehicleStatus(pos);
+          const lat = pos?.latitude?.toFixed(5);
+          const lng = pos?.longitude?.toFixed(5);
+          const mapsUrl = `https://www.google.com/maps?q=${pos?.latitude},${pos?.longitude}`;
+          return (
+            <div key={d.id}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", background: "var(--bg1)", borderRadius: 8, border: "1px solid var(--border)", cursor: "pointer" }}
+              onClick={() => onSelectDevice(d)}>
+              <span style={{ fontSize: 20 }}>{st.icon}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 13 }}>{d.name}</div>
+                <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                  {lat}, {lng} · {st.lbl} · {fmtTime(pos?.fixTime)}
+                </div>
+              </div>
+              <a href={mapsUrl} target="_blank" rel="noreferrer"
+                onClick={e => e.stopPropagation()}
+                style={{ fontSize: 11, color: "var(--cyan)", textDecoration: "none", whiteSpace: "nowrap",
+                  padding: "4px 10px", borderRadius: 6, border: "1px solid var(--cyan)", background: "rgba(0,153,204,.08)" }}>
+                🗺️ Ver mapa
+              </a>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function GeocercaModal({ geocerca, devices, onSave, onClose }) {
+  const [f, setF] = useState(geocerca || {
+    id: "gc_" + Date.now(),
+    nombre: "",
+    lat: "",
+    lng: "",
+    radio: 200,
+    deviceIds: [],
+    alertEntrada: true,
+    alertSalida: true,
+    color: "#0099CC",
+  });
+  const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
+  const toggleDev = id => setF(p => ({
+    ...p,
+    deviceIds: p.deviceIds.includes(id) ? p.deviceIds.filter(x => x !== id) : [...p.deviceIds, id]
+  }));
+  const ok = () => {
+    if (!f.nombre || !f.lat || !f.lng) return alert("Nombre, latitud y longitud son requeridos");
+    onSave({ ...f, lat: Number(f.lat), lng: Number(f.lng), radio: Number(f.radio) });
+  };
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 500 }} onClick={e => e.stopPropagation()}>
+        <div className="mhdr">
+          <h3>🛡️ {geocerca ? "Editar" : "Nueva"} Geocerca</h3>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+        </div>
+        <div className="mbody">
+          <div className="fg">
+            <div className="field s2">
+              <label>Nombre de la zona</label>
+              <input value={f.nombre} onChange={ch("nombre")} placeholder="Ej: Planta Monterrey, Bodega Norte..." />
+            </div>
+            <div className="field">
+              <label>Latitud</label>
+              <input value={f.lat} onChange={ch("lat")} placeholder="Ej: 25.6866" type="number" step="0.0001"/>
+            </div>
+            <div className="field">
+              <label>Longitud</label>
+              <input value={f.lng} onChange={ch("lng")} placeholder="Ej: -100.3161" type="number" step="0.0001"/>
+            </div>
+            <div className="field">
+              <label>Radio (metros)</label>
+              <input value={f.radio} onChange={ch("radio")} type="number" min="50" max="50000" step="50"/>
+            </div>
+            <div className="field">
+              <label>Color</label>
+              <input value={f.color} onChange={ch("color")} type="color" style={{ height: 38, cursor: "pointer" }}/>
+            </div>
+            <div className="field s2" style={{ flexDirection: "row", gap: 16, alignItems: "center" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontWeight: 600, fontSize: 12 }}>
+                <input type="checkbox" checked={f.alertEntrada} onChange={e => setF(p => ({ ...p, alertEntrada: e.target.checked }))} />
+                ⬇️ Alerta de entrada
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontWeight: 600, fontSize: 12 }}>
+                <input type="checkbox" checked={f.alertSalida} onChange={e => setF(p => ({ ...p, alertSalida: e.target.checked }))} />
+                ⬆️ Alerta de salida
+              </label>
+            </div>
+          </div>
+          {devices.length > 0 && (
+            <div style={{ marginTop: 14 }}>
+              <div className="sec-lbl" style={{ marginBottom: 8 }}>Dispositivos a monitorear</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {devices.map(d => (
+                  <button key={d.id} onClick={() => toggleDev(d.id)}
+                    style={{ padding: "5px 12px", borderRadius: 8,
+                      border: `1.5px solid ${f.deviceIds.includes(d.id) ? "var(--cyan)" : "var(--border)"}`,
+                      background: f.deviceIds.includes(d.id) ? "rgba(0,153,204,.12)" : "var(--bg2)",
+                      color: f.deviceIds.includes(d.id) ? "var(--cyan)" : "var(--muted)",
+                      fontSize: 12, cursor: "pointer", fontWeight: f.deviceIds.includes(d.id) ? 700 : 400 }}>
+                    {f.deviceIds.includes(d.id) ? "✅ " : ""}{d.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div style={{ marginTop: 12, padding: "10px 12px", background: "var(--bg2)", borderRadius: 8, fontSize: 11, color: "var(--muted)" }}>
+            💡 Para obtener coordenadas: abre Google Maps, haz clic derecho en el punto y copia las coordenadas.
+          </div>
+        </div>
+        <div className="mftr">
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-cyan" onClick={ok}>💾 Guardar Geocerca</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TraccarConfigModal({ config, onSave, onClose }) {
+  const [f, setF] = useState({ ...config });
+  const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+
+  const testConnection = async () => {
+    if (!f.serverUrl || !f.email) return alert("Ingresa URL y email primero");
+    setTesting(true); setTestResult(null);
+    try {
+      const auth = "Basic " + btoa(`${f.email}:${f.password}`);
+      const url  = f.serverUrl.replace(/\/$/, "");
+      const r = await fetch(`${url}/api/devices`, { headers: { Authorization: auth } });
+      if (r.ok) {
+        const devs = await r.json();
+        setTestResult({ ok: true, msg: `✅ Conexión exitosa — ${Array.isArray(devs) ? devs.length : 0} dispositivos encontrados` });
+      } else {
+        setTestResult({ ok: false, msg: `❌ Error ${r.status}: ${r.statusText}. Verifica usuario y contraseña.` });
+      }
+    } catch (e) {
+      setTestResult({ ok: false, msg: `❌ No se pudo conectar: ${e.message}. Verifica la URL y que el servidor esté en línea.` });
+    }
+    setTesting(false);
+  };
+
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+        <div className="mhdr">
+          <h3>⚙️ Configurar Conexión GPS — Traccar</h3>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+        </div>
+        <div className="mbody">
+          <div className="fg">
+            <div className="field s2">
+              <label>URL del servidor Traccar</label>
+              <input value={f.serverUrl} onChange={ch("serverUrl")} placeholder="https://demo.traccar.org  ó  http://tu-ip:8082" />
+              <span style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>
+                Incluye https:// o http:// y el puerto si no es 80/443
+              </span>
+            </div>
+            <div className="field">
+              <label>Email / Usuario</label>
+              <input value={f.email} onChange={ch("email")} placeholder="admin@tuempresa.com" />
+            </div>
+            <div className="field">
+              <label>Contraseña</label>
+              <input value={f.password} onChange={ch("password")} type="password" placeholder="••••••••" />
+            </div>
+            <div className="field">
+              <label>Intervalo de actualización (seg)</label>
+              <select value={f.intervalo || "30"} onChange={ch("intervalo")}
+                style={{ background: "var(--bg0)", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 12px", color: "var(--text)" }}>
+                <option value="10">10 segundos</option>
+                <option value="15">15 segundos</option>
+                <option value="30">30 segundos (recomendado)</option>
+                <option value="60">1 minuto</option>
+                <option value="120">2 minutos</option>
+              </select>
+            </div>
+          </div>
+
+          {testResult && (
+            <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 8,
+              background: testResult.ok ? "rgba(0,200,150,.12)" : "rgba(220,50,50,.1)",
+              border: `1px solid ${testResult.ok ? "var(--green)" : "var(--red)"}`,
+              fontSize: 13, fontWeight: 600,
+              color: testResult.ok ? "var(--green)" : "var(--red)" }}>
+              {testResult.msg}
+            </div>
+          )}
+
+          <div style={{ marginTop: 14, padding: "12px 14px", background: "var(--bg2)", borderRadius: 8, fontSize: 12, color: "var(--muted)" }}>
+            <strong style={{ color: "var(--cyan)" }}>🧪 Servidor demo gratuito para pruebas:</strong>
+            <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+              <div>URL: <code style={{ background: "var(--bg3)", padding: "2px 6px", borderRadius: 4 }}>https://demo.traccar.org</code></div>
+              <div>Email: <code style={{ background: "var(--bg3)", padding: "2px 6px", borderRadius: 4 }}>demo</code></div>
+              <div>Contraseña: <code style={{ background: "var(--bg3)", padding: "2px 6px", borderRadius: 4 }}>demo</code></div>
+            </div>
+          </div>
+        </div>
+        <div className="mftr" style={{ justifyContent: "space-between" }}>
+          <button className="btn btn-ghost" onClick={testConnection} disabled={testing}>
+            {testing ? "⏳ Probando..." : "🔌 Probar conexión"}
+          </button>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+            <button className="btn btn-cyan" onClick={() => { onSave(f); onClose(); }}>💾 Guardar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
 
 function GpsPage({ units, traccarConfig, onOpenConfig }) {
   const [devices,    setDevices]    = useState([]);
