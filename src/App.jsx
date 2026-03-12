@@ -2551,13 +2551,13 @@ function ProveedorModal({ proveedor, onSave, onClose }) {
 
 function HojaViajeModal({ units, drivers, remitentes, onClose, companyLogo, companyName }) {
   const [f, setF] = useState({
-  const [remitenteId, setRemitenteId] = useState("");
-  const remSel = (remitentes||[]).find(r => r.id === remitenteId);
     folio: "", fecha: new Date().toLocaleDateString("es-MX"), unidadId: "", operadorId: "",
     origenHoraCita: "", origenCliente: "", origenDireccion: "", origenContacto: "", origenTel: "",
     destinoHoraCita: "", destinoCliente: "", destinoDireccion: "", destinoContacto: "", destinoTel: "",
     carga: "", peso: "", sello: "", notas: ""
   });
+  const [remitenteId, setRemitenteId] = useState("");
+  const remSel = (remitentes||[]).find(r => r.id === remitenteId);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const unit = units.find(u => u.id === f.unidadId);
   const driver = drivers.find(d => d.id === f.operadorId) || (unit ? drivers.find(d => d.id === unit.operador) : null);
