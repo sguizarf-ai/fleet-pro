@@ -1034,6 +1034,10 @@ function DocModal({ doc, units, drivers, onSave, onClose }) {
     const base = doc || {};
     const tipo = base.entidadTipo || "unidad";
     const lista = tipo === "operador" ? DOCS_LIST_OPERADOR : DOCS_LIST_UNIDAD;
+    // Migrar campo foto (string) a fotos (array) si viene de versión anterior
+    const fotosBase = base.fotos
+      ? base.fotos
+      : base.foto ? [base.foto] : [];
     return {
       entidadTipo: "unidad",
       unidadId: "",
@@ -1043,9 +1047,9 @@ function DocModal({ doc, units, drivers, onSave, onClose }) {
       vence: "",
       empresa: "",
       notas: "",
-      foto: "",
+      fotos: [],
       ...base,
-      // Si nombre llegó vacío/undefined, poner el primero de la lista correcta
+      fotos: fotosBase,
       nombre: (base.nombre && base.nombre.trim()) ? base.nombre : lista[0],
     };
   };
@@ -1086,7 +1090,7 @@ function DocModal({ doc, units, drivers, onSave, onClose }) {
             <div className="field"><label>Fecha Vencimiento</label><input value={f.vence} onChange={ch("vence")} placeholder="dd/mm/aaaa" /></div>
             <div className="field"><label>Empresa / Emisor</label><input value={f.empresa} onChange={ch("empresa")} /></div>
             <div className="field s2"><label>Notas</label><textarea value={f.notas} onChange={ch("notas")} rows={2} /></div>
-            <PhotoInputSm value={f.foto} onChange={v => setF(p => ({ ...p, foto: v }))} label="Foto del documento" />
+            <MultiPhotoInput values={f.fotos || []} onChange={v => setF(p => ({ ...p, fotos: v }))} label="📷 Fotos del documento (puedes subir varias)" />
           </div>
         </div>
         <div className="mftr"><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-cyan" onClick={ok}>💾 Guardar</button></div>
@@ -4541,27 +4545,262 @@ function openDocPrint(doc, unit, driver) {
   setTimeout(() => w.print(), 500);
 }
 
-function DocsPage({ units, drivers, docs, onAdd, onEdit, onDelete }) {
-  const [viewMode, setViewMode] = useState("unidad"); // "unidad" | "operador"
-  const [uf, setUf] = useState("TODOS");
+// ── Modal de envío de documentos por WhatsApp ─────────────────────────────────
+function DocEnvioModal({ docs, clientes, onClose }) {
+  const [tel, setTel] = useState("");
+  const [clienteId, setClienteId] = useState("");
+  const [msg, setMsg] = useState("");
 
-  const docsUnidad = docs.filter(d => !d.entidadTipo || d.entidadTipo === "unidad");
+  // Al seleccionar cliente del catálogo, rellenar teléfono
+  const handleCliente = (id) => {
+    setClienteId(id);
+    if (id) {
+      const cli = clientes.find(c => c.id === id);
+      if (cli?.telefono) setTel(cli.telefono.replace(/\D/g, ""));
+    } else {
+      setTel("");
+    }
+  };
+
+  // Construir texto del mensaje
+  const buildMsg = () => {
+    const lineas = ["📋 *Documentos solicitados — Fleet Pro*\n"];
+    docs.forEach(d => {
+      lineas.push(`*${d.nombre}*`);
+      if (d.numero)  lineas.push(`  N°: ${d.numero}`);
+      if (d.vence)   lineas.push(`  Vence: ${d.vence}`);
+      if (d.empresa) lineas.push(`  Emisor: ${d.empresa}`);
+      if (d.notas)   lineas.push(`  Notas: ${d.notas}`);
+      lineas.push("");
+    });
+    lineas.push("_Enviado desde Fleet Pro v6_");
+    return lineas.join("\n");
+  };
+
+  const fotosTotal = docs.reduce((s, d) => s + (d.fotos?.length || (d.foto ? 1 : 0)), 0);
+
+  const enviarWhatsapp = () => {
+    const numero = tel.replace(/\D/g, "");
+    if (!numero || numero.length < 10) return alert("Ingresa un número de teléfono válido (10 dígitos mínimo)");
+    const texto = msg || buildMsg();
+    const url = `https://wa.me/52${numero}?text=${encodeURIComponent(texto)}`;
+    window.open(url, "_blank");
+  };
+
+  const copiarTexto = () => {
+    const texto = msg || buildMsg();
+    navigator.clipboard.writeText(texto).then(() => alert("✅ Texto copiado al portapapeles"));
+  };
+
+  // Previsualizar fotos de todos los documentos seleccionados
+  const todasFotos = docs.flatMap(d => {
+    const arr = d.fotos?.length ? d.fotos : d.foto ? [d.foto] : [];
+    return arr.map(src => ({ src, docNombre: d.nombre }));
+  });
+
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal wide" style={{ maxWidth: 620, maxHeight: "92vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
+        <div className="mhdr">
+          <h3>📲 Enviar Documentos por WhatsApp</h3>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+        </div>
+        <div className="mbody" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+          {/* Resumen de docs seleccionados */}
+          <div style={{ padding: "10px 14px", background: "rgba(0,153,204,.07)", border: "1px solid var(--cyan)", borderRadius: 10 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: "var(--cyan)" }}>
+              📋 {docs.length} documento{docs.length !== 1 ? "s" : ""} seleccionado{docs.length !== 1 ? "s" : ""}
+              {fotosTotal > 0 && <span style={{ marginLeft: 8, fontSize: 11, color: "var(--muted)" }}>· {fotosTotal} foto{fotosTotal !== 1 ? "s" : ""}</span>}
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {docs.map(d => (
+                <span key={d.id} style={{ padding: "3px 9px", borderRadius: 8, background: "var(--bg2)", border: "1px solid var(--border)", fontSize: 11, fontWeight: 600 }}>
+                  {d.nombre}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Fotos preview */}
+          {todasFotos.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", marginBottom: 8 }}>
+                Vista previa de fotos ({todasFotos.length})
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8 }}>
+                {todasFotos.map((f, i) => (
+                  <div key={i} style={{ position: "relative" }}>
+                    <img src={f.src} alt={f.docNombre}
+                      style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)", cursor: "pointer" }}
+                      onClick={() => window.open(f.src, "_blank")}
+                    />
+                    <div style={{ fontSize: 9, color: "var(--muted)", textAlign: "center", marginTop: 2, lineHeight: 1.2 }}>{f.docNombre}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 6, padding: "8px 12px", background: "var(--bg2)", borderRadius: 8 }}>
+                💡 <strong>Importante:</strong> WhatsApp no permite enviar imágenes por URL directa. Después de abrir la conversación, deberás enviar las fotos manualmente desde esta vista previa (clic en cada foto → guardar → adjuntar en WhatsApp).
+              </div>
+            </div>
+          )}
+
+          {/* Destinatario */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div className="field">
+              <label>Cliente del catálogo (opcional)</label>
+              <select value={clienteId} onChange={e => handleCliente(e.target.value)}
+                style={{ background: "var(--bg0)", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 12px", color: "var(--text)", fontSize: 13 }}>
+                <option value="">— Seleccionar cliente registrado —</option>
+                {clientes.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}{c.telefono ? ` · ${c.telefono}` : " · (sin tel)"}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label>Número de WhatsApp *</label>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span style={{ padding: "9px 12px", background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, color: "var(--muted)", flexShrink: 0 }}>🇲🇽 +52</span>
+                <input value={tel} onChange={e => setTel(e.target.value.replace(/\D/g, ""))}
+                  placeholder="8181234567 (10 dígitos)"
+                  maxLength={10}
+                  style={{ flex: 1, background: "var(--bg0)", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 12px", color: "var(--text)", fontSize: 13 }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Mensaje editable */}
+          <div className="field">
+            <label>Mensaje personalizado (opcional — si lo dejas vacío se genera automáticamente)</label>
+            <textarea value={msg} onChange={e => setMsg(e.target.value)} rows={5}
+              placeholder={buildMsg()}
+              style={{ background: "var(--bg0)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", color: "var(--text)", fontSize: 12, resize: "vertical", fontFamily: "monospace" }}
+            />
+          </div>
+
+          {/* Preview del mensaje generado */}
+          {!msg && (
+            <div style={{ padding: "12px 14px", background: "var(--bg2)", borderRadius: 8, border: "1px solid var(--border)" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase" }}>Vista previa del mensaje</div>
+              <pre style={{ fontSize: 11, margin: 0, whiteSpace: "pre-wrap", fontFamily: "inherit", color: "var(--text)", lineHeight: 1.6 }}>{buildMsg()}</pre>
+            </div>
+          )}
+        </div>
+
+        <div className="mftr" style={{ justifyContent: "space-between" }}>
+          <button className="btn btn-ghost" onClick={copiarTexto}>📋 Copiar texto</button>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+            <button className="btn" style={{ background: "#25D366", color: "#fff", fontWeight: 700 }} onClick={enviarWhatsapp}>
+              📲 Abrir en WhatsApp
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function DocsPage({ units, drivers, docs, clientes, onAdd, onEdit, onDelete }) {
+  const [viewMode, setViewMode]   = useState("unidad");
+  const [uf, setUf]               = useState("TODOS");
+  const [selDocs, setSelDocs]     = useState([]); // ids seleccionados
+  const [showEnvio, setShowEnvio] = useState(false);
+
+  const docsUnidad   = docs.filter(d => !d.entidadTipo || d.entidadTipo === "unidad");
   const docsOperador = docs.filter(d => d.entidadTipo === "operador");
+  const fdUnidad     = docsUnidad.filter(d => uf === "TODOS" || d.unidadId === uf);
+  const fdOperador   = docsOperador.filter(d => uf === "TODOS" || d.operadorId === uf);
 
-  const fdUnidad = docsUnidad.filter(d => uf === "TODOS" || d.unidadId === uf);
-  const fdOperador = docsOperador.filter(d => uf === "TODOS" || d.operadorId === uf);
+  const toggleSel = (id) => setSelDocs(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
+  const clearSel  = () => setSelDocs([]);
+  const docsSelObj = docs.filter(d => selDocs.includes(d.id));
+
+  const DocCard = ({ d, entity, isUnit }) => {
+    const dy  = daysUntil(d.vence);
+    const dc  = dy === null ? "var(--muted)" : dy < 0 ? "var(--red)" : dy <= 30 ? "var(--yellow)" : "var(--green)";
+    const sel = selDocs.includes(d.id);
+    const fotos = d.fotos?.length ? d.fotos : d.foto ? [d.foto] : [];
+    return (
+      <div className="doc-card" style={{ "--dc": dc, outline: sel ? "2.5px solid var(--cyan)" : "none", position: "relative", cursor: "pointer" }}
+        onClick={() => toggleSel(d.id)}>
+        {/* Checkbox de selección */}
+        <div style={{ position: "absolute", top: 8, right: 8, width: 20, height: 20, borderRadius: 5,
+          background: sel ? "var(--cyan)" : "var(--bg3)", border: `2px solid ${sel ? "var(--cyan)" : "var(--border)"}`,
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#fff", zIndex: 1 }}>
+          {sel ? "✓" : ""}
+        </div>
+        <div className="doc-name" style={{ paddingRight: 24 }}>{d.nombre}</div>
+        <div className="doc-date">{d.vence || "Sin fecha"}</div>
+        <div style={{ marginTop: 5 }}>{docBdg(dy)}</div>
+        {d.numero  && <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>N°: {d.numero}</div>}
+        {d.empresa && <div style={{ fontSize: 10, color: "var(--muted)" }}>{d.empresa}</div>}
+        {/* Galería de fotos */}
+        {fotos.length > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(fotos.length, 3)}, 1fr)`, gap: 4, marginTop: 8 }}>
+            {fotos.map((src, i) => (
+              <img key={i} src={src}
+                style={{ width: "100%", height: fotos.length === 1 ? 80 : 55, objectFit: "cover", borderRadius: 5, border: "1px solid var(--border)" }}
+                alt={`foto ${i+1}`}
+                onClick={e => { e.stopPropagation(); window.open(src, "_blank"); }}
+                title="Clic para ver completo"
+              />
+            ))}
+            {fotos.length > 1 && <div style={{ fontSize: 9, color: "var(--muted)", gridColumn: "1/-1", textAlign: "right" }}>{fotos.length} fotos · clic para ampliar</div>}
+          </div>
+        )}
+        <div className="acts" style={{ marginTop: 8 }} onClick={e => e.stopPropagation()}>
+          <button className="btn btn-ghost btn-xs" title="Imprimir"
+            onClick={() => isUnit ? openDocPrint(d, entity, null) : openDocPrint(d, null, entity)}>🖨️</button>
+          <button className="btn btn-ghost btn-xs" title="Descargar"
+            onClick={() => isUnit ? downloadDocAsHtml(d, entity, null) : downloadDocAsHtml(d, null, entity)}>⬇️</button>
+          <button className="btn btn-ghost btn-xs" onClick={() => onEdit(d)}>✏️</button>
+          <button className="btn btn-red btn-xs" onClick={() => onDelete(d.id)}>🗑</button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="card">
-      <div className="card-hdr"><h3>📄 Documentos y Vencimientos ({docs.length})</h3>
+      <div className="card-hdr">
+        <h3>📄 Documentos y Vencimientos ({docs.length})</h3>
         <div className="row-gap">
           <div style={{ display: "flex", gap: 6 }}>
-            <button className={`btn btn-sm ${viewMode === "unidad" ? "btn-cyan" : "btn-ghost"}`} onClick={() => { setViewMode("unidad"); setUf("TODOS") }}>🚛 Unidades</button>
-            <button className={`btn btn-sm ${viewMode === "operador" ? "btn-cyan" : "btn-ghost"}`} onClick={() => { setViewMode("operador"); setUf("TODOS") }}>👤 Operadores</button>
+            <button className={`btn btn-sm ${viewMode === "unidad" ? "btn-cyan" : "btn-ghost"}`}
+              onClick={() => { setViewMode("unidad"); setUf("TODOS"); clearSel(); }}>🚛 Unidades</button>
+            <button className={`btn btn-sm ${viewMode === "operador" ? "btn-cyan" : "btn-ghost"}`}
+              onClick={() => { setViewMode("operador"); setUf("TODOS"); clearSel(); }}>👤 Operadores</button>
           </div>
           <button className="btn btn-cyan btn-sm" onClick={onAdd}>+ Agregar</button>
         </div>
       </div>
+
+      {/* Barra de selección */}
+      {selDocs.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px",
+          background: "rgba(0,153,204,.1)", borderBottom: "2px solid var(--cyan)" }}>
+          <span style={{ fontWeight: 700, color: "var(--cyan)", fontSize: 13 }}>
+            ✅ {selDocs.length} documento{selDocs.length !== 1 ? "s" : ""} seleccionado{selDocs.length !== 1 ? "s" : ""}
+          </span>
+          <button className="btn btn-sm" style={{ background: "#25D366", color: "#fff", fontWeight: 700 }}
+            onClick={() => setShowEnvio(true)}>
+            📲 Enviar por WhatsApp
+          </button>
+          <button className="btn btn-ghost btn-sm" onClick={clearSel}>✕ Quitar selección</button>
+        </div>
+      )}
+
+      {/* Instrucción de selección */}
+      {selDocs.length === 0 && (
+        <div style={{ padding: "7px 16px", fontSize: 11, color: "var(--muted)", background: "var(--bg2)", borderBottom: "1px solid var(--border)" }}>
+          💡 Clic en una tarjeta para seleccionarla y enviarla por WhatsApp al cliente
+        </div>
+      )}
 
       {viewMode === "unidad" && (
         <>
@@ -4575,31 +4814,15 @@ function DocsPage({ units, drivers, docs, onAdd, onEdit, onDelete }) {
             const ud = fdUnidad.filter(d => d.unidadId === u.id);
             return (
               <div key={u.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                <div style={{ padding: "10px 16px 4px", fontSize: 13, fontWeight: 700, color: "var(--cyan)" }}>🚛 {u.num} — {u.placas}</div>
+                <div style={{ padding: "10px 16px 4px", fontSize: 13, fontWeight: 700, color: "var(--cyan)" }}>
+                  🚛 {u.num} — {u.placas}
+                  <span style={{ fontSize: 11, fontWeight: 400, color: "var(--muted)", marginLeft: 8 }}>{ud.length} doc{ud.length !== 1 ? "s" : ""}</span>
+                </div>
                 <div className="doc-grid">
-                  {ud.map(d => {
-                    const dy = daysUntil(d.vence);
-                    const dc = dy === null ? "var(--muted)" : dy < 0 ? "var(--red)" : dy <= 30 ? "var(--yellow)" : "var(--green)";
-                    return (
-                      <div key={d.id} className="doc-card" style={{ "--dc": dc }}>
-                        <div className="doc-name">{d.nombre}</div>
-                        <div className="doc-date">{d.vence || "Sin fecha"}</div>
-                        <div style={{ marginTop: 5 }}>{docBdg(dy)}</div>
-                        {d.numero && <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>{d.numero}</div>}
-                        {d.empresa && <div style={{ fontSize: 10, color: "var(--muted)" }}>{d.empresa}</div>}
-                        {d.foto && <div style={{ marginTop: 8 }}><img src={d.foto} style={{ width: "100%", height: 65, objectFit: "cover", borderRadius: 5, border: "1px solid var(--border)" }} alt="doc" /></div>}
-                        <div className="acts" style={{ marginTop: 8 }}>
-                          <button className="btn btn-ghost btn-xs" title="Imprimir" onClick={() => openDocPrint(d, u, null)}>🖨️</button>
-                          <button className="btn btn-ghost btn-xs" title="Descargar" onClick={() => downloadDocAsHtml(d, u, null)}>⬇️</button>
-                          <button className="btn btn-ghost btn-xs" onClick={() => onEdit(d)}>✏️</button>
-                          <button className="btn btn-red btn-xs" onClick={() => onDelete(d.id)}>🗑</button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {ud.map(d => <DocCard key={d.id} d={d} entity={u} isUnit={true} />)}
                   {ud.length === 0 && (
                     <div className="doc-empty-card">
-                      <span style={{fontSize:12}}>Sin documentos registrados</span>
+                      <span style={{ fontSize: 12 }}>Sin documentos registrados</span>
                       <button className="btn btn-cyan btn-xs" onClick={() => onAdd && onAdd({ unidadId: u.id, entidadTipo: "unidad" })}>✏️ Agregar doc</button>
                     </div>
                   )}
@@ -4622,31 +4845,15 @@ function DocsPage({ units, drivers, docs, onAdd, onEdit, onDelete }) {
             const dd = fdOperador.filter(d => d.operadorId === driver.id);
             return (
               <div key={driver.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                <div style={{ padding: "10px 16px 4px", fontSize: 13, fontWeight: 700, color: "var(--purple)" }}>👤 {driver.nombre}</div>
+                <div style={{ padding: "10px 16px 4px", fontSize: 13, fontWeight: 700, color: "var(--purple)" }}>
+                  👤 {driver.nombre}
+                  <span style={{ fontSize: 11, fontWeight: 400, color: "var(--muted)", marginLeft: 8 }}>{dd.length} doc{dd.length !== 1 ? "s" : ""}</span>
+                </div>
                 <div className="doc-grid">
-                  {dd.map(d => {
-                    const dy = daysUntil(d.vence);
-                    const dc = dy === null ? "var(--muted)" : dy < 0 ? "var(--red)" : dy <= 30 ? "var(--yellow)" : "var(--green)";
-                    return (
-                      <div key={d.id} className="doc-card" style={{ "--dc": dc }}>
-                        <div className="doc-name">{d.nombre}</div>
-                        <div className="doc-date">{d.vence || "Sin fecha"}</div>
-                        <div style={{ marginTop: 5 }}>{docBdg(dy)}</div>
-                        {d.numero && <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>{d.numero}</div>}
-                        {d.empresa && <div style={{ fontSize: 10, color: "var(--muted)" }}>{d.empresa}</div>}
-                        {d.foto && <div style={{ marginTop: 8 }}><img src={d.foto} style={{ width: "100%", height: 65, objectFit: "cover", borderRadius: 5, border: "1px solid var(--border)" }} alt="doc" /></div>}
-                        <div className="acts" style={{ marginTop: 8 }}>
-                          <button className="btn btn-ghost btn-xs" title="Imprimir" onClick={() => openDocPrint(d, null, driver)}>🖨️</button>
-                          <button className="btn btn-ghost btn-xs" title="Descargar" onClick={() => downloadDocAsHtml(d, null, driver)}>⬇️</button>
-                          <button className="btn btn-ghost btn-xs" onClick={() => onEdit(d)}>✏️</button>
-                          <button className="btn btn-red btn-xs" onClick={() => onDelete(d.id)}>🗑</button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {dd.map(d => <DocCard key={d.id} d={d} entity={driver} isUnit={false} />)}
                   {dd.length === 0 && (
                     <div className="doc-empty-card">
-                      <span style={{fontSize:12}}>Sin documentos registrados</span>
+                      <span style={{ fontSize: 12 }}>Sin documentos registrados</span>
                       <button className="btn btn-cyan btn-xs" onClick={() => onAdd && onAdd({ operadorId: driver.id, entidadTipo: "operador" })}>✏️ Agregar doc</button>
                     </div>
                   )}
@@ -4655,6 +4862,14 @@ function DocsPage({ units, drivers, docs, onAdd, onEdit, onDelete }) {
             );
           })}
         </>
+      )}
+
+      {showEnvio && (
+        <DocEnvioModal
+          docs={docsSelObj}
+          clientes={clientes || []}
+          onClose={() => setShowEnvio(false)}
+        />
       )}
     </div>
   );
@@ -9446,7 +9661,7 @@ export default function App() {
             onHojaViaje={userCan("hojaViaje") ? d => setModal({ type: "hojaViaje", data: d }) : null}
             onNomina={userCan("verNominas") ? d => setModal({ type: "nomina", data: d }) : null}
             branding={branding} />}
-          {tab === "docs" && <DocsPage units={units} drivers={drivers} docs={docs}
+          {tab === "docs" && <DocsPage units={units} drivers={drivers} docs={docs} clientes={clientes}
             onAdd={(prefill) => setModal({ type: "doc", data: prefill || null })}
             onEdit={d => setModal({ type: "doc", data: d })}
             onDelete={DoC.del} />}
