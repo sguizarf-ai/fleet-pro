@@ -2549,8 +2549,10 @@ function ProveedorModal({ proveedor, onSave, onClose }) {
   );
 }
 
-function HojaViajeModal({ units, drivers, onClose, companyLogo, companyName }) {
+function HojaViajeModal({ units, drivers, remitentes, onClose, companyLogo, companyName }) {
   const [f, setF] = useState({
+  const [remitenteId, setRemitenteId] = useState("");
+  const remSel = (remitentes||[]).find(r => r.id === remitenteId);
     folio: "", fecha: new Date().toLocaleDateString("es-MX"), unidadId: "", operadorId: "",
     origenHoraCita: "", origenCliente: "", origenDireccion: "", origenContacto: "", origenTel: "",
     destinoHoraCita: "", destinoCliente: "", destinoDireccion: "", destinoContacto: "", destinoTel: "",
@@ -2677,7 +2679,8 @@ function HojaViajeModal({ units, drivers, onClose, companyLogo, companyName }) {
       `_${companyName || "Fleet Pro"}_`,
     ].filter(l => l !== "").join("\n");
 
-    const url = `https://wa.me/${numFinal}?text=${encodeURIComponent(msg)}`;
+    const firma = remSel ? `\n_Envía: ${remSel.nombre}${remSel.cargo?" — "+remSel.cargo:""} · +52 ${remSel.tel}_` : "";
+    const url = `https://wa.me/${numFinal}?text=${encodeURIComponent(msg + firma)}`;
 
     if (!tel) {
       alert(`⚠️ El operador ${driver?.nombre || ""} no tiene número de teléfono registrado.\n\nAgrega su número en el módulo Conductores y vuelve a intentar.`);
@@ -2745,6 +2748,9 @@ function HojaViajeModal({ units, drivers, onClose, companyLogo, companyName }) {
         <div className="mftr">
           <button className="btn btn-ghost" onClick={onClose}>Cerrar</button>
           <button className="btn btn-ghost btn-sm" onClick={doDownload} title="Descargar como archivo HTML">⬇️ Descargar</button>
+          <div style={{marginBottom:6}}>
+            <RemitenteSelector remitentes={remitentes||[]} selected={remitenteId} onChange={setRemitenteId}/>
+          </div>
           <button
             className="btn btn-green btn-sm"
             onClick={doWhatsApp}
@@ -4548,12 +4554,151 @@ function openDocPrint(doc, unit, driver) {
   setTimeout(() => w.print(), 500);
 }
 
+
+// ── Catálogo de remitentes (números de empresa para envíos WhatsApp) ──────────
+function RemitentesModal({ remitentes, onSave, onClose }) {
+  const [list, setList] = useState(remitentes.length ? remitentes : []);
+  const [form, setForm] = useState({ id:"", nombre:"", tel:"", cargo:"" });
+  const [editing, setEditing] = useState(false);
+
+  const chF = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
+  const limpiar = () => { setForm({ id:"", nombre:"", tel:"", cargo:"" }); setEditing(false); };
+
+  const agregar = () => {
+    if (!form.nombre || !form.tel) return alert("Nombre y teléfono son requeridos");
+    const tel = form.tel.replace(/\D/g,"");
+    if (tel.length < 10) return alert("El teléfono debe tener al menos 10 dígitos");
+    if (editing) {
+      setList(l => l.map(r => r.id === form.id ? { ...form, tel } : r));
+    } else {
+      setList(l => [...l, { ...form, tel, id: "rem_"+Date.now() }]);
+    }
+    limpiar();
+  };
+
+  const editar = (r) => { setForm({ ...r }); setEditing(true); };
+  const borrar = (id) => setList(l => l.filter(r => r.id !== id));
+
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal" style={{ maxWidth:540 }} onClick={e => e.stopPropagation()}>
+        <div className="mhdr">
+          <h3>📱 Remitentes WhatsApp</h3>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+        </div>
+        <div className="mbody" style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
+          <div style={{ padding:"10px 14px", background:"rgba(0,153,204,.07)",
+            border:"1px solid var(--cyan)", borderRadius:8, fontSize:12, color:"var(--muted)" }}>
+            📲 Agrega los números de WhatsApp de tu empresa desde los que se enviarán documentos,
+            cotizaciones y evidencias. Al enviar, podrás elegir cuál aparece como remitente en el mensaje.
+          </div>
+
+          {/* Formulario agregar/editar */}
+          <div style={{ padding:"14px 16px", background:"var(--bg2)", borderRadius:10,
+            border:"1px solid var(--border)" }}>
+            <div style={{ fontWeight:700, fontSize:12, marginBottom:10, color:"var(--cyan)" }}>
+              {editing ? "✏️ Editando remitente" : "➕ Agregar remitente"}
+            </div>
+            <div className="fg">
+              <div className="field">
+                <label>Nombre / Alias *</label>
+                <input value={form.nombre} onChange={chF("nombre")}
+                  placeholder="Ej: Oficina MTY, Logística, Juan Ops" />
+              </div>
+              <div className="field">
+                <label>Cargo / Área</label>
+                <input value={form.cargo} onChange={chF("cargo")}
+                  placeholder="Ej: Logística, Operaciones" />
+              </div>
+              <div className="field s2">
+                <label>Teléfono WhatsApp * (10 dígitos)</label>
+                <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                  <span style={{ padding:"9px 12px", background:"var(--bg1)", border:"1px solid var(--border)",
+                    borderRadius:8, fontSize:13, color:"var(--muted)", flexShrink:0 }}>🇲🇽 +52</span>
+                  <input value={form.tel} onChange={e => setForm(p=>({...p, tel:e.target.value.replace(/\D/g,"")}))}
+                    placeholder="8181234567" maxLength={10} style={{ flex:1 }} />
+                </div>
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:8, marginTop:10 }}>
+              <button className="btn btn-cyan btn-sm" onClick={agregar}>
+                {editing ? "💾 Guardar cambios" : "➕ Agregar"}
+              </button>
+              {editing && <button className="btn btn-ghost btn-sm" onClick={limpiar}>Cancelar</button>}
+            </div>
+          </div>
+
+          {/* Lista */}
+          {list.length === 0 ? (
+            <div className="empty" style={{ padding:"24px 0" }}>
+              <div className="empty-icon">📱</div>
+              <p>Sin remitentes. Agrega el primero arriba.</p>
+            </div>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {list.map(r => (
+                <div key={r.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px",
+                  background:"var(--bg1)", borderRadius:10, border:"1px solid var(--border)" }}>
+                  <div style={{ fontSize:22 }}>📱</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontWeight:700, fontSize:13 }}>{r.nombre}</div>
+                    <div style={{ fontSize:11, color:"var(--muted)" }}>
+                      +52 {r.tel}{r.cargo ? ` · ${r.cargo}` : ""}
+                    </div>
+                  </div>
+                  <button className="btn btn-ghost btn-xs" onClick={() => editar(r)}>✏️</button>
+                  <button className="btn btn-red btn-xs" onClick={() => borrar(r.id)}>🗑</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="mftr">
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-cyan" onClick={() => { onSave(list); onClose(); }}>💾 Guardar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Selector de remitente reutilizable (usado en DocEnvio, CotizPreview, Viaje) ─
+function RemitenteSelector({ remitentes, selected, onChange }) {
+  if (!remitentes?.length) return (
+    <div style={{ padding:"10px 12px", background:"var(--bg2)", borderRadius:8,
+      border:"1px solid var(--border)", fontSize:12, color:"var(--muted)" }}>
+      📱 Sin remitentes configurados.
+      <span style={{ color:"var(--cyan)", marginLeft:4 }}>
+        Ve a Configuración → Ajustes → Remitentes WhatsApp para agregarlos.
+      </span>
+    </div>
+  );
+  return (
+    <div className="field">
+      <label>Enviar como (remitente) — opcional</label>
+      <select value={selected} onChange={e => onChange(e.target.value)}
+        style={{ background:"var(--bg0)", border:"1px solid var(--border)", borderRadius:8,
+          padding:"9px 12px", color:"var(--text)", fontSize:13 }}>
+        <option value="">— Sin firma de remitente —</option>
+        {remitentes.map(r => (
+          <option key={r.id} value={r.id}>
+            📱 {r.nombre}{r.cargo ? ` (${r.cargo})` : ""} · +52 {r.tel}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+
 // ── Modal de envío de documentos por WhatsApp ────────────────────────────────
-function DocEnvioModal({ docs, clientes, onClose }) {
-  const [tel, setTel]         = useState("");
+function DocEnvioModal({ docs, clientes, remitentes, onClose }) {
+  const [tel, setTel]             = useState("");
   const [clienteId, setClienteId] = useState("");
-  const [msg, setMsg]         = useState("");
-  const [lightbox, setLightbox] = useState(null); // { src, label }
+  const [remitenteId, setRemitenteId] = useState("");
+  const [msg, setMsg]             = useState("");
+  const [lightbox, setLightbox]   = useState(null);
 
   const handleCliente = (id) => {
     setClienteId(id);
@@ -4562,6 +4707,8 @@ function DocEnvioModal({ docs, clientes, onClose }) {
       if (cli?.telefono) setTel(cli.telefono.replace(/\D/g, ""));
     } else { setTel(""); }
   };
+
+  const remSel = remitentes?.find(r => r.id === remitenteId);
 
   const buildMsg = () => {
     const lineas = ["📋 *Documentos — Fleet Pro*\n"];
@@ -4573,7 +4720,9 @@ function DocEnvioModal({ docs, clientes, onClose }) {
       if (d.notas)   lineas.push(`  Notas: ${d.notas}`);
       lineas.push("");
     });
-    lineas.push("_Enviado desde Fleet Pro v6_");
+    if (remSel) {
+      lineas.push(`_Envía: ${remSel.nombre}${remSel.cargo ? " — "+remSel.cargo : ""} · +52 ${remSel.tel}_`);
+    }
     return lineas.join("\n");
   };
 
@@ -4678,6 +4827,9 @@ function DocEnvioModal({ docs, clientes, onClose }) {
                 </div>
               </div>
             )}
+
+            {/* Remitente */}
+            <RemitenteSelector remitentes={remitentes||[]} selected={remitenteId} onChange={setRemitenteId} />
 
             {/* Destinatario */}
             <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
@@ -4816,7 +4968,7 @@ function DocCard({ d, entity, isUnit, selected, onToggle, onEdit, onDelete }) {
   );
 }
 
-function DocsPage({ units, drivers, docs, clientes, onAdd, onEdit, onDelete }) {
+function DocsPage({ units, drivers, docs, clientes, remitentes, onAdd, onEdit, onDelete }) {
   const [viewMode, setViewMode]   = useState("unidad");
   const [uf, setUf]               = useState("TODOS");
   const [selDocs, setSelDocs]     = useState([]); // ids de docs seleccionados individualmente
@@ -4992,6 +5144,7 @@ function DocsPage({ units, drivers, docs, clientes, onAdd, onEdit, onDelete }) {
         <DocEnvioModal
           docs={docsSelObj}
           clientes={clientes || []}
+          remitentes={remitentes || []}
           onClose={() => setShowEnvio(false)}
         />
       )}
@@ -8028,7 +8181,7 @@ function calcFiscal(subtotal, tipoPersona) {
 }
 
 // ── Tabulador de tarifas (configuración) ──────────────────────────────────────
-function TabuladorPage({ tabulador, extrasTabulador, onSaveTabulador, onSaveExtras, branding, clientes, cotizaciones, onSaveCotizaciones }) {
+function TabuladorPage({ tabulador, extrasTabulador, onSaveTabulador, onSaveExtras, branding, clientes, cotizaciones, onSaveCotizaciones, remitentes }) {
   const [tab, setTab] = useState("tarifas");
 
   return (
@@ -8312,6 +8465,7 @@ function CotizacionesTab({ cotizaciones, clientes, tabulador, extrasTabulador, b
           cotizacion={preview}
           branding={branding}
           clientes={clientes}
+          remitentes={remitentes}
           onClose={() => setPreview(null)}
         />
       )}
@@ -8616,9 +8770,11 @@ function CotizacionModal({ cotizacion, clientes, tabulador, extrasTabulador, fol
 }
 
 // ── Preview / Imprimir / WhatsApp ─────────────────────────────────────────────
-function CotizacionPreviewModal({ cotizacion: c, branding, clientes, onClose }) {
+function CotizacionPreviewModal({ cotizacion: c, branding, clientes, remitentes, onClose }) {
   const cli = clientes.find(x => x.id === c.clienteId);
   const fiscal = calcFiscal(c.subtotal || 0, c.tipoPersona);
+  const [remitenteId, setRemitenteId] = useState("");
+  const remSel = remitentes?.find(r => r.id === remitenteId);
   const fmtMXN = n => "$" + (n||0).toLocaleString("es-MX",{minimumFractionDigits:2});
 
   const htmlContent = () => `<!DOCTYPE html>
@@ -8741,7 +8897,8 @@ _(${c.tipoPersona==="moral"?"Persona Moral — aplica retención 4%":"Persona F�
 ${c.notasImportantes&&c.notasImportantes.length>0 ? c.notasImportantes.join("\n") : ""}
 
 _${branding?.nombre||"JL Transportaciones"}_`;
-    const url = "https://wa.me/?text=" + encodeURIComponent(msg);
+    const firma = remSel ? `\n_Envía: ${remSel.nombre}${remSel.cargo?" — "+remSel.cargo:""} · +52 ${remSel.tel}_` : "";
+    const url = "https://wa.me/?text=" + encodeURIComponent(msg + firma);
     window.open(url, "_blank");
   };
 
@@ -9429,6 +9586,7 @@ export default function App() {
   const [nominasAdmin, setNominasAdmin] = useState([]);
   const [roles, setRoles] = useState([]);
   const [traccarConfig, setTraccarConfig] = useState(null);
+  const [remitentes, setRemitentes] = useState([]); // [{id, nombre, tel, cargo}]
   const [modalGpsConfig, setModalGpsConfig] = useState(false);
   const [tema, setTema] = useState("light");
 
@@ -9474,7 +9632,8 @@ export default function App() {
         [setFacturApiKey,        "fp6:facturApiKey",    ""],
         [setTabulador,           "fp6:tabulador",       D_TABULADOR],
         [setExtrasTabulador,     "fp6:extrasTabulador", D_EXTRAS_TABULADOR],
-        [setCotizaciones,        "fp6:cotizaciones",    []]
+        [setCotizaciones,        "fp6:cotizaciones",    []],
+        [setRemitentes,          "fp6:remitentes",      []]
       ];
       // Cargar tema
       try {
@@ -9734,6 +9893,7 @@ export default function App() {
             <button className="btn btn-ghost btn-sm" style={{ width: "100%", justifyContent: "center", marginBottom: 6 }} onClick={exportExcel}>📊 Exportar Excel</button>
             {isAdmin && <button className="btn btn-ghost btn-sm" style={{ width: "100%", justifyContent: "center", fontSize: 11, marginBottom: 6 }} onClick={resetAll}>↺ Restaurar datos</button>}
             {isAdmin && <button className="btn btn-ghost btn-sm" style={{ width: "100%", justifyContent: "center", fontSize: 11, marginBottom: 6 }} onClick={() => setModal({ type: "usuarios" })}>👥 Usuarios</button>}
+            {isAdmin && <button className="btn btn-ghost btn-sm" style={{ width: "100%", justifyContent: "center", fontSize: 11, marginBottom: 6 }} onClick={() => setModal({ type: "remitentes" })}>📱 Remitentes WhatsApp</button>}
             {/* Theme selector */}
             <div style={{ marginBottom:6 }}>
               <div style={{ fontSize:10, color:"var(--muted)", fontWeight:700, textTransform:"uppercase", letterSpacing:".08em", marginBottom:4 }}>🎨 Tema</div>
@@ -9821,6 +9981,7 @@ export default function App() {
               cotizaciones={cotizaciones}
               clientes={clientes}
               branding={branding}
+              remitentes={remitentes}
               onSaveTabulador={async t => { setTabulador(t); await sv("fp6:tabulador", t); }}
               onSaveExtras={async e => { setExtrasTabulador(e); await sv("fp6:extrasTabulador", e); }}
               onSaveCotizaciones={async c => { setCotizaciones(c); await sv("fp6:cotizaciones", c); }}
@@ -9879,6 +10040,7 @@ export default function App() {
 
       {/* MODALES */}
       {modal?.type === "branding" && <BrandingModal branding={branding} onSave={async b => { setBranding(b); await sv("fp6:branding", b); }} onClose={() => setModal(null)} />}
+      {modal?.type === "remitentes" && isAdmin && <RemitentesModal remitentes={remitentes} onSave={async r => { setRemitentes(r); await sv("fp6:remitentes", r); }} onClose={() => setModal(null)} />}
       {modalGpsConfig && <TraccarConfigModal config={traccarConfig || { serverUrl:"", email:"", password:"", intervalo:"30" }} onSave={async c => { setTraccarConfig(c); await sv("fp6:traccarConfig", c); }} onClose={() => setModalGpsConfig(false)} />}
       {modal?.type === "usuarios" && isAdmin && <UsuariosModal usuarios={usuarios} roles={roles} onSave={async u => { setUsuarios(u); await sv("fp6:usuarios", u); }} onSaveRoles={async r => { setRoles(r); await sv("fp6:roles", r); }} onClose={() => setModal(null)} />}
       {modal?.type === "facturapi" && isAdmin && (() => {
@@ -9921,7 +10083,7 @@ export default function App() {
       {modal?.type === "cliente" && <ClienteModal cliente={modal.data} onSave={c => CliC.save({ ...c, id: c.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "factura" && <FacturaModal factura={modal.data} clientes={clientes} viajes={trips} onSave={f => FacC.save(f)} onClose={() => setModal(null)} />}
       {modal?.type === "proveedor" && <ProveedorModal proveedor={modal.data} onSave={p => PVC.save({ ...p, id: p.id || uid() })} onClose={() => setModal(null)} />}
-      {modal?.type === "hojaViaje" && <HojaViajeModal units={units} drivers={drivers} onClose={() => setModal(null)} companyLogo={branding.logo} companyName={branding.nombre} />}
+      {modal?.type === "hojaViaje" && <HojaViajeModal units={units} drivers={drivers} remitentes={remitentes} onClose={() => setModal(null)} companyLogo={branding.logo} companyName={branding.nombre} />}
       {modal?.type === "nomina" && <NominaModal driver={modal.data} trips={trips} units={units} onClose={() => setModal(null)} companyLogo={branding.logo} companyName={branding.nombre} />}
       {confirm && <Confirm msg={confirm.msg} onOk={confirm.onOk} onCancel={() => setConfirm(null)} />}
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
