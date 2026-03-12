@@ -1,7 +1,8 @@
 // firebaseDB.js — Adaptador Firebase Firestore para Fleet Pro v6
+// Las fotos se almacenan en Cloudinary (URLs). Firestore solo guarda texto/URLs.
 import { initializeApp } from "firebase/app";
 import {
-  getFirestore, doc, getDoc, setDoc, onSnapshot, collection
+  getFirestore, doc, getDoc, setDoc, onSnapshot
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -16,14 +17,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
-// Nombre del documento principal donde se guardan todos los datos
-const DOC_ID = "fleetpro_data";
-const COL    = "config";
+const COL = "config";
 
-// Lee todos los datos de Firestore
+// ── Lee una clave de Firestore ────────────────────────────────────────────────
 export async function fsGet(key) {
   try {
-    const ref = doc(db, COL, key);
+    const ref  = doc(db, COL, key);
     const snap = await getDoc(ref);
     if (snap.exists()) return snap.data().value ?? null;
     return null;
@@ -33,7 +32,9 @@ export async function fsGet(key) {
   }
 }
 
-// Guarda datos en Firestore
+// ── Guarda una clave en Firestore ─────────────────────────────────────────────
+// Las fotos ya vienen como URLs de Cloudinary (no base64), así que
+// el tamaño del documento es mínimo y nunca supera el límite de 1MB.
 export async function fsSet(key, value) {
   try {
     const ref = doc(db, COL, key);
@@ -41,21 +42,29 @@ export async function fsSet(key, value) {
     return true;
   } catch (e) {
     console.warn("fsSet error:", e);
-    // Detectar error de tamaño de Firestore (límite ~1MB por documento)
     const msg = e?.message || "";
     if (msg.includes("exceeds") || msg.includes("size") || msg.includes("large") || e?.code === "invalid-argument") {
-      alert("⚠️ No se pudo guardar: el documento supera el límite de tamaño de Firebase.\nReduce la cantidad de fotos o evidencias e intenta de nuevo.");
+      alert("⚠️ No se pudo guardar: el documento supera el límite de Firebase.\nSi subiste fotos sin conexión a Cloudinary, elimínalas e intenta de nuevo.");
     } else {
-      alert("⚠️ Error al guardar en Firebase: " + msg + "\nRevisa tu conexión e intenta de nuevo.");
+      alert("⚠️ Error al guardar: " + msg + "\nRevisa tu conexión e intenta de nuevo.");
     }
     return false;
   }
 }
 
-// Escucha cambios en tiempo real de una clave
+// ── Escucha cambios en tiempo real ────────────────────────────────────────────
 export function fsListen(key, callback) {
   const ref = doc(db, COL, key);
-  return onSnapshot(ref, (snap) => {
+  return onSnapshot(ref, snap => {
     if (snap.exists()) callback(snap.data().value ?? null);
   });
+}
+
+// ── deleteStoragePhoto — no-op con Cloudinary ─────────────────────────────────
+// Cloudinary no permite borrar desde el cliente sin API secret.
+// Las fotos huérfanas se pueden limpiar manualmente en cloudinary.com/console
+// o con una Cloud Function en el futuro.
+export async function deleteStoragePhoto(_url) {
+  // No-op: con Cloudinary no borramos desde el cliente
+  return;
 }

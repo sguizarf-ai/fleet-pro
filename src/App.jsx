@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { fsGet, fsSet, fsListen } from "./firebaseDB";
+import { fsGet, fsSet, fsListen, deleteStoragePhoto } from "./firebaseDB";
 
 /* ═══════════════════════════════════════════════════════════════
    FLEET PRO v6.0 — Sistema Integral de Gestión de Flota
@@ -449,7 +449,74 @@ function Confirm({ msg, onOk, onCancel }) {
 
 // Comprime imagen a base64 con ancho máx y calidad configurable
 // Evita el límite de 1MB de Firestore por documento
-const compressImage = (file, maxW = 800, quality = 0.72) =>
+
+// ── DatePicker — input de fecha con icono de calendario ─────────────────────
+// Usa el input type="date" nativo del navegador (celular = teclado numérico/rueda)
+// Formato externo: dd/mm/aaaa  |  Formato interno HTML: yyyy-mm-dd
+function toDMY(iso) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  if (!y || !m || !d) return iso; // si ya viene en dd/mm/aaaa lo devuelve tal cual
+  return `${d}/${m}/${y}`;
+}
+function toISO_dp(dmy) {
+  if (!dmy) return "";
+  // Acepta dd/mm/aaaa o yyyy-mm-dd
+  if (dmy.includes("-") && dmy.length === 10) return dmy;
+  const [d, m, y] = dmy.split("/");
+  if (!y || !m || !d) return "";
+  return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
+}
+
+function DatePicker({ value, onChange, placeholder = "dd/mm/aaaa", label, required, style }) {
+  const inputRef = useRef();
+  // isoVal: lo que el <input type="date"> necesita (yyyy-mm-dd)
+  const isoVal = toISO_dp(value);
+
+  const handleChange = e => {
+    const iso = e.target.value; // yyyy-mm-dd
+    onChange(toDMY(iso));       // devuelve dd/mm/aaaa
+  };
+
+  return (
+    <div style={{ position:"relative", ...style }}>
+      {/* Text display layer (visual) */}
+      <input
+        readOnly
+        value={value || ""}
+        placeholder={placeholder}
+        required={required}
+        onClick={() => inputRef.current?.showPicker?.() || inputRef.current?.click()}
+        style={{
+          width:"100%", padding:"8px 36px 8px 10px", borderRadius:8,
+          border:"1px solid var(--border)", background:"var(--bg0)",
+          color: value ? "var(--text)" : "var(--muted)", fontSize:13,
+          cursor:"pointer", boxSizing:"border-box"
+        }}
+      />
+      {/* Calendar icon */}
+      <span
+        onClick={() => inputRef.current?.showPicker?.() || inputRef.current?.click()}
+        style={{ position:"absolute", right:8, top:"50%", transform:"translateY(-50%)",
+          fontSize:16, cursor:"pointer", lineHeight:1 }}>
+        📅
+      </span>
+      {/* Real date input — invisible but functional */}
+      <input
+        ref={inputRef}
+        type="date"
+        value={isoVal}
+        onChange={handleChange}
+        style={{ position:"absolute", inset:0, opacity:0, width:"100%",
+          height:"100%", cursor:"pointer", pointerEvents:"none" }}
+        tabIndex={-1}
+      />
+    </div>
+  );
+}
+
+
+const compressImage = (file, maxW = 600, quality = 0.45) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = reject;
@@ -470,13 +537,93 @@ const compressImage = (file, maxW = 800, quality = 0.72) =>
     reader.readAsDataURL(file);
   });
 
+
+// ── Cloudinary config ────────────────────────────────────────────────────────
+// ⚠️ REEMPLAZA ESTOS VALORES con los de tu cuenta Cloudinary
+// Los encuentras en cloudinary.com → Dashboard
+const CLOUD_NAME    = "dos08dgru";
+const UPLOAD_PRESET = "Fleet-Pro";         // preset sin firma
+
+// Validar configuración
+const CLOUDINARY_OK = CLOUD_NAME !== "TU_CLOUD_NAME" && CLOUD_NAME.length > 3;
+
+/** ¿Es una URL de Cloudinary? */
+const isCloudinaryURL = s =>
+  typeof s === "string" && s.includes("res.cloudinary.com");
+
+/** ¿Es base64? (fotos viejas guardadas antes de Cloudinary) */
+const isBase64 = s =>
+  typeof s === "string" && s.startsWith("data:image");
+
+/**
+ * Sube un File o base64 a Cloudinary y devuelve la URL segura.
+ * Si ya es una URL (cloudinary u otra), la devuelve sin tocarla.
+ * folder: subcarpeta en Cloudinary, ej "fleet-pro/docs"
+ */
+async function uploadToCloudinary(fileOrBase64, folder = "fleet-pro") {
+  // Si Cloudinary no está configurado, devolver base64 como fallback
+  if (!CLOUDINARY_OK) {
+    console.warn("Cloudinary no configurado. Usando base64 como fallback.");
+    return fileOrBase64;
+  }
+  // Si ya es URL, devolver tal cual
+  if (typeof fileOrBase64 === "string" && !isBase64(fileOrBase64)) {
+    return fileOrBase64;
+  }
+
+  const formData = new FormData();
+  formData.append("upload_preset", UPLOAD_PRESET);
+  formData.append("folder", folder);
+
+  if (fileOrBase64 instanceof File) {
+    formData.append("file", fileOrBase64);
+  } else {
+    // base64 string
+    formData.append("file", fileOrBase64);
+  }
+
+  const res = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+    { method: "POST", body: formData }
+  );
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `HTTP ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.secure_url; // https://res.cloudinary.com/...
+}
+
+/**
+ * Comprime un File localmente y lo sube a Cloudinary.
+ * Devuelve la URL segura.
+ * maxW/quality: compresión local para reducir tiempo de subida
+ */
+async function compressAndUpload(file, folder = "fleet-pro", maxW = 1200, quality = 0.82) {
+  // Comprimir localmente primero (reduce tiempo de upload)
+  const compressed = await compressImage(file, maxW, quality);
+  // Subir a Cloudinary
+  return uploadToCloudinary(compressed, folder);
+}
+
+
 function PhotoInput({ value, onChange, label = "Foto" }) {
   const ref = useRef();
   const [loading, setLoading] = useState(false);
   const handle = async e => {
     const f = e.target.files[0]; if (!f) return;
     setLoading(true);
-    try { onChange(await compressImage(f)); } catch { alert("No se pudo procesar la imagen"); }
+    try {
+      const url = await compressAndUpload(f, "fleet-pro/fotos", 1200, 0.82);
+      onChange(url);
+    } catch(err) {
+      console.error("Upload error:", err);
+      // Fallback: guardar base64 si Cloudinary falla
+      try { onChange(await compressImage(f, 500, 0.40)); }
+      catch { alert("No se pudo procesar la imagen. Verifica tu conexión."); }
+    }
     setLoading(false);
     e.target.value = "";
   };
@@ -485,11 +632,11 @@ function PhotoInput({ value, onChange, label = "Foto" }) {
       <label>{label}</label>
       <div className="photo-box" onClick={() => !loading && ref.current.click()}>
         {loading
-          ? <span style={{ fontSize: 12, color: "var(--muted)" }}>⏳ Procesando...</span>
+          ? <span style={{ fontSize: 12, color: "var(--muted)" }}>⏳ Subiendo...</span>
           : value
             ? <>
                 <img src={value} alt="" />
-                <button onClick={e => { e.stopPropagation(); onChange(""); }}
+                <button onClick={e => { e.stopPropagation(); deleteStoragePhoto(value).catch(()=>{}); onChange(""); }}
                   style={{ position:"absolute", top:4, right:4, background:"rgba(0,0,0,.55)", border:"none", borderRadius:"50%", width:22, height:22, color:"#fff", fontSize:12, cursor:"pointer", lineHeight:"22px", textAlign:"center" }}>✕</button>
               </>
             : <><span style={{ fontSize: 28, opacity: .4 }}>📷</span><span style={{ fontSize: 11, color: "var(--muted)" }}>Clic para subir foto</span></>
@@ -506,7 +653,13 @@ function PhotoInputSm({ value, onChange, label = "Foto" }) {
   const handle = async e => {
     const f = e.target.files[0]; if (!f) return;
     setLoading(true);
-    try { onChange(await compressImage(f, 600, 0.70)); } catch { alert("No se pudo procesar la imagen"); }
+    try {
+      const url = await compressAndUpload(f, "fleet-pro/fotos", 800, 0.80);
+      onChange(url);
+    } catch(err) {
+      try { onChange(await compressImage(f, 400, 0.38)); }
+      catch { alert("No se pudo procesar la imagen."); }
+    }
     setLoading(false);
     e.target.value = "";
   };
@@ -519,7 +672,7 @@ function PhotoInputSm({ value, onChange, label = "Foto" }) {
           : value
             ? <>
                 <img src={value} alt="" />
-                <button onClick={e => { e.stopPropagation(); onChange(""); }}
+                <button onClick={e => { e.stopPropagation(); deleteStoragePhoto(value).catch(()=>{}); onChange(""); }}
                   style={{ position:"absolute", top:3, right:3, background:"rgba(0,0,0,.55)", border:"none", borderRadius:"50%", width:18, height:18, color:"#fff", fontSize:10, cursor:"pointer", lineHeight:"18px", textAlign:"center" }}>✕</button>
               </>
             : <><span style={{ fontSize: 22, opacity: .4 }}>📷</span><span style={{ fontSize: 10, color: "var(--muted)" }}>Clic</span></>
@@ -537,19 +690,33 @@ function MultiPhotoInput({ values = [], onChange, label = "Evidencias Fotográfi
     const files = Array.from(e.target.files); if (!files.length) return;
     setLoading(true);
     try {
-      const compressed = await Promise.all(files.map(f => compressImage(f, 900, 0.72)));
-      onChange([...values, ...compressed]);
-    } catch { alert("No se pudo procesar alguna imagen"); }
+      // Subir en paralelo a Cloudinary
+      const urls = await Promise.all(
+        files.map(f => compressAndUpload(f, "fleet-pro/evidencias", 1400, 0.85))
+      );
+      onChange([...values, ...urls]);
+    } catch(err) {
+      console.error("Upload error:", err);
+      // Fallback base64
+      try {
+        const compressed = await Promise.all(files.map(f => compressImage(f, 700, 0.45)));
+        onChange([...values, ...compressed]);
+      } catch { alert("No se pudo subir alguna imagen. Verifica tu conexión."); }
+    }
     setLoading(false);
     e.target.value = "";
   };
-  const remove = i => onChange(values.filter((_, idx) => idx !== i));
+  const remove = i => {
+    const url = values[i];
+    deleteStoragePhoto(url).catch(() => {});
+    onChange(values.filter((_, idx) => idx !== i));
+  };
   return (
     <div className="field s2">
       <label>{label} ({values.length})</label>
       <div className="photo-box" onClick={() => !loading && ref.current.click()} style={{ height: 64, flexDirection: "row", gap: 10 }}>
         {loading
-          ? <span style={{ fontSize: 12, color: "var(--muted)" }}>⏳ Procesando imágenes...</span>
+          ? <span style={{ fontSize: 12, color: "var(--muted)" }}>⏳ Subiendo imágenes...</span>
           : <><span style={{ fontSize: 24, opacity: .4 }}>📸</span><span style={{ fontSize: 11, color: "var(--muted)" }}>Clic para subir (puedes elegir varias)</span></>
         }
         <input ref={ref} type="file" accept="image/*" multiple onChange={handle} style={{ display: "none" }} />
@@ -830,7 +997,7 @@ function DriverModal({ driver, units, onSave, onClose }) {
             </div>
             <div className="field">
               <label>Vence Licencia</label>
-              <input value={f.licVence} onChange={ch("licVence")} placeholder="dd/mm/aaaa" />
+              <DatePicker value={f.licVence} onChange={v=>setF(p=>({...p,licVence:v}))} />
             </div>
             <div className="field">
               <label>Email</label>
@@ -950,7 +1117,7 @@ function FuelModal({ fuel, units, onSave, onClose, onUpdateUnit }) {
             </div>
             <div className="field">
               <label>Fecha</label>
-              <input value={f.fecha} onChange={ch("fecha")} placeholder="dd/mm/aaaa" />
+              <DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))} />
             </div>
             <div className="field">
               <label>KM al Cargar</label>
@@ -1087,7 +1254,7 @@ function DocModal({ doc, units, drivers, onSave, onClose }) {
             )}
             <div className="field"><label>Tipo *</label><select value={f.nombre} onChange={ch("nombre")}>{docList.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
             <div className="field"><label>Número / Folio</label><input value={f.numero} onChange={ch("numero")} /></div>
-            <div className="field"><label>Fecha Vencimiento</label><input value={f.vence} onChange={ch("vence")} placeholder="dd/mm/aaaa" /></div>
+            <div className="field"><label>Fecha Vencimiento</label><DatePicker value={f.vence} onChange={v=>setF(p=>({...p,vence:v}))} /></div>
             <div className="field"><label>Empresa / Emisor</label><input value={f.empresa} onChange={ch("empresa")} /></div>
             <div className="field s2"><label>Notas</label><textarea value={f.notas} onChange={ch("notas")} rows={2} /></div>
             <MultiPhotoInput values={f.fotos || []} onChange={v => setF(p => ({ ...p, fotos: v }))} label="📷 Fotos del documento (puedes subir varias)" />
@@ -1115,8 +1282,8 @@ function MaintModal({ maint, units, proveedores, onSave, onClose }) {
             <div className="field"><label>Tipo</label><select value={f.tipo} onChange={ch("tipo")}>{SERVS.map(s => <option key={s}>{s}</option>)}</select></div>
             <div className="field"><label>Prioridad</label><select value={f.prioridad} onChange={ch("prioridad")}>{PRIOS.map(p => <option key={p}>{p}</option>)}</select></div>
             <div className="field s2"><label>Descripción *</label><textarea value={f.desc} onChange={ch("desc")} rows={2} /></div>
-            <div className="field"><label>F. Programada</label><input value={f.fechaProg} onChange={ch("fechaProg")} placeholder="dd/mm/aaaa" /></div>
-            <div className="field"><label>F. Ejecución</label><input value={f.fechaEjec} onChange={ch("fechaEjec")} placeholder="dd/mm/aaaa" /></div>
+            <div className="field"><label>F. Programada</label><DatePicker value={f.fechaProg} onChange={v=>setF(p=>({...p,fechaProg:v}))} /></div>
+            <div className="field"><label>F. Ejecución</label><DatePicker value={f.fechaEjec} onChange={v=>setF(p=>({...p,fechaEjec:v}))} /></div>
             <div className="field"><label>Realizado</label><select value={f.realizado} onChange={ch("realizado")}><option>NO</option><option>SI</option></select></div>
             <div className="field"><label>KM Servicio</label><input value={f.km} onChange={ch("km")} type="number" /></div>
             <div className="field s2">
@@ -1164,8 +1331,8 @@ function TripModal({ trip, units, onSave, onClose }) {
             <div className="field s2"><label>Unidad *</label><select value={f.unidadId} onChange={ch("unidadId")}><option value="">— Seleccionar —</option>{units.map(u => <option key={u.id} value={u.id}>{u.num} — {u.placas}</option>)}</select></div>
             <div className="field"><label>Origen *</label><input value={f.origen} onChange={ch("origen")} placeholder="Ciudad, Estado" /></div>
             <div className="field"><label>Destino</label><input value={f.destino} onChange={ch("destino")} placeholder="Ciudad, Estado" /></div>
-            <div className="field"><label>F. Salida</label><input value={f.fecha} onChange={ch("fecha")} placeholder="dd/mm/aaaa" /></div>
-            <div className="field"><label>F. Regreso</label><input value={f.fechaReg} onChange={ch("fechaReg")} placeholder="dd/mm/aaaa" /></div>
+            <div className="field"><label>F. Salida</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))} /></div>
+            <div className="field"><label>F. Regreso</label><DatePicker value={f.fechaReg} onChange={v=>setF(p=>({...p,fechaReg:v}))} /></div>
             <div className="field"><label>KM Salida</label><input value={f.kmSalida} onChange={ch("kmSalida")} type="number" /></div>
             <div className="field"><label>KM Llegada</label><input value={f.kmLlegada} onChange={ch("kmLlegada")} type="number" /></div>
             <div className="field"><label>Carga / Mercancía</label><input value={f.carga} onChange={ch("carga")} /></div>
@@ -1212,7 +1379,7 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
         <div className="mbody">
           <div className="sec-lbl">Empresa Transportista</div>
           <div className="fg">
-            <div className="field"><label>Fecha</label><input value={f.fecha} onChange={ch("fecha")} placeholder="dd/mm/aaaa" /></div>
+            <div className="field"><label>Fecha</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))} /></div>
             <div className="field s2">
               <label>Empresa Transportista *</label>
               <div style={{ display:"flex", gap:8 }}>
@@ -1513,7 +1680,7 @@ function GastoModal({ gasto, proveedores, onSave, onClose }) {
         <div className="mhdr"><h3>{f.id ? "✏️ Editar" : "💵 Nuevo Gasto General"}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
         <div className="mbody">
           <div className="fg">
-            <div className="field"><label>Fecha</label><input value={f.fecha} onChange={ch("fecha")} placeholder="dd/mm/aaaa" /></div>
+            <div className="field"><label>Fecha</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))} /></div>
             <div className="field"><label>Tipo de Gasto</label><select value={f.tipo} onChange={ch("tipo")}>{GASTO_TIPOS.map(t => <option key={t}>{t}</option>)}</select></div>
             <div className="field s2"><label>Descripción</label><input value={f.descripcion} onChange={ch("descripcion")} /></div>
             <div className="field"><label>Monto ($)</label><input value={f.monto} onChange={ch("monto")} type="number" /></div>
@@ -2696,7 +2863,7 @@ function HojaViajeModal({ units, drivers, remitentes, onClose, companyLogo, comp
         <div className="mbody">
           <div className="fg">
             <div className="field"><label>Folio</label><input value={f.folio} onChange={ch("folio")} placeholder="HV-001" /></div>
-            <div className="field"><label>Fecha</label><input value={f.fecha} onChange={ch("fecha")} placeholder="dd/mm/aaaa" /></div>
+            <div className="field"><label>Fecha</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))} /></div>
             <div className="field"><label>Unidad</label><select value={f.unidadId} onChange={ch("unidadId")}><option value="">— Seleccionar —</option>{units.map(u => <option key={u.id} value={u.id}>{u.num} — {u.placas}</option>)}</select></div>
             <div className="field"><label>Operador</label><select value={f.operadorId} onChange={ch("operadorId")}><option value="">— Auto/manual —</option>{drivers.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}</select></div>
             <div className="field"><label>Carga / Mercancía</label><input value={f.carga} onChange={ch("carga")} /></div>
@@ -2866,8 +3033,8 @@ function NominaModal({ driver, trips, units = [], onClose, companyLogo, companyN
           {/* Período */}
           <div className="sec-lbl">📅 Período de Nómina</div>
           <div className="fg">
-            <div className="field"><label>Fecha Inicio</label><input value={periodo.inicio} onChange={e => setPeriodo(p => ({ ...p, inicio: e.target.value }))} placeholder="dd/mm/aaaa" /></div>
-            <div className="field"><label>Fecha Fin</label><input value={periodo.fin} onChange={e => setPeriodo(p => ({ ...p, fin: e.target.value }))} placeholder="dd/mm/aaaa" /></div>
+            <div className="field"><label>Fecha Inicio</label><DatePicker value={periodo.inicio} onChange={v=>setPeriodo(p=>({...p,inicio:v}))} /></div>
+            <div className="field"><label>Fecha Fin</label><DatePicker value={periodo.fin} onChange={v=>setPeriodo(p=>({...p,fin:v}))} /></div>
             <div className="field s2">
               <div style={{ padding: "10px 14px", background: "var(--bg0)", borderRadius: 8, fontSize: 12, border: "1px solid var(--border)" }}>
                 {unitDelDriver
@@ -3233,11 +3400,7 @@ function FacturaModal({ factura, clientes, viajes, onSave, onClose }) {
             </div>
             <div className="field">
               <label>Fecha Emisión *</label>
-              <input 
-                value={f.fechaEmision} 
-                onChange={ch("fechaEmision")} 
-                placeholder="dd/mm/aaaa"
-              />
+              <DatePicker value={f.fechaEmision} onChange={v=>setF(p=>({...p,fechaEmision:v}))} />
             </div>
             <div className="field">
               <label>Días de Crédito</label>
@@ -5538,13 +5701,15 @@ function SelectorNominaModal({ tipo, personas, preselId, onConfirm, onClose }) {
   const [fin,       setFin]         = useState("");
 
   // Helper: semana actual
-  const semanaActual = () => {
+  const [semDias, setSemDias] = useState(6); // 5=lun-vier, 6=lun-sab, 7=lun-dom
+
+  const semanaActual = (dias = semDias) => {
     const hoy   = new Date();
     const dia   = hoy.getDay(); // 0=dom
     const lunes = new Date(hoy); lunes.setDate(hoy.getDate() - ((dia + 6) % 7));
-    const vier  = new Date(lunes); vier.setDate(lunes.getDate() + 4);
+    const fin   = new Date(lunes); fin.setDate(lunes.getDate() + dias - 1);
     const fmt   = d => `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
-    setInicio(fmt(lunes)); setFin(fmt(vier));
+    setInicio(fmt(lunes)); setFin(fmt(fin));
   };
 
   const ok = () => {
@@ -5607,19 +5772,28 @@ function SelectorNominaModal({ tipo, personas, preselId, onConfirm, onClose }) {
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
               <div className="field">
                 <label>Inicio</label>
-                <input value={inicio} onChange={e => setInicio(e.target.value)} placeholder="dd/mm/aaaa"/>
+                <DatePicker value={inicio} onChange={setInicio} />
               </div>
               <div className="field">
                 <label>Fin</label>
-                <input value={fin} onChange={e => setFin(e.target.value)} placeholder="dd/mm/aaaa"/>
+                <DatePicker value={fin} onChange={setFin} />
               </div>
             </div>
-            <button
-              className="btn btn-ghost btn-sm"
-              style={{ marginTop:8, fontSize:11 }}
-              onClick={semanaActual}>
-              📅 Usar semana actual (lun–vie)
-            </button>
+            <div style={{ display:"flex", gap:6, marginTop:8, alignItems:"center", flexWrap:"wrap" }}>
+              <span style={{ fontSize:11, color:"var(--muted)" }}>📅 Semana actual:</span>
+              {[
+                { dias:5, label:"Lun–Vie" },
+                { dias:6, label:"Lun–Sáb" },
+                { dias:7, label:"Lun–Dom" },
+              ].map(opt => (
+                <button key={opt.dias}
+                  className={"btn btn-sm " + (semDias === opt.dias ? "btn-cyan" : "btn-ghost")}
+                  style={{ fontSize:11, padding:"4px 10px" }}
+                  onClick={() => { setSemDias(opt.dias); semanaActual(opt.dias); }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Preview rápido */}
@@ -5702,8 +5876,8 @@ function NominaAdminModal({ persona, onSave, onClose, companyLogo, companyName, 
         <div className="mbody">
           <div className="sec-lbl">📅 Período</div>
           <div className="fg">
-            <div className="field"><label>Inicio</label><input value={periodo.inicio} onChange={e=>setPeriodo(p=>({...p,inicio:e.target.value}))} placeholder="dd/mm/aaaa"/></div>
-            <div className="field"><label>Fin</label><input value={periodo.fin} onChange={e=>setPeriodo(p=>({...p,fin:e.target.value}))} placeholder="dd/mm/aaaa"/></div>
+            <div className="field"><label>Inicio</label><DatePicker value={periodo.inicio} onChange={v=>setPeriodo(p=>({...p,inicio:v}))} /></div>
+            <div className="field"><label>Fin</label><DatePicker value={periodo.fin} onChange={v=>setPeriodo(p=>({...p,fin:v}))} /></div>
             <div className="field s2"><div style={{padding:"8px 12px",background:"var(--bg2)",borderRadius:8,fontSize:12}}><strong>{f.nombre}</strong> — {f.puesto||"Sin puesto"}</div></div>
           </div>
           <div className="sec-lbl" style={{color:"var(--cyan)",borderColor:"var(--cyan)"}}>💼 Parámetros (editables para este recibo)</div>
