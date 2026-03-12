@@ -3395,13 +3395,11 @@ function FacturaModal({ factura, clientes, viajes, onSave, onClose }) {
 // PRINT FUNCTIONS
 // ══════════════════════════════════════════════════════════════
 
-function printEvidencias({ trip, unit, externos = [] }) {
-  const w = window.open("", "_blank");
+// ── buildEvidenciasHtml — genera el HTML de evidencias para imprimir/descargar ─
+function buildEvidenciasHtml({ trip, unit, ext }) {
   const isExt = trip.esExterno;
-  const ext = isExt ? externos.find(e => e.id === trip.unidadId) : null;
   const evidencias = trip.evidencias || [];
-  
-  w.document.write(`<!DOCTYPE html><html><head><title>Evidencias ${isExt ? ext?.empresa : unit?.num}</title><style>
+  return `<!DOCTYPE html><html><head><title>Evidencias ${isExt ? ext?.empresa : unit?.num}</title><style>
   body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:20px}
   h1{font-size:20px;border-bottom:3px solid #0099CC;padding-bottom:8px;margin-bottom:18px;color:#0099CC}
   .info{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
@@ -3412,37 +3410,172 @@ function printEvidencias({ trip, unit, externos = [] }) {
   .photo-item img{width:100%;height:auto;border:2px solid #0099CC;border-radius:8px}
   .photo-caption{text-align:center;margin-top:8px;font-size:11px;color:#666;font-weight:600}
   @media print{@page{size:A4;margin:15mm}.photos{grid-template-columns:1fr}}
-  </style></head><body>`);
-  
-  w.document.write(`
-    <h1>📸 EVIDENCIAS DE ENTREGA DE MERCANCÍA</h1>
-    <div class="info">
-      <div class="field"><label>${isExt ? "Empresa Transportista" : "Unidad"}</label>${isExt ? ext?.empresa : `${unit?.num} — ${unit?.placas}`}</div>
-      <div class="field"><label>Ruta</label>${trip.origen} → ${trip.destino}</div>
-      <div class="field"><label>Cliente</label>${trip.cliente || "—"}</div>
-      <div class="field"><label>Fecha Entrega</label>${trip.fechaReg || trip.fecha}</div>
-      <div class="field"><label>Carga</label>${trip.carga || "—"}</div>
-      <div class="field"><label>Status</label>${trip.status}</div>
-    </div>
-  `);
-  
-  if (evidencias.length === 0) {
-    w.document.write(`<p style="text-align:center;padding:40px;color:#999">Sin evidencias fotográficas</p>`);
-  } else {
-    w.document.write(`<div class="photos">`);
-    evidencias.forEach((ev, i) => {
-      w.document.write(`
-        <div class="photo-item">
-          <img src="${ev}" alt="Evidencia ${i + 1}"/>
-          <div class="photo-caption">Evidencia ${i + 1} de ${evidencias.length}</div>
-        </div>
-      `);
-    });
-    w.document.write(`</div>`);
+  </style></head><body>
+  <h1>📸 EVIDENCIAS DE ENTREGA DE MERCANCÍA</h1>
+  <div class="info">
+    <div class="field"><label>${isExt ? "Empresa Transportista" : "Unidad"}</label>${isExt ? ext?.empresa : `${unit?.num} — ${unit?.placas}`}</div>
+    <div class="field"><label>Ruta</label>${trip.origen} → ${trip.destino}</div>
+    <div class="field"><label>Cliente</label>${trip.cliente || "—"}</div>
+    <div class="field"><label>Fecha Entrega</label>${trip.fechaReg || trip.fecha}</div>
+    <div class="field"><label>Carga</label>${trip.carga || "—"}</div>
+    <div class="field"><label>Status</label>${trip.status}</div>
+  </div>
+  ${evidencias.length === 0
+    ? '<p style="text-align:center;padding:40px;color:#999">Sin evidencias fotográficas</p>'
+    : `<div class="photos">${evidencias.map((ev,i) => `
+      <div class="photo-item">
+        <img src="${ev}" alt="Evidencia ${i+1}"/>
+        <div class="photo-caption">Evidencia ${i+1} de ${evidencias.length}</div>
+      </div>`).join("")}</div>`
   }
-  
-  w.document.write(`<p style="margin-top:20px;font-size:10px;color:#999">Generado: ${new Date().toLocaleDateString("es-MX", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p></body></html>`);
-  w.document.close(); w.focus(); setTimeout(() => w.print(), 600);
+  <p style="margin-top:20px;font-size:10px;color:#999">Generado: ${new Date().toLocaleDateString("es-MX", { weekday:"long", year:"numeric", month:"long", day:"numeric" })}</p>
+  </body></html>`;
+}
+
+// ── printEvidencias — abre ventana de impresión (sin auto-print bloqueante) ───
+function printEvidencias({ trip, unit, externos = [] }) {
+  const isExt = trip.esExterno;
+  const ext = isExt ? externos.find(e => e.id === trip.unidadId) : null;
+  const w = window.open("", "_blank");
+  if (!w) { alert("El navegador bloqueó la ventana. Permite pop-ups para este sitio."); return; }
+  w.document.write(buildEvidenciasHtml({ trip, unit, ext }));
+  w.document.close();
+  w.addEventListener("load", () => setTimeout(() => w.print(), 400));
+}
+
+// ── EvidenciasModal — modal in-app para ver, descargar y enviar evidencias ────
+function EvidenciasModal({ trip, unit, ext, clientes, remitentes, onClose }) {
+  const evidencias = trip.evidencias || [];
+  const [lightbox, setLightbox] = useState(null);
+
+  const descargarHTML = () => {
+    const html = buildEvidenciasHtml({ trip, unit, ext });
+    const blob = new Blob([html], { type:"text/html;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `Evidencias_${trip.origen?.replace(/[^a-zA-Z0-9]/g,"-")}_${trip.destino?.replace(/[^a-zA-Z0-9]/g,"-")}.html`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const descargarFotos = () => {
+    evidencias.forEach((src, i) => {
+      const a = document.createElement("a");
+      a.href = src;
+      a.download = `Evidencia_${trip.origen?.replace(/\s/g,"-")}_${i+1}.jpg`;
+      setTimeout(() => a.click(), i * 300);
+    });
+  };
+
+  // Buscar clienteId si el trip.cliente coincide con algún cliente del catálogo
+  const clienteMatch = (clientes||[]).find(c =>
+    c.nombre?.toLowerCase() === trip.cliente?.toLowerCase()
+  );
+
+  const contextoTexto = `📸 *Evidencias de entrega*\n🚛 ${trip.origen} → ${trip.destino}\n📦 Carga: ${trip.carga||"—"}\n👤 Cliente: ${trip.cliente||"—"}\n📅 Fecha: ${trip.fechaReg||trip.fecha}\n${evidencias.length} foto${evidencias.length!==1?"s":""}`;
+
+  return (
+    <>
+      {lightbox && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.88)", zIndex:9999,
+          display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}
+          onClick={() => setLightbox(null)}>
+          <div style={{ fontSize:11, color:"#aaa", marginBottom:8 }}>{lightbox.label} · clic para cerrar</div>
+          <img src={lightbox.src} alt={lightbox.label}
+            style={{ maxWidth:"92vw", maxHeight:"82vh", borderRadius:10, border:"3px solid #0099CC", objectFit:"contain" }} />
+        </div>
+      )}
+      <div className="modal-ov" onClick={onClose}>
+        <div className="modal wide" style={{ maxWidth:600, maxHeight:"92vh", overflowY:"auto" }}
+          onClick={e => e.stopPropagation()}>
+          <div className="mhdr">
+            <h3>📸 Evidencias — {trip.origen} → {trip.destino}</h3>
+            <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+          </div>
+          <div className="mbody" style={{ display:"flex", flexDirection:"column", gap:14 }}>
+
+            {/* Info viaje */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8,
+              padding:"10px 14px", background:"var(--bg2)", borderRadius:10, border:"1px solid var(--border)" }}>
+              {[
+                ["Cliente", trip.cliente||"—"],
+                ["Carga", trip.carga||"—"],
+                ["Fecha entrega", trip.fechaReg||trip.fecha||"—"],
+                ["Status", trip.status],
+              ].map(([l,v]) => (
+                <div key={l}>
+                  <div style={{ fontSize:10, color:"var(--muted)", fontWeight:700 }}>{l}</div>
+                  <div style={{ fontWeight:600, fontSize:12 }}>{v}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Galería */}
+            {evidencias.length === 0 ? (
+              <div className="empty" style={{ padding:"30px 0" }}>
+                <div className="empty-icon">📸</div>
+                <p>Sin evidencias fotográficas en este viaje</p>
+              </div>
+            ) : (
+              <>
+                <div style={{ fontWeight:700, fontSize:12, color:"var(--muted)", textTransform:"uppercase" }}>
+                  {evidencias.length} foto{evidencias.length!==1?"s":""}
+                </div>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))", gap:8 }}>
+                  {evidencias.map((src, i) => (
+                    <div key={i} style={{ position:"relative" }}>
+                      <img src={src}
+                        style={{ width:"100%", height:100, objectFit:"cover", borderRadius:8,
+                          border:"2px solid var(--border)", cursor:"zoom-in" }}
+                        onClick={() => setLightbox({ src, label:`Evidencia ${i+1}` })}
+                        alt={`Evidencia ${i+1}`}
+                      />
+                      <div style={{ position:"absolute", bottom:4, right:4, display:"flex", gap:3 }}>
+                        <button style={{ background:"rgba(0,0,0,.6)", border:"none", borderRadius:4,
+                          padding:"2px 6px", fontSize:10, color:"#fff", cursor:"pointer" }}
+                          onClick={e => { e.stopPropagation();
+                            const a = document.createElement("a");
+                            a.href = src;
+                            a.download = `Evidencia_${i+1}.jpg`;
+                            a.click();
+                          }}>⬇️</button>
+                        <button style={{ background:"rgba(0,0,0,.6)", border:"none", borderRadius:4,
+                          padding:"2px 6px", fontSize:10, color:"#fff", cursor:"pointer" }}
+                          onClick={e => { e.stopPropagation(); setLightbox({ src, label:`Evidencia ${i+1}` }); }}>🔍</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display:"flex", gap:8 }}>
+                  <button className="btn btn-ghost btn-sm" onClick={descargarFotos}>
+                    ⬇️ Descargar todas ({evidencias.length})
+                  </button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => printEvidencias({ trip, unit, externos:[] })}>
+                    🖨️ Imprimir / PDF
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Descargar + enviar */}
+            {evidencias.length > 0 && (
+              <DescargarEnviarWA
+                descargarLabel={`⬇️ Descargar ${evidencias.length} foto${evidencias.length!==1?"s":""} de evidencia`}
+                onDescargar={descargarFotos}
+                clientes={clientes}
+                clienteId={clienteMatch?.id || ""}
+                remitentes={remitentes}
+                contextoTexto={contextoTexto}
+              />
+            )}
+          </div>
+          <div className="mftr">
+            <button className="btn btn-ghost" onClick={onClose}>Cerrar</button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
 }
 
 function printUnitSheet({ unit, driver, docs, maints, fuels, trips, showFinancial = true, companyLogo = "", companyName = "" }) {
@@ -4555,6 +4688,130 @@ function openDocPrint(doc, unit, driver) {
 }
 
 
+
+// ── DescargarEnviarWA — componente reutilizable de descarga + abrir WhatsApp ──
+// Props:
+//   onDescargar: fn() → dispara la descarga del archivo
+//   descargarLabel: string (ej: "⬇️ Descargar PDF")
+//   clientes: array (catálogo de clientes con .telefono)
+//   clienteId: string (preseleccionado si viene del contexto)
+//   remitentes: array (catálogo de remitentes)
+//   contextoTexto: string (texto corto de contexto: folio, ruta, etc.)
+function DescargarEnviarWA({ onDescargar, descargarLabel, clientes, clienteId: clienteIdProp, remitentes, contextoTexto }) {
+  const [tel, setTel]           = useState("");
+  const [clienteId, setClienteId] = useState(clienteIdProp || "");
+  const [remitenteId, setRemitenteId] = useState("");
+  const [descargado, setDescargado] = useState(false);
+
+  // Auto-llenar teléfono cuando hay clienteId prop (cotizaciones)
+  useEffect(() => {
+    if (clienteIdProp) {
+      const cli = (clientes||[]).find(c => c.id === clienteIdProp);
+      if (cli?.telefono) setTel(cli.telefono.replace(/\D/g,""));
+    }
+  }, [clienteIdProp]);
+
+  const handleClienteChange = (id) => {
+    setClienteId(id);
+    if (id) {
+      const cli = (clientes||[]).find(c => c.id === id);
+      if (cli?.telefono) setTel(cli.telefono.replace(/\D/g,""));
+    } else { setTel(""); }
+  };
+
+  const remSel = (remitentes||[]).find(r => r.id === remitenteId);
+
+  const handleDescargar = () => {
+    onDescargar();
+    setDescargado(true);
+  };
+
+  const abrirWhatsApp = () => {
+    const numero = tel.replace(/\D/g,"");
+    if (!numero || numero.length < 10) return alert("Ingresa un número válido (10 dígitos)");
+    const firma = remSel ? `\n_Envía: ${remSel.nombre}${remSel.cargo?" — "+remSel.cargo:""} · +52 ${remSel.tel}_` : "";
+    const txt = contextoTexto ? contextoTexto + firma : firma;
+    window.open(`https://wa.me/52${numero}?text=${encodeURIComponent(txt)}`, "_blank");
+  };
+
+  return (
+    <div style={{ marginTop:14, padding:"14px 16px", background:"rgba(37,211,102,.06)",
+      border:"1px solid rgba(37,211,102,.3)", borderRadius:12 }}>
+      <div style={{ fontWeight:700, fontSize:12, color:"#25D366", marginBottom:12 }}>
+        📲 Enviar al cliente
+      </div>
+
+      {/* Paso 1: Descargar */}
+      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+        <div style={{ width:22, height:22, borderRadius:"50%", background: descargado ? "#25D366":"var(--cyan)",
+          color:"#fff", display:"flex", alignItems:"center", justifyContent:"center",
+          fontSize:11, fontWeight:700, flexShrink:0 }}>1</div>
+        <button
+          style={{ flex:1, padding:"9px 14px", background: descargado ? "rgba(37,211,102,.15)" : "var(--cyan)",
+            color: descargado ? "#25D366" : "#fff", border: descargado ? "1.5px solid #25D366" : "none",
+            borderRadius:8, fontWeight:700, cursor:"pointer", fontSize:13, textAlign:"left" }}
+          onClick={handleDescargar}>
+          {descargado ? "✅ Descargado — puedes adjuntarlo en WhatsApp" : descargarLabel || "⬇️ Descargar archivo"}
+        </button>
+        {descargado && (
+          <button style={{ padding:"6px 10px", background:"var(--bg2)", border:"1px solid var(--border)",
+            borderRadius:7, cursor:"pointer", fontSize:11, color:"var(--muted)" }}
+            onClick={handleDescargar} title="Volver a descargar">↺</button>
+        )}
+      </div>
+
+      {/* Paso 2: Número destinatario */}
+      <div style={{ display:"flex", alignItems:"flex-start", gap:10, marginBottom:10 }}>
+        <div style={{ width:22, height:22, borderRadius:"50%", background:"var(--bg3)",
+          color:"var(--muted)", display:"flex", alignItems:"center", justifyContent:"center",
+          fontSize:11, fontWeight:700, flexShrink:0, marginTop:8 }}>2</div>
+        <div style={{ flex:1, display:"flex", flexDirection:"column", gap:6 }}>
+          {(clientes||[]).length > 0 && (
+            <select value={clienteId} onChange={e => handleClienteChange(e.target.value)}
+              style={{ padding:"7px 10px", borderRadius:8, border:"1px solid var(--border)",
+                background:"var(--bg0)", color:"var(--text)", fontSize:12 }}>
+              <option value="">— Elegir cliente del catálogo —</option>
+              {(clientes||[]).map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}{c.telefono ? " · "+c.telefono : " · (sin tel)"}
+                </option>
+              ))}
+            </select>
+          )}
+          <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+            <span style={{ padding:"7px 10px", background:"var(--bg2)", border:"1px solid var(--border)",
+              borderRadius:8, fontSize:12, color:"var(--muted)", flexShrink:0 }}>🇲🇽 +52</span>
+            <input value={tel} onChange={e => setTel(e.target.value.replace(/\D/g,""))}
+              placeholder="8181234567" maxLength={10}
+              style={{ flex:1, padding:"7px 10px", borderRadius:8, border:"1px solid var(--border)",
+                background:"var(--bg0)", color:"var(--text)", fontSize:13 }} />
+          </div>
+          <RemitenteSelector remitentes={remitentes||[]} selected={remitenteId} onChange={setRemitenteId}/>
+        </div>
+      </div>
+
+      {/* Paso 3: Abrir WhatsApp */}
+      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+        <div style={{ width:22, height:22, borderRadius:"50%", background:"var(--bg3)",
+          color:"var(--muted)", display:"flex", alignItems:"center", justifyContent:"center",
+          fontSize:11, fontWeight:700, flexShrink:0 }}>3</div>
+        <button
+          style={{ flex:1, padding:"10px 14px", background:"#25D366", color:"#fff",
+            border:"none", borderRadius:8, fontWeight:700, cursor:"pointer", fontSize:13 }}
+          onClick={abrirWhatsApp}>
+          📲 Abrir WhatsApp {tel.length >= 10 ? `(+52 ${tel})` : ""}
+        </button>
+      </div>
+      {!descargado && (
+        <div style={{ fontSize:10, color:"var(--muted)", marginTop:8, paddingLeft:32 }}>
+          💡 Descarga primero el archivo, luego abre WhatsApp y adjúntalo desde tu carpeta de Descargas.
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 // ── Catálogo de remitentes (números de empresa para envíos WhatsApp) ──────────
 function RemitentesModal({ remitentes, onSave, onClose }) {
   const [list, setList] = useState(remitentes.length ? remitentes : []);
@@ -5188,8 +5445,9 @@ function DocsPage({ units, drivers, docs, clientes, remitentes, onAdd, onEdit, o
   );
 }
 
-function TripsPage({ trips, units, externos, maints, fuels, onAdd, onEdit, onDelete, onAddExt, onEditExt, onDeleteExt, isAdmin, branding = {} }) {
+function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes, onAdd, onEdit, onDelete, onAddExt, onEditExt, onDeleteExt, isAdmin, branding = {} }) {
   const [q, setQ] = useState(""); const [sf, setSf] = useState("TODOS"); const [tf, setTf] = useState("TODOS");
+  const [evidModal, setEvidModal] = useState(null); // { trip, unit, ext }
   const allTrips = [...trips.filter(t => !t.esExterno).map(t => ({ ...t, tipo: "PROPIO" })), ...trips.filter(t => t.esExterno).map(t => ({ ...t, tipo: "EXTERNO" }))];
   const fil = allTrips.filter(t => {
     const u = t.tipo === "PROPIO" ? units.find(u => u.id === t.unidadId) : null;
@@ -5200,6 +5458,7 @@ function TripsPage({ trips, units, externos, maints, fuels, onAdd, onEdit, onDel
   const totIng = fil.filter(t => t.status === "COMPLETADO").reduce((a, t) => a + (Number(t.costoOfrecido) || 0), 0);
   
   return (
+    <>
     <div className="card">
       <div className="card-hdr"><h3>🗺️ Viajes ({allTrips.length})</h3>
         <div className="row-gap">
@@ -5238,7 +5497,9 @@ function TripsPage({ trips, units, externos, maints, fuels, onAdd, onEdit, onDel
                   <td style={{ color: "var(--cyan)", fontFamily: "var(--font-hd)", fontWeight: 700 }}>{dist ? `${fmtN(dist)} km` : "—"}</td>
                   <td style={{ fontSize: 12 }}>{t.cliente || "—"}</td>
                   <td><Bdg c={t.status === "COMPLETADO" ? "bg" : t.status === "EN RUTA" ? "bb" : "bm"} t={t.status} /></td>
-                  <td>{hasEvid ? <button className="btn btn-ghost btn-xs" onClick={() => printEvidencias({ trip: t, unit: u, externos })} title="Ver evidencias">📸 {t.evidencias.length}</button> : <span style={{ color: "var(--muted)" }}>—</span>}</td>
+                  <td>{hasEvid ? <button className="btn btn-ghost btn-xs"
+  onClick={() => setEvidModal({ trip: t, unit: u, ext: externos.find(e => e.id === t.unidadId) })}
+  title="Ver y enviar evidencias">📸 {t.evidencias.length}</button> : <span style={{ color: "var(--muted)" }}>—</span>}</td>
                   {isAdmin && <td>{t.status === "COMPLETADO" ? <button className="btn btn-purple btn-xs" onClick={() => printTripProfit({ trip: t, unit: u, fuels, maints, externos })} title="Ver utilidad">💰</button> : <span style={{ color: "var(--muted)" }}>—</span>}</td>}
                   <td><div className="acts">
                     <button className="btn btn-ghost btn-sm" onClick={() => t.tipo === "PROPIO" ? onEdit(t) : onEditExt(t)}>✏️</button>
@@ -5250,9 +5511,20 @@ function TripsPage({ trips, units, externos, maints, fuels, onAdd, onEdit, onDel
           </table>}
       </div>
     </div>
+
+      {evidModal && (
+        <EvidenciasModal
+          trip={evidModal.trip}
+          unit={evidModal.unit}
+          ext={evidModal.ext}
+          clientes={clientes || []}
+          remitentes={remitentes || []}
+          onClose={() => setEvidModal(null)}
+        />
+      )}
+    </>
   );
 }
-
 
 // ──────────────────────────────────────────────────────────────────────────────
 // NÓMINA ADMINISTRATIVA — personal de oficina
@@ -8471,7 +8743,7 @@ function CotizacionesTab({ cotizaciones, clientes, tabulador, extrasTabulador, b
                     <div style={{ display:"flex", gap:4 }}>
                       <button className="btn btn-cyan btn-xs" title="Ver / Imprimir" onClick={() => setPreview(c)}>🖨️</button>
                       <button className="btn btn-xs" style={{ background:"#25D366", color:"#fff", fontWeight:700 }}
-                        title="Enviar por WhatsApp"
+                        title="Descargar y enviar por WhatsApp"
                         onClick={() => setPreview({ ...c, _quickWA: true })}>📲</button>
                       <button className="btn btn-ghost btn-xs" title="Editar" onClick={() => { setEditing(c); setShowModal(true); }}>✏️</button>
                       <button className="btn btn-ghost btn-xs" style={{ color:"var(--red)" }} title="Eliminar" onClick={() => del(c.id)}>🗑️</button>
@@ -8814,8 +9086,6 @@ function CotizacionModal({ cotizacion, clientes, tabulador, extrasTabulador, fol
 function CotizacionPreviewModal({ cotizacion: c, branding, clientes, remitentes, autoWA, onClose }) {
   const cli = clientes.find(x => x.id === c.clienteId);
   const fiscal = calcFiscal(c.subtotal || 0, c.tipoPersona);
-  const [remitenteId, setRemitenteId] = useState("");
-  const remSel = remitentes?.find(r => r.id === remitenteId);
   const waRef = useRef(null);
   useEffect(() => {
     if (autoWA && waRef.current) {
@@ -8917,39 +9187,6 @@ ${c.notasImportantes&&c.notasImportantes.length>0 ? `
     w.addEventListener("load", () => setTimeout(() => w.print(), 400));
   };
 
-  const handleWhatsApp = () => {
-    const fiscal2 = calcFiscal(c.subtotal||0, c.tipoPersona);
-    const fmx = n => "$"+Number(n).toLocaleString("es-MX",{minimumFractionDigits:2});
-    const lineas = (c.conceptos||[]).map(x=>`• ${x.cant}x ${x.desc}: ${fmx(x.precioTotal)}`).join("\n");
-    const extras = (c.extras||[]).map(x=>`• ${x.concepto}: ${fmx(x.precioTotal)}`).join("\n");
-    const msg =
-`📋 *COTIZACIÓN #${c.folio}*
-📅 Fecha: ${c.fecha}
-🏢 Cliente: ${c.clienteNombre || "—"}
-${c.atencion ? `👤 Atención: ${c.atencion}` : ""}
-
-🚛 *Servicio:* ${c.servicio||"—"}
-📦 Unidad: ${c.unidadTipo||"—"}
-📍 ${c.origen||"—"} → ${c.destino||"—"}
-${c.material?"📦 Material: "+c.material:""}
-
-*Conceptos:*
-${lineas}
-${extras ? "\n*Extras:*\n"+extras : ""}
-
-━━━━━━━━━━━━━━
-💰 Subtotal: ${fmx(c.subtotal)}
-📊 IVA 16%: ${fmx(fiscal2.iva)}
-${c.tipoPersona==="moral"?`📉 Ret. IVA 4%: -${fmx(fiscal2.ret)}\n`:""}✅ *TOTAL: ${fmx(fiscal2.total)}*
-_(${c.tipoPersona==="moral"?"Persona Moral — aplica retención 4%":"Persona Física — sin retención"})_
-
-${c.notasImportantes&&c.notasImportantes.length>0 ? c.notasImportantes.join("\n") : ""}
-
-_${branding?.nombre||"JL Transportaciones"}_`;
-    const firma = remSel ? `\n_Envía: ${remSel.nombre}${remSel.cargo?" — "+remSel.cargo:""} · +52 ${remSel.tel}_` : "";
-    const url = "https://wa.me/?text=" + encodeURIComponent(msg + firma);
-    window.open(url, "_blank");
-  };
 
   const fiscal2 = calcFiscal(c.subtotal||0, c.tipoPersona);
   const fmx = n => "$"+Number(n||0).toLocaleString("es-MX",{minimumFractionDigits:2});
@@ -9020,16 +9257,16 @@ _${branding?.nombre||"JL Transportaciones"}_`;
             </div>
           )}
 
-          {/* Remitente + WhatsApp */}
-          <div ref={waRef} style={{ marginTop:14, padding:"12px 14px", background:"rgba(37,211,102,.06)",
-            border:"1px solid rgba(37,211,102,.3)", borderRadius:10 }}>
-            <RemitenteSelector remitentes={remitentes||[]} selected={remitenteId} onChange={setRemitenteId}/>
-            <button className="btn" style={{ marginTop:10, width:"100%", background:"#25D366", color:"#fff",
-              fontWeight:700, fontSize:13, padding:"10px", display:"flex", alignItems:"center",
-              justifyContent:"center", gap:8 }}
-              onClick={handleWhatsApp}>
-              📱 Enviar por WhatsApp
-            </button>
+          {/* Descargar + enviar por WhatsApp */}
+          <div ref={waRef}>
+            <DescargarEnviarWA
+              descargarLabel="⬇️ Descargar PDF de la cotización"
+              onDescargar={handleImprimir}
+              clientes={clientes}
+              clienteId={c.clienteId}
+              remitentes={remitentes}
+              contextoTexto={`📋 Cotización #${c.folio} — ${c.clienteNombre||cli?.nombre||""}\n📍 ${c.origen||""} → ${c.destino||""}\n💰 Total: $${fiscal2?.total?.toLocaleString("es-MX",{minimumFractionDigits:2})}`}
+            />
           </div>
         </div>
         <div className="mftr">
@@ -9080,6 +9317,8 @@ const AYUDA_DATA = [
         a: "Es un documento con instrucciones para el operador: ruta, cliente, datos de contacto, observaciones. Se genera desde Flota → Conductores o desde el viaje. Puedes descargarla como HTML o enviarla por WhatsApp." },
       { q: "¿Qué diferencia hay entre un viaje propio y logística externa?",
         a: "Un viaje propio usa tus unidades y conductores. La logística externa es subcontratada a un tercero. Los viajes externos no se cuentan en las nóminas de tus operadores pero sí en tus ingresos y en las gráficas de rentabilidad." },
+      { q: "¿Cómo veo y envío las evidencias de un viaje?",
+        a: "En la columna 📸 de la tabla de viajes, el número indica cuántas fotos de evidencia hay. Haz clic para abrir el modal de evidencias: verás la galería completa, podrás ampliar cada foto, descargarla individualmente o descargar todas. Para enviarlas por WhatsApp: usa los 3 pasos del panel verde — descarga las fotos, elige el número del cliente y toca '📲 Abrir WhatsApp'. En celular se abre directo la conversación para que adjuntes desde Descargas." },
     ]
   },
   {
@@ -9162,10 +9401,10 @@ const AYUDA_DATA = [
         a: "Ve a Finanzas → Cotizaciones → pestaña 'Cotizaciones' → '➕ Nueva Cotización'. Selecciona el cliente, tipo de unidad del tabulador, origen, destino y los extras que apliquen. El sistema calcula el total automáticamente." },
       { q: "¿Qué es el Tabulador?",
         a: "Es tu catálogo de tarifas por tipo de unidad: tarifa por viaje, tarifa por km y tarifa por día. Se configura en Finanzas → Cotizaciones → pestaña 'Tabulador'. Las cotizaciones toman automáticamente estas tarifas." },
-      { q: "¿Cómo envío una cotización al cliente?",
-        a: "Hay dos formas: 1) Desde la lista, el botón 📲 verde abre directo la vista de la cotización en el apartado de WhatsApp. 2) Desde el botón 🖨️ que abre la vista completa, desplázate hacia abajo para ver el panel verde de WhatsApp. Si tienes Remitentes configurados, puedes elegir cuál firma el mensaje antes de enviarlo." },
+      { q: "¿Cómo envío una cotización al cliente por WhatsApp?",
+        a: "Abre la cotización con el botón 🖨️ (o el 📲 verde desde la lista). Dentro, al fondo hay un panel verde '📲 Enviar al cliente'. Sigue los 3 pasos: 1) Descarga el PDF. 2) Elige el número del cliente del catálogo o escríbelo. 3) Toca '📲 Abrir WhatsApp' — abre directo la conversación. Adjunta el PDF desde tu carpeta de Descargas. En celular este flujo es muy rápido." },
       { q: "¿Cómo imprimo o genero PDF de una cotización?",
-        a: "En la lista de cotizaciones, haz clic en 🖨️. Se abre una ventana de vista previa. Haz clic en '🖨️ Imprimir / PDF', se abre el diálogo de impresión del navegador. Para guardar como PDF, elige 'Guardar como PDF' como destino en el diálogo de impresión." },
+        a: "En la lista de cotizaciones, haz clic en 🖨️. Se abre la vista completa. Haz clic en '🖨️ Imprimir / PDF', se abre el diálogo del navegador. Para PDF, elige 'Guardar como PDF' como destino." },
       { q: "¿Cómo configuro el folio de las cotizaciones?",
         a: "En Finanzas → Cotizaciones → pestaña Cotizaciones, en la parte superior hay un campo 'Prefijo de Folio'. Puedes escribir algo como 'COT-2026-' y el sistema numerará las cotizaciones a partir del número que definas." },
       { q: "¿Puedo agregar servicios adicionales a una cotización?",
