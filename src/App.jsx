@@ -689,7 +689,7 @@ function UnitModal({ unit, drivers, onSave, onClose, tiposPersonalizados = [], o
             <div className="field">
               <label>Estado</label>
               <select value={f.estado} onChange={ch("estado")}>
-                {ESTADOS.map(e => <option key={e}>{e}</option>)}
+                {ESTADOS.map(e => <option key={e} value={e}>{e}</option>)}
               </select>
             </div>
             <div className="field">
@@ -1029,15 +1029,36 @@ function FuelModal({ fuel, units, onSave, onClose, onUpdateUnit }) {
   );
 }
 function DocModal({ doc, units, drivers, onSave, onClose }) {
-  const [f, setF] = useState(doc || { entidadTipo: "unidad", unidadId: "", operadorId: "", nombre: DOCS_LIST_UNIDAD[0], numero: "", vence: "", empresa: "", notas: "", foto: "" });
+  // Normalizar el doc/prefill para garantizar que nombre siempre tenga valor
+  const initDoc = () => {
+    const base = doc || {};
+    const tipo = base.entidadTipo || "unidad";
+    const lista = tipo === "operador" ? DOCS_LIST_OPERADOR : DOCS_LIST_UNIDAD;
+    return {
+      entidadTipo: "unidad",
+      unidadId: "",
+      operadorId: "",
+      nombre: lista[0],
+      numero: "",
+      vence: "",
+      empresa: "",
+      notas: "",
+      foto: "",
+      ...base,
+      // Si nombre llegó vacío/undefined, poner el primero de la lista correcta
+      nombre: (base.nombre && base.nombre.trim()) ? base.nombre : lista[0],
+    };
+  };
+  const [f, setF] = useState(initDoc);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const docList = f.entidadTipo === "operador" ? DOCS_LIST_OPERADOR : DOCS_LIST_UNIDAD;
 
   const ok = () => { 
     if (f.entidadTipo === "unidad" && !f.unidadId) return alert("Selecciona una unidad");
     if (f.entidadTipo === "operador" && !f.operadorId) return alert("Selecciona un operador");
-    if (!f.nombre) return alert("Tipo de documento requerido");
-    onSave({ ...f, id: f.id || uid() });
+    // Si nombre quedó vacío por algún bug del select, usar el primero de la lista
+    const nombreFinal = (f.nombre && f.nombre.trim()) ? f.nombre : docList[0];
+    onSave({ ...f, nombre: nombreFinal, id: f.id || uid() });
   };
 
   return (
@@ -1060,7 +1081,7 @@ function DocModal({ doc, units, drivers, onSave, onClose }) {
             ) : (
               <div className="field s2"><label>Operador *</label><select value={f.operadorId} onChange={ch("operadorId")}><option value="">— Seleccionar —</option>{(drivers||[]).map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}</select></div>
             )}
-            <div className="field"><label>Tipo *</label><select value={f.nombre} onChange={ch("nombre")}>{docList.map(d => <option key={d}>{d}</option>)}</select></div>
+            <div className="field"><label>Tipo *</label><select value={f.nombre} onChange={ch("nombre")}>{docList.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
             <div className="field"><label>Número / Folio</label><input value={f.numero} onChange={ch("numero")} /></div>
             <div className="field"><label>Fecha Vencimiento</label><input value={f.vence} onChange={ch("vence")} placeholder="dd/mm/aaaa" /></div>
             <div className="field"><label>Empresa / Emisor</label><input value={f.empresa} onChange={ch("empresa")} /></div>
@@ -1211,7 +1232,7 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
               <div style={{ display: "flex", gap: 8 }}>
                 <select value={f.tipoUnidad} onChange={ch("tipoUnidad")} style={{ flex: 1 }}>
                   <option value="">— Seleccionar o escribir nuevo —</option>
-                  {[...TIPOS, ...tiposPersonalizados].map(t => <option key={t}>{t}</option>)}
+                  {[...TIPOS, ...tiposPersonalizados].map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
                 <input placeholder="Nuevo tipo" value={nuevoTipo} onChange={e => setNuevoTipo(e.target.value)} style={{ flex: 1, background: "var(--bg0)", border: "1px solid var(--border)", padding: "9px 12px", borderRadius: 8 }} />
                 <button className="btn btn-green btn-sm" onClick={addTipo}>+ Agregar</button>
@@ -1409,7 +1430,7 @@ _${branding?.nombre||"Fleet Pro"} — Comprobante de liquidación_`;
             <div>
               <label style={lbl}>Forma de pago</label>
               <select value={f.pagoForma} onChange={ch("pagoForma")} style={inp}>
-                {FORMAS_PAGO.map(fp=><option key={fp}>{fp}</option>)}
+                {FORMAS_PAGO.map(fp=><option key={fp} value={fp}>{fp}</option>)}
               </select>
             </div>
           </div>
@@ -5132,7 +5153,7 @@ _${branding?.nombre||"Fleet Pro"} — Comprobante_`;
             <div><label style={lbl}>Fecha de pago</label><input type="date" value={f.pagoFecha} onChange={ch("pagoFecha")} style={inp}/></div>
             <div><label style={lbl}>Forma de pago</label>
               <select value={f.pagoForma} onChange={ch("pagoForma")} style={inp}>
-                {FORMAS_PAGO.map(fp=><option key={fp}>{fp}</option>)}
+                {FORMAS_PAGO.map(fp=><option key={fp} value={fp}>{fp}</option>)}
               </select>
             </div>
           </div>

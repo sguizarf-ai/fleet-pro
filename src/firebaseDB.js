@@ -38,8 +38,17 @@ export async function fsSet(key, value) {
   try {
     const ref = doc(db, COL, key);
     await setDoc(ref, { value });
+    return true;
   } catch (e) {
     console.warn("fsSet error:", e);
+    // Detectar error de tamaño de Firestore (límite ~1MB por documento)
+    const msg = e?.message || "";
+    if (msg.includes("exceeds") || msg.includes("size") || msg.includes("large") || e?.code === "invalid-argument") {
+      alert("⚠️ No se pudo guardar: el documento supera el límite de tamaño de Firebase.\nReduce la cantidad de fotos o evidencias e intenta de nuevo.");
+    } else {
+      alert("⚠️ Error al guardar en Firebase: " + msg + "\nRevisa tu conexión e intenta de nuevo.");
+    }
+    return false;
   }
 }
 
