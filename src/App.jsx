@@ -7690,8 +7690,8 @@ function CotizacionModal({ cotizacion, clientes, tabulador, extrasTabulador, fol
   const inp = { padding:"8px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--bg0)", color:"var(--text)", fontSize:13, width:"100%", boxSizing:"border-box", outline:"none" };
 
   return (
-    <div className="modal-ov" onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
-      <div className="modal wide" style={{ maxWidth:720, maxHeight:"92vh", overflowY:"auto" }} onMouseDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal wide" style={{ maxWidth:720, maxHeight:"92vh", overflowY:"auto" }} onClick={e=>e.stopPropagation()}>
         <div className="mhdr">
           <h3>📄 {cotizacion ? "Editar" : "Nueva"} Cotización — Folio #{form.folio}</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
