@@ -2766,8 +2766,8 @@ function HojaViajeModal({ units, drivers, remitentes, onClose, companyLogo, comp
   );
 }
 
-function NominaModal({ driver, trips, units = [], onClose, companyLogo, companyName }) {
-  const [periodo, setPeriodo] = useState({ inicio: "", fin: "" });
+function NominaModal({ driver, trips, units = [], onClose, companyLogo, companyName, periodoInit = null }) {
+  const [periodo, setPeriodo] = useState(periodoInit || { inicio: "", fin: "" });
   const [bonos, setBonos] = useState(0);
   const [estimulos, setEstimulos] = useState(0);
   const [otrasPercepciones, setOtrasPercepciones] = useState(0);
@@ -5529,9 +5529,123 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
 // ──────────────────────────────────────────────────────────────────────────────
 // NÓMINA ADMINISTRATIVA — personal de oficina
 // ──────────────────────────────────────────────────────────────────────────────
-function NominaAdminModal({ persona, onSave, onClose, companyLogo, companyName }) {
+
+// ── SelectorNominaModal — elige persona + período antes de abrir la nómina ──
+// tipo: "operador" | "admin"
+function SelectorNominaModal({ tipo, personas, preselId, onConfirm, onClose }) {
+  const [personaId, setPersonaId]   = useState(preselId || (personas.length === 1 ? personas[0].id : ""));
+  const [inicio,    setInicio]      = useState("");
+  const [fin,       setFin]         = useState("");
+
+  // Helper: semana actual
+  const semanaActual = () => {
+    const hoy   = new Date();
+    const dia   = hoy.getDay(); // 0=dom
+    const lunes = new Date(hoy); lunes.setDate(hoy.getDate() - ((dia + 6) % 7));
+    const vier  = new Date(lunes); vier.setDate(lunes.getDate() + 4);
+    const fmt   = d => `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+    setInicio(fmt(lunes)); setFin(fmt(vier));
+  };
+
+  const ok = () => {
+    if (!personaId) return alert("Selecciona un " + (tipo === "operador" ? "operador" : "administrativo"));
+    if (!inicio || !fin) return alert("Ingresa el período de pago");
+    const persona = personas.find(p => p.id === personaId);
+    onConfirm(persona, { inicio, fin });
+  };
+
+  const esAdmin = tipo === "admin";
+
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
+        <div className="mhdr">
+          <h3>{esAdmin ? "💼" : "🚛"} Nueva Nómina — {esAdmin ? "Administrativo" : "Operador"}</h3>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+        </div>
+        <div className="mbody" style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
+          {/* Selector de persona */}
+          <div>
+            <div className="sec-lbl" style={{ color: esAdmin ? "var(--purple)" : "var(--cyan)", borderColor: esAdmin ? "var(--purple)" : "var(--cyan)" }}>
+              {esAdmin ? "💼 Empleado Administrativo" : "🚛 Operador"}
+            </div>
+            <select
+              value={personaId}
+              onChange={e => setPersonaId(e.target.value)}
+              style={{ width:"100%", padding:"9px 12px", borderRadius:9, border:"1px solid var(--border)",
+                background:"var(--bg0)", color:"var(--text)", fontSize:13 }}>
+              <option value="">— Seleccionar {esAdmin ? "administrativo" : "operador"} —</option>
+              {personas.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre}{p.puesto ? ` — ${p.puesto}` : ""}{p.status && p.status !== "ACTIVO" ? ` (${p.status})` : ""}
+                </option>
+              ))}
+            </select>
+            {personaId && (() => {
+              const p = personas.find(x => x.id === personaId);
+              if (!p) return null;
+              const sueldoBase = Number(p.sueldoBase) || 0;
+              return (
+                <div style={{ marginTop:8, padding:"8px 12px", background:"var(--bg2)",
+                  borderRadius:8, border:"1px solid var(--border)", fontSize:12,
+                  display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <span style={{ color:"var(--muted)" }}>Sueldo base:</span>
+                  <strong style={{ color:"var(--cyan)", fontFamily:"var(--font-hd)" }}>
+                    {sueldoBase > 0 ? fmt$(sueldoBase) : "No configurado"}
+                  </strong>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Período */}
+          <div>
+            <div className="sec-lbl" style={{ color:"var(--orange)", borderColor:"var(--orange)" }}>
+              📅 Período de Pago
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+              <div className="field">
+                <label>Inicio</label>
+                <input value={inicio} onChange={e => setInicio(e.target.value)} placeholder="dd/mm/aaaa"/>
+              </div>
+              <div className="field">
+                <label>Fin</label>
+                <input value={fin} onChange={e => setFin(e.target.value)} placeholder="dd/mm/aaaa"/>
+              </div>
+            </div>
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ marginTop:8, fontSize:11 }}
+              onClick={semanaActual}>
+              📅 Usar semana actual (lun–vie)
+            </button>
+          </div>
+
+          {/* Preview rápido */}
+          {inicio && fin && (
+            <div style={{ padding:"8px 14px", background:"rgba(0,153,204,.08)",
+              border:"1px solid rgba(0,153,204,.25)", borderRadius:9, fontSize:12,
+              color:"var(--text)" }}>
+              📋 Se generará nómina del <strong>{inicio}</strong> al <strong>{fin}</strong>
+            </div>
+          )}
+        </div>
+        <div className="mftr">
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-cyan" onClick={ok}>
+            💵 Continuar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function NominaAdminModal({ persona, onSave, onClose, companyLogo, companyName, periodoInit = null }) {
   const [f, setF] = useState({ ...persona });
-  const [periodo, setPeriodo] = useState({ inicio: "", fin: "" });
+  const [periodo, setPeriodo] = useState(periodoInit || { inicio: "", fin: "" });
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
 
   const totalPercepciones = (Number(f.sueldoBase)||0) + (Number(f.bonos)||0) + (Number(f.otrasPercepciones)||0);
@@ -5656,11 +5770,12 @@ function EmpleadoAdminModal({ persona, onSave, onClose }) {
   );
 }
 
-function NominaPage({ drivers, units, trips, onOpenNomina, nominasAdmin = [], onSaveNominasAdmin }) {
+function NominaPage({ drivers, units, trips, onOpenNomina, nominasAdmin = [], onSaveNominasAdmin, companyLogo, companyName }) {
   const [tabNom, setTabNom] = useState("operadores"); // operadores | admin
   const [q, setQ] = useState("");
   const [sf, setSf] = useState("TODOS");
   const [modalAdmin, setModalAdmin] = useState(null); // { mode: "edit"|"recibo", data }
+  const [selectorNomina, setSelectorNomina] = useState(null); // { tipo: "operador"|"admin" }
 
   // ── OPERADORES ──────────────────────────────────────────────
   const fil = drivers.filter(d =>
@@ -5736,10 +5851,13 @@ function NominaPage({ drivers, units, trips, onOpenNomina, nominasAdmin = [], on
               <input placeholder="Buscar..." value={q} onChange={e=>setQ(e.target.value)} />
             </div>
             {tabNom === "admin" && (
-              <button className="btn btn-cyan btn-sm" onClick={() => setModalAdmin({ mode:"edit", data: null })}>➕ Agregar Empleado</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setModalAdmin({ mode:"edit", data: null })}>➕ Empleado</button>
             )}
             {tabNom === "operadores" && (
-              <button className="btn btn-cyan btn-sm" onClick={() => fil.length > 0 && onOpenNomina(fil[0])} disabled={fil.length===0}>💵 Crear Nómina</button>
+              <button className="btn btn-cyan btn-sm" onClick={() => setSelectorNomina({ tipo:"operador" })}>💵 Crear Nómina</button>
+            )}
+            {tabNom === "admin" && nominasAdmin.filter(e=>e.activo).length > 0 && (
+              <button className="btn btn-purple btn-sm" onClick={() => setSelectorNomina({ tipo:"admin" })}>💵 Crear Nómina</button>
             )}
           </div>
         </div>
@@ -5784,7 +5902,7 @@ function NominaPage({ drivers, units, trips, onOpenNomina, nominasAdmin = [], on
                           <td style={{fontWeight:700,color:"var(--green)"}}>{s.comisionCalc > 0 ? fmt$(s.comisionCalc) : <span style={{color:"var(--muted)"}}>—</span>}</td>
                           <td style={{fontFamily:"var(--font-hd)",fontSize:15,fontWeight:700,color:"var(--orange)"}}>{fmt$(totalEst)}</td>
                           <td><Bdg c={d.status==="ACTIVO"?"bg":d.status==="VACACIONES"?"by":"bm"} t={d.status}/></td>
-                          <td><div className="acts"><button className="btn btn-cyan btn-sm" onClick={e=>{e.stopPropagation();onOpenNomina(d);}}>💵 Crear Nómina</button></div></td>
+                          <td><div className="acts"><button className="btn btn-cyan btn-sm" onClick={e=>{e.stopPropagation();setSelectorNomina({tipo:"operador",presel:d.id});}}>💵 Nómina</button></div></td>
                         </tr>
                       );
                     })}</tbody>
@@ -5822,7 +5940,7 @@ function NominaPage({ drivers, units, trips, onOpenNomina, nominasAdmin = [], on
                         <td><Bdg c={e.activo?"bg":"bm"} t={e.activo?"ACTIVO":"INACTIVO"}/></td>
                         <td>
                           <div className="acts">
-                            <button className="btn btn-cyan btn-xs" onClick={()=>setModalAdmin({mode:"recibo",data:{...e}})}>🖨️ Recibo</button>
+                            <button className="btn btn-purple btn-xs" onClick={()=>setSelectorNomina({tipo:"admin",presel:e.id})}>💵 Nómina</button>
                             <button className="btn btn-ghost btn-xs" onClick={()=>setModalAdmin({mode:"edit",data:{...e}})}>✏️</button>
                             <button className="btn btn-ghost btn-xs" onClick={()=>delEmpleado(e.id)}>🗑️</button>
                           </div>
@@ -5849,6 +5967,34 @@ function NominaPage({ drivers, units, trips, onOpenNomina, nominasAdmin = [], on
           persona={modalAdmin.data}
           onSave={emp => saveEmpleado(emp)}
           onClose={() => setModalAdmin(null)}
+          companyLogo={companyLogo}
+          companyName={companyName}
+        />
+      )}
+
+      {/* ── Selector Nómina: elige quién + período ── */}
+      {selectorNomina?.tipo === "operador" && (
+        <SelectorNominaModal
+          tipo="operador"
+          personas={drivers.filter(d => d.status === "ACTIVO" || !d.status)}
+          preselId={selectorNomina.presel}
+          onConfirm={(driver, periodo) => {
+            setSelectorNomina(null);
+            onOpenNomina(driver, periodo);
+          }}
+          onClose={() => setSelectorNomina(null)}
+        />
+      )}
+      {selectorNomina?.tipo === "admin" && (
+        <SelectorNominaModal
+          tipo="admin"
+          personas={nominasAdmin.filter(e => e.activo)}
+          preselId={selectorNomina.presel}
+          onConfirm={(emp, periodo) => {
+            setSelectorNomina(null);
+            setModalAdmin({ mode:"recibo", data:{ ...emp }, periodo });
+          }}
+          onClose={() => setSelectorNomina(null)}
         />
       )}
     </div>
@@ -10312,9 +10458,11 @@ export default function App() {
               drivers={userCan("verNominas") ? drivers : []}
               units={units}
               trips={trips}
-              onOpenNomina={d => setModal({ type: "nomina", data: d })}
+              onOpenNomina={(d, periodo) => setModal({ type: "nomina", data: d, periodo })}
               nominasAdmin={userCan("verNominasAdmin") ? nominasAdmin : []}
               onSaveNominasAdmin={async list => { setNominasAdmin(list); await sv("fp6:nominasAdmin", list); }}
+              companyLogo={branding.logo}
+              companyName={branding.nombre}
             />
           )}
           {tab === "proveedores" && isSupervisor && <ProveedoresPage
