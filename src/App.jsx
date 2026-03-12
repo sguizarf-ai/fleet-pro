@@ -563,13 +563,15 @@ const isBase64 = s =>
 async function uploadToCloudinary(fileOrBase64, folder = "fleet-pro") {
   // Si Cloudinary no está configurado, devolver base64 como fallback
   if (!CLOUDINARY_OK) {
-    console.warn("Cloudinary no configurado. Usando base64 como fallback.");
+    console.error("❌ CLOUDINARY: No configurado. CLOUD_NAME=", CLOUD_NAME);
     return fileOrBase64;
   }
   // Si ya es URL, devolver tal cual
   if (typeof fileOrBase64 === "string" && !isBase64(fileOrBase64)) {
     return fileOrBase64;
   }
+
+  console.log("☁️ CLOUDINARY: Subiendo a", CLOUD_NAME, "preset:", UPLOAD_PRESET, "folder:", folder);
 
   const formData = new FormData();
   formData.append("upload_preset", UPLOAD_PRESET);
@@ -578,7 +580,6 @@ async function uploadToCloudinary(fileOrBase64, folder = "fleet-pro") {
   if (fileOrBase64 instanceof File) {
     formData.append("file", fileOrBase64);
   } else {
-    // base64 string
     formData.append("file", fileOrBase64);
   }
 
@@ -587,13 +588,17 @@ async function uploadToCloudinary(fileOrBase64, folder = "fleet-pro") {
     { method: "POST", body: formData }
   );
 
+  console.log("☁️ CLOUDINARY: HTTP status:", res.status);
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
+    console.error("❌ CLOUDINARY ERROR:", err);
     throw new Error(err?.error?.message || `HTTP ${res.status}`);
   }
 
   const data = await res.json();
-  return data.secure_url; // https://res.cloudinary.com/...
+  console.log("✅ CLOUDINARY OK:", data.secure_url);
+  return data.secure_url;
 }
 
 /**
