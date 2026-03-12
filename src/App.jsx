@@ -614,22 +614,23 @@ async function compressAndUpload(file, folder = "fleet-pro", maxW = 1200, qualit
 }
 
 
-function PhotoInput({ value, onChange, label = "Foto" }) {
+function PhotoInput({ value, onChange, label = "Foto", onUploading }) {
   const ref = useRef();
   const [loading, setLoading] = useState(false);
   const handle = async e => {
     const f = e.target.files[0]; if (!f) return;
     setLoading(true);
+    if (onUploading) onUploading(true);
     try {
       const url = await compressAndUpload(f, "fleet-pro/fotos", 1200, 0.82);
       onChange(url);
     } catch(err) {
       console.error("Upload error:", err);
-      // Fallback: guardar base64 si Cloudinary falla
       try { onChange(await compressImage(f, 500, 0.40)); }
       catch { alert("No se pudo procesar la imagen. Verifica tu conexión."); }
     }
     setLoading(false);
+    if (onUploading) onUploading(false);
     e.target.value = "";
   };
   return (
@@ -652,12 +653,13 @@ function PhotoInput({ value, onChange, label = "Foto" }) {
   );
 }
 
-function PhotoInputSm({ value, onChange, label = "Foto" }) {
+function PhotoInputSm({ value, onChange, label = "Foto", onUploading }) {
   const ref = useRef();
   const [loading, setLoading] = useState(false);
   const handle = async e => {
     const f = e.target.files[0]; if (!f) return;
     setLoading(true);
+    if (onUploading) onUploading(true);
     try {
       const url = await compressAndUpload(f, "fleet-pro/fotos", 800, 0.80);
       onChange(url);
@@ -666,6 +668,7 @@ function PhotoInputSm({ value, onChange, label = "Foto" }) {
       catch { alert("No se pudo procesar la imagen."); }
     }
     setLoading(false);
+    if (onUploading) onUploading(false);
     e.target.value = "";
   };
   return (
@@ -688,12 +691,13 @@ function PhotoInputSm({ value, onChange, label = "Foto" }) {
   );
 }
 
-function MultiPhotoInput({ values = [], onChange, label = "Evidencias Fotográficas" }) {
+function MultiPhotoInput({ values = [], onChange, label = "Evidencias Fotográficas", onUploading }) {
   const ref = useRef();
   const [loading, setLoading] = useState(false);
   const handle = async e => {
     const files = Array.from(e.target.files); if (!files.length) return;
     setLoading(true);
+    if (onUploading) onUploading(true);
     try {
       // Subir en paralelo a Cloudinary
       const urls = await Promise.all(
@@ -709,6 +713,7 @@ function MultiPhotoInput({ values = [], onChange, label = "Evidencias Fotográfi
       } catch { alert("No se pudo subir alguna imagen. Verifica tu conexión."); }
     }
     setLoading(false);
+    if (onUploading) onUploading(false);
     e.target.value = "";
   };
   const remove = i => {
@@ -785,7 +790,7 @@ function UnitModal({ unit, drivers, onSave, onClose, tiposPersonalizados = [], o
         </div>
         <div className="mbody">
           <div className="fg">
-            <PhotoInput value={f.foto} onChange={v => setF(p => ({ ...p, foto: v }))} label="Fotografía de la Unidad" />
+            <PhotoInput value={f.foto} onChange={v => setF(p => ({ ...p, foto: v }))} onUploading={setUploading} label="Fotografía de la Unidad" />
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div className="fg">
                 <div className="field">
@@ -950,8 +955,9 @@ function DriverModal({ driver, units, onSave, onClose }) {
     porcentajeViaje: 10
   });
   
+  const [uploading, setUploading] = useState(false);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
-  const ok = () => { if (!f.nombre) return alert("Nombre requerido"); onSave({ ...f, id: f.id || uid() }) };
+  const ok = () => { if (uploading) return alert("⏳ Espera a que termine de subir la foto..."); if (!f.nombre) return alert("Nombre requerido"); onSave({ ...f, id: f.id || uid() }) };
 
   return (
     <div className="modal-ov" onClick={onClose}>
@@ -962,7 +968,7 @@ function DriverModal({ driver, units, onSave, onClose }) {
         </div>
         <div className="mbody">
           <div className="fg">
-            <PhotoInput value={f.foto} onChange={v => setF(p => ({ ...p, foto: v }))} label="Foto del Conductor" />
+            <PhotoInput value={f.foto} onChange={v => setF(p => ({ ...p, foto: v }))} onUploading={setUploading} label="Foto del Conductor" />
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div className="field">
                 <label>Nombre Completo *</label>
@@ -1226,13 +1232,14 @@ function DocModal({ doc, units, drivers, onSave, onClose }) {
     };
   };
   const [f, setF] = useState(initDoc);
+  const [uploading, setUploading] = useState(false);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const docList = f.entidadTipo === "operador" ? DOCS_LIST_OPERADOR : DOCS_LIST_UNIDAD;
 
   const ok = () => { 
+    if (uploading) return alert("⏳ Espera a que termine de subir la foto...");
     if (f.entidadTipo === "unidad" && !f.unidadId) return alert("Selecciona una unidad");
     if (f.entidadTipo === "operador" && !f.operadorId) return alert("Selecciona un operador");
-    // Si nombre quedó vacío por algún bug del select, usar el primero de la lista
     const nombreFinal = (f.nombre && f.nombre.trim()) ? f.nombre : docList[0];
     onSave({ ...f, nombre: nombreFinal, id: f.id || uid() });
   };
@@ -1262,10 +1269,10 @@ function DocModal({ doc, units, drivers, onSave, onClose }) {
             <div className="field"><label>Fecha Vencimiento</label><DatePicker value={f.vence} onChange={v=>setF(p=>({...p,vence:v}))} /></div>
             <div className="field"><label>Empresa / Emisor</label><input value={f.empresa} onChange={ch("empresa")} /></div>
             <div className="field s2"><label>Notas</label><textarea value={f.notas} onChange={ch("notas")} rows={2} /></div>
-            <MultiPhotoInput values={f.fotos || []} onChange={v => setF(p => ({ ...p, fotos: v }))} label="📷 Fotos del documento (puedes subir varias)" />
+            <MultiPhotoInput values={f.fotos || []} onChange={v => setF(p => ({ ...p, fotos: v }))} onUploading={setUploading} label="📷 Fotos del documento (puedes subir varias)" />
           </div>
         </div>
-        <div className="mftr"><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-cyan" onClick={ok}>💾 Guardar</button></div>
+        <div className="mftr"><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-cyan" onClick={ok} disabled={uploading} style={uploading?{opacity:.6,cursor:"not-allowed"}:{}}>{uploading?"⏳ Subiendo...":"💾 Guardar"}</button></div>
       </div>
     </div>
   );
@@ -1317,13 +1324,14 @@ function MaintModal({ maint, units, proveedores, onSave, onClose }) {
             <div className="field s2"><label>Observaciones</label><textarea value={f.obs} onChange={ch("obs")} rows={2} /></div>
           </div>
         </div>
-        <div className="mftr"><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-cyan" onClick={ok}>💾 Guardar</button></div>
+        <div className="mftr"><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-cyan" onClick={ok} disabled={uploading} style={uploading?{opacity:.6,cursor:"not-allowed"}:{}}>{uploading?"⏳ Subiendo...":"💾 Guardar"}</button></div>
       </div>
     </div>
   );
 }
 function TripModal({ trip, units, onSave, onClose }) {
   const [f, setF] = useState(trip || { unidadId: "", esExterno: false, origen: "", destino: "", fecha: "", fechaReg: "", kmSalida: "", kmLlegada: "", carga: "", cliente: "", status: "EN RUTA", notas: "", costoOfrecido: 0, gastosExtras: 0, costoEstadias: 0, evidencias: [] });
+  const [uploading, setUploading] = useState(false);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const dist = f.kmLlegada && f.kmSalida ? Number(f.kmLlegada) - Number(f.kmSalida) : null;
   const ok = () => { if (!f.unidadId || !f.origen) return alert("Unidad y origen requeridos"); onSave({ ...f, id: f.id || uid() }) };
@@ -1355,9 +1363,9 @@ function TripModal({ trip, units, onSave, onClose }) {
             <div className="field"><label>Gastos Extras ($)</label><input value={f.gastosExtras} onChange={ch("gastosExtras")} type="number" /></div>
             <div className="field"><label>Costo Estadías ($)</label><input value={f.costoEstadias} onChange={ch("costoEstadias")} type="number" /></div>
           </div>
-          <MultiPhotoInput values={f.evidencias || []} onChange={v => setF(p => ({ ...p, evidencias: v }))} label="📸 Evidencias de Entrega" />
+          <MultiPhotoInput values={f.evidencias || []} onChange={v => setF(p => ({ ...p, evidencias: v }))} onUploading={setUploading} label="📸 Evidencias de Entrega" />
         </div>
-        <div className="mftr"><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-cyan" onClick={ok}>💾 Guardar</button></div>
+        <div className="mftr"><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-cyan" onClick={ok} disabled={uploading} style={uploading?{opacity:.6,cursor:"not-allowed"}:{}}>{uploading?"⏳ Subiendo...":"💾 Guardar"}</button></div>
       </div>
     </div>
   );
@@ -1365,6 +1373,7 @@ function TripModal({ trip, units, onSave, onClose }) {
 
 function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], proveedores = [], onNuevoProveedor }) {
   const [f, setF] = useState(externo || { fecha: "", empresa: "", contacto: "", tel: "", tipoUnidad: "", placas: "", color: "", eco: "", operador: "", seguroOp: "", seguroVeh: "", herramientas: [], origen: "", destino: "", cliente: "", carga: "", costoPagar: 0, precioCliente: 0, costoEstadias: 0, status: "EN RUTA", notas: "", evidencias: [] });
+  const [uploading, setUploading] = useState(false);
   const [nuevoTipo, setNuevoTipo] = useState("");
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const toggleHerr = h => setF(p => ({ ...p, herramientas: p.herramientas.includes(h) ? p.herramientas.filter(x => x !== h) : [...p.herramientas, h] }));
@@ -1450,9 +1459,9 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
             <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700 }}>UTILIDAD: </span>
             <span style={{ fontFamily: "var(--font-hd)", fontSize: 24, fontWeight: 700, color: utilidad >= 0 ? "#00864E" : "var(--red)" }}>{fmt$(utilidad)}</span>
           </div>}
-          <MultiPhotoInput values={f.evidencias || []} onChange={v => setF(p => ({ ...p, evidencias: v }))} label="📸 Evidencias de Entrega" />
+          <MultiPhotoInput values={f.evidencias || []} onChange={v => setF(p => ({ ...p, evidencias: v }))} onUploading={setUploading} label="📸 Evidencias de Entrega" />
         </div>
-        <div className="mftr"><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-cyan" onClick={ok}>💾 Guardar</button></div>
+        <div className="mftr"><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-cyan" onClick={ok} disabled={uploading} style={uploading?{opacity:.6,cursor:"not-allowed"}:{}}>{uploading?"⏳ Subiendo...":"💾 Guardar"}</button></div>
       </div>
     </div>
   );
@@ -1707,7 +1716,7 @@ function GastoModal({ gasto, proveedores, onSave, onClose }) {
             )}
           </div>
         </div>
-        <div className="mftr"><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-cyan" onClick={ok}>💾 Guardar</button></div>
+        <div className="mftr"><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-cyan" onClick={ok} disabled={uploading} style={uploading?{opacity:.6,cursor:"not-allowed"}:{}}>{uploading?"⏳ Subiendo...":"💾 Guardar"}</button></div>
       </div>
     </div>
   );
@@ -2715,7 +2724,7 @@ function ProveedorModal({ proveedor, onSave, onClose }) {
             <div className="field s2"><label>Notas</label><textarea value={f.notas} onChange={ch("notas")} rows={2} /></div>
           </div>
         </div>
-        <div className="mftr"><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-cyan" onClick={ok}>💾 Guardar</button></div>
+        <div className="mftr"><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-cyan" onClick={ok} disabled={uploading} style={uploading?{opacity:.6,cursor:"not-allowed"}:{}}>{uploading?"⏳ Subiendo...":"💾 Guardar"}</button></div>
       </div>
     </div>
   );
