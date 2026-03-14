@@ -770,6 +770,7 @@ function UnitModal({ unit, drivers, onSave, onClose, tiposPersonalizados = [], o
     rendEsperado: 0 
   });
   
+  const [uploading, setUploading] = useState(false);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   
   const ok = (_e) => { 
@@ -1301,6 +1302,7 @@ function DocModal({ doc, units, drivers, onSave, onClose }) {
 
 function MaintModal({ maint, units, proveedores, onSave, onClose }) {
   const [f, setF] = useState(maint || { unidadId: "", tipo: "PREVENTIVO", desc: "", prioridad: "MEDIA", fechaProg: "", fechaEjec: "", realizado: "NO", proveedorId: "", taller: "", km: "", costoRef: 0, costoMO: 0, obs: "" });
+  const [uploading, setUploading] = useState(false);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const provs = (proveedores || []).filter(p => ["Talleres","Mano de Obra","Refacciones"].includes(p.categoria));
   const selectedProv = provs.find(p => p.id === f.proveedorId);
@@ -1706,6 +1708,7 @@ _${branding?.nombre||"Fleet Pro"} — Comprobante de liquidación_`;
 
 function GastoModal({ gasto, proveedores, onSave, onClose }) {
   const [f, setF] = useState(gasto || { fecha: "", tipo: GASTO_TIPOS[0], descripcion: "", monto: 0, responsable: "", proveedorId: "" });
+  const [uploading, setUploading] = useState(false);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const ok = (_e) => { if (!f.tipo || !f.monto) return alert("Tipo y monto requeridos"); onSave({ ...f, id: f.id || uid() }) };
   const selectedProv = (proveedores||[]).find(p => p.id === f.proveedorId);
@@ -2705,6 +2708,7 @@ function BrandingModal({ branding, onSave, onClose }) {
 
 function ProveedorModal({ proveedor, onSave, onClose }) {
   const [f, setF] = useState(proveedor || { nombre: "", categoria: PROVEEDOR_CATS[0], tipoProv: TIPO_PROVEEDOR_CATS[0], contacto: "", tel: "", email: "", rfc: "", direccion: "", banco: "", cuenta: "", diasCredito: 0, limiteCredito: 0, saldoPendiente: 0, ultimoPago: "", notas: "" });
+  const [uploading, setUploading] = useState(false);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const chN = k => e => setF(p => ({ ...p, [k]: Number(e.target.value) }));
   const ok = (_e) => { if (!f.nombre) return alert("Nombre requerido"); onSave({ ...f, id: f.id || uid() }) };
@@ -10353,7 +10357,7 @@ export default function App() {
   const tpRef = useRef(tiposPersonalizados); tpRef.current = tiposPersonalizados;
 
   const mkCRUD = (getRef, setter, key) => ({
-    save: async item => { const cur = getRef(); const next = cur.find(x => x.id === item.id) ? cur.map(x => x.id === item.id ? item : x) : [...cur, item]; setter(next); await sv(key, next); setModal(null); notify("Guardado ✓") },
+    save: async item => { const safe = JSON.parse(JSON.stringify(item)); const cur = getRef(); const next = cur.find(x => x.id === safe.id) ? cur.map(x => x.id === safe.id ? safe : x) : [...cur, safe]; setter(next); await sv(key, next); setModal(null); notify("Guardado ✓") },
     del: id => setConfirm({ msg: "¿Eliminar este registro?", onOk: async () => { const next = getRef().filter(x => x.id !== id); setter(next); await sv(key, next); setConfirm(null); notify("Eliminado") } })
   });
 
@@ -10362,15 +10366,17 @@ export default function App() {
   // DoC — CRUD de documentos con guardado por item (evita límite 1MB de Firestore)
   const DoC = {
     save: async item => {
+      // Sanitizar item: eliminar cualquier valor no serializable (eventos, funciones, etc.)
+      const clean = JSON.parse(JSON.stringify(item));
       const cur = dcRef.current;
-      const next = cur.find(x => x.id === item.id)
-        ? cur.map(x => x.id === item.id ? item : x)
-        : [...cur, item];
+      const next = cur.find(x => x.id === clean.id)
+        ? cur.map(x => x.id === clean.id ? clean : x)
+        : [...cur, clean];
       setter_docs_ref.current = next;
       setDocs(next);
       // Guardar item individual en su propio doc Firestore
-      await sv("fp6:doc:" + item.id, item);
-      // También actualizar índice de IDs para poder reconstruir la lista al cargar
+      await sv("fp6:doc:" + clean.id, clean);
+      // También actualizar índice de IDs
       const ids = next.map(x => x.id);
       await sv("fp6:docs:index", ids);
       setModal(null);
