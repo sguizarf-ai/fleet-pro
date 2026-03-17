@@ -71,17 +71,36 @@ export function fsListen(key, callback) {
 
 // ── API para documentos (colección separada, sin límite 1MB) ─────────────────
 
+/** Sanitiza un objeto para Firestore: solo strings, numbers, booleans, arrays y objetos planos */
+function sanitizeForFirestore(val) {
+  if (val === null || val === undefined) return null;
+  if (typeof val === "string" || typeof val === "number" || typeof val === "boolean") return val;
+  if (Array.isArray(val)) return val.map(sanitizeForFirestore).filter(v => v !== undefined);
+  if (typeof val === "object") {
+    // Rechazar eventos de React/DOM (tienen nativeEvent, _reactName, etc.)
+    if ("nativeEvent" in val || "_reactName" in val || "_reactFiber" in val) return undefined;
+    // Rechazar objetos con constructor que no sea Object o Array
+    if (val.constructor && val.constructor !== Object && val.constructor !== Array) return undefined;
+    const out = {};
+    for (const [k, v] of Object.entries(val)) {
+      const clean = sanitizeForFirestore(v);
+      if (clean !== undefined) out[k] = clean;
+    }
+    return out;
+  }
+  return undefined;
+}
+
 /** Guarda un documento individual */
 export async function docSave(item) {
   try {
-    // Sanitizar: eliminar valores no serializables (eventos, funciones, etc.)
-    const clean = JSON.parse(JSON.stringify(item));
+    const clean = sanitizeForFirestore(item);
     const ref = doc(db, DOCS_COL, clean.id);
     await setDoc(ref, clean);
     return true;
   } catch (e) {
     console.error("docSave error:", e?.code, e?.message);
-    alert("⚠️ Error al guardar documento: " + (e?.message || e?.code || "desconocido") + "\nRevisa tu conexión.");
+    alert("⚠️ Error al guardar: " + (e?.message || e?.code || "desconocido"));
     return false;
   }
 }
