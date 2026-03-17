@@ -10324,20 +10324,28 @@ export default function App() {
           else setter(defaultVal);
         } catch { setter(defaultVal); }
       }));
-      // Cargar documentos desde colección separada (sin límite 1MB)
+      // Cargar documentos: combinar colección nueva + legacy
       try {
-        const items = await docsGetAll();
-        if (items && items.length > 0) {
-          setDocs(items);
-        } else {
-          // Migrar desde fp6:docs legacy si existe
-          const legacy = await fsGet("fp6:docs");
-          if (Array.isArray(legacy) && legacy.length > 0) {
-            setDocs(legacy);
-            for (const d of legacy) await docSave(d);
-          } else {
-            setDocs(D_DOCS);
+        const [newDocs, legacy] = await Promise.all([
+          docsGetAll(),
+          fsGet("fp6:docs")
+        ]);
+        const newItems = Array.isArray(newDocs) ? newDocs : [];
+        const legacyItems = Array.isArray(legacy) ? legacy : [];
+        // Combinar: los nuevos sobreescriben los legacy si tienen mismo ID
+        const allById = {};
+        for (const d of legacyItems) allById[d.id] = d;
+        for (const d of newItems) allById[d.id] = d;
+        const combined = Object.values(allById);
+        if (combined.length > 0) {
+          setDocs(combined);
+          // Migrar legacy a nueva colección si hay datos ahí
+          if (legacyItems.length > 0) {
+            for (const d of legacyItems) await docSave(d);
+            await fsSetSilent("fp6:docs", null); // limpiar legacy
           }
+        } else {
+          setDocs(D_DOCS);
         }
       } catch(e) { console.warn("docs load error:", e); setDocs(D_DOCS); }
 
