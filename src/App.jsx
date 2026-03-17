@@ -625,9 +625,8 @@ function PhotoInput({ value, onChange, label = "Foto", onUploading }) {
       const url = await compressAndUpload(f, "fleet-pro/fotos", 1200, 0.82);
       onChange(url);
     } catch(err) {
-      console.error("Upload error:", err);
-      try { onChange(await compressImage(f, 500, 0.40)); }
-      catch { alert("No se pudo procesar la imagen. Verifica tu conexión."); }
+      console.error("Cloudinary upload error:", err);
+      alert("❌ Error al subir foto: " + err.message + "\nVerifica tu conexión a internet.");
     }
     setLoading(false);
     if (onUploading) onUploading(false);
@@ -664,8 +663,8 @@ function PhotoInputSm({ value, onChange, label = "Foto", onUploading }) {
       const url = await compressAndUpload(f, "fleet-pro/fotos", 800, 0.80);
       onChange(url);
     } catch(err) {
-      try { onChange(await compressImage(f, 400, 0.38)); }
-      catch { alert("No se pudo procesar la imagen."); }
+      console.error("Cloudinary upload error:", err);
+      alert("❌ Error al subir foto: " + err.message + "\nVerifica tu conexión.");
     }
     setLoading(false);
     if (onUploading) onUploading(false);
@@ -699,18 +698,13 @@ function MultiPhotoInput({ values = [], onChange, label = "Evidencias Fotográfi
     setLoading(true);
     if (onUploading) onUploading(true);
     try {
-      // Subir en paralelo a Cloudinary
       const urls = await Promise.all(
-        files.map(f => compressAndUpload(f, "fleet-pro/evidencias", 1400, 0.85))
+        files.map(f => compressAndUpload(f, "fleet-pro/fotos", 1200, 0.82))
       );
       onChange([...values, ...urls]);
     } catch(err) {
-      console.error("Upload error:", err);
-      // Fallback base64
-      try {
-        const compressed = await Promise.all(files.map(f => compressImage(f, 700, 0.45)));
-        onChange([...values, ...compressed]);
-      } catch { alert("No se pudo subir alguna imagen. Verifica tu conexión."); }
+      console.error("Cloudinary upload error:", err);
+      alert("❌ Error al subir foto: " + err.message + "\nVerifica tu conexión a internet.");
     }
     setLoading(false);
     if (onUploading) onUploading(false);
@@ -10355,6 +10349,20 @@ export default function App() {
 
   const mkCRUD = (getRef, setter, key) => ({
     save: async item => {
+      // Verificar que no haya fotos en base64 (deben estar en Cloudinary)
+      const hasBase64 = v => typeof v === "string" && v.startsWith("data:image");
+      const fotosFields = ["fotos","evidencias","pagoEvidencias"];
+      for (const field of fotosFields) {
+        const arr = item[field];
+        if (Array.isArray(arr) && arr.some(hasBase64)) {
+          alert("⚠️ Hay fotos que no se subieron a Cloudinary.\nEspera a que termine de cargar o verifica tu conexión.");
+          return;
+        }
+        if (typeof item[field] === "string" && hasBase64(item[field])) {
+          alert("⚠️ La foto no se subió a Cloudinary.\nEspera a que termine de cargar o verifica tu conexión.");
+          return;
+        }
+      }
       const cur = getRef();
       const next = cur.find(x => x.id === item.id)
         ? cur.map(x => x.id === item.id ? item : x)
