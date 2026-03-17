@@ -1208,17 +1208,11 @@ function FuelModal({ fuel, units, onSave, onClose, onUpdateUnit }) {
   );
 }
 function DocModal({ doc, units, drivers, onSave, onClose }) {
-  const docList = (() => {
-    const tipo = (doc?.entidadTipo) || "unidad";
-    return tipo === "operador" ? DOCS_LIST_OPERADOR : DOCS_LIST_UNIDAD;
-  })();
-
-  const [f, setF] = useState(() => {
+  const initState = () => {
     const base = doc || {};
     const tipo = base.entidadTipo || "unidad";
     const lista = tipo === "operador" ? DOCS_LIST_OPERADOR : DOCS_LIST_UNIDAD;
-    const fotosBase = Array.isArray(base.fotos) ? base.fotos
-      : base.foto ? [base.foto] : [];
+    const fotos = Array.isArray(base.fotos) ? base.fotos : base.foto ? [base.foto] : [];
     return {
       entidadTipo: "unidad",
       unidadId: "",
@@ -1230,30 +1224,22 @@ function DocModal({ doc, units, drivers, onSave, onClose }) {
       notas: "",
       fotos: [],
       ...base,
-      fotos: fotosBase,
+      fotos,
       nombre: (base.nombre && base.nombre.trim()) ? base.nombre : lista[0],
     };
-  });
+  };
 
+  const [f, setF] = useState(initState);
   const [uploading, setUploading] = useState(false);
-  const docListActual = f.entidadTipo === "operador" ? DOCS_LIST_OPERADOR : DOCS_LIST_UNIDAD;
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
+  const docList = f.entidadTipo === "operador" ? DOCS_LIST_OPERADOR : DOCS_LIST_UNIDAD;
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (uploading) { alert("⏳ Espera a que termine de subir la foto..."); return; }
     if (f.entidadTipo === "unidad" && !f.unidadId) { alert("Selecciona una unidad"); return; }
     if (f.entidadTipo === "operador" && !f.operadorId) { alert("Selecciona un operador"); return; }
-    const nombreFinal = (f.nombre && f.nombre.trim()) ? f.nombre : docListActual[0];
-    const item = { ...f, nombre: nombreFinal, id: f.id || uid() };
-    // Si quedan fotos en base64 (por falla de Cloudinary), intentar subirlas ahora
-    const fotosOk = await Promise.all((item.fotos || []).map(async v => {
-      if (typeof v === "string" && v.startsWith("data:image")) {
-        try { return await uploadToCloudinary(v, "fleet-pro/fotos"); } catch { return v; }
-      }
-      return v;
-    }));
-    item.fotos = fotosOk;
-    onSave(item);
+    const nombre = (f.nombre && f.nombre.trim()) ? f.nombre : docList[0];
+    onSave({ ...f, nombre, id: f.id || uid() });
   };
 
   return (
@@ -1265,22 +1251,20 @@ function DocModal({ doc, units, drivers, onSave, onClose }) {
         </div>
         <div className="mbody">
           <div className="fg">
-            {/* Tipo de entidad */}
             <div className="field s2">
               <label>Pertenece a</label>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button className={`btn${f.entidadTipo === "unidad" ? " btn-cyan" : " btn-ghost"}`}
-                  onClick={() => setF(p => ({ ...p, entidadTipo: "unidad", operadorId: "", nombre: DOCS_LIST_UNIDAD[0] }))}>
+              <div style={{ display:"flex", gap:8 }}>
+                <button className={`btn${f.entidadTipo==="unidad"?" btn-cyan":" btn-ghost"}`}
+                  onClick={() => setF(p => ({ ...p, entidadTipo:"unidad", operadorId:"", nombre:DOCS_LIST_UNIDAD[0] }))}>
                   🚛 Unidad
                 </button>
-                <button className={`btn${f.entidadTipo === "operador" ? " btn-cyan" : " btn-ghost"}`}
-                  onClick={() => setF(p => ({ ...p, entidadTipo: "operador", unidadId: "", nombre: DOCS_LIST_OPERADOR[0] }))}>
+                <button className={`btn${f.entidadTipo==="operador"?" btn-cyan":" btn-ghost"}`}
+                  onClick={() => setF(p => ({ ...p, entidadTipo:"operador", unidadId:"", nombre:DOCS_LIST_OPERADOR[0] }))}>
                   👤 Operador
                 </button>
               </div>
             </div>
 
-            {/* Selector unidad u operador */}
             {f.entidadTipo === "unidad" ? (
               <div className="field s2">
                 <label>Unidad *</label>
@@ -1302,7 +1286,7 @@ function DocModal({ doc, units, drivers, onSave, onClose }) {
             <div className="field s2">
               <label>Tipo *</label>
               <select value={f.nombre} onChange={ch("nombre")}>
-                {docListActual.map(d => <option key={d} value={d}>{d}</option>)}
+                {docList.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
             <div className="field"><label>Número / Folio</label><input value={f.numero} onChange={ch("numero")} /></div>
@@ -10371,20 +10355,14 @@ export default function App() {
 
   const mkCRUD = (getRef, setter, key) => ({
     save: async item => {
-      try {
-        const safe = JSON.parse(JSON.stringify(item));
-        const cur = getRef();
-        const next = cur.find(x => x.id === safe.id)
-          ? cur.map(x => x.id === safe.id ? safe : x)
-          : [...cur, safe];
-        setter(next);
-        await sv(key, next);
-        setModal(null);
-        notify("Guardado ✓");
-      } catch(err) {
-        console.error("mkCRUD.save error:", key, err);
-        // El error ya fue mostrado por fsSet - no mostrar doble alert
-      }
+      const cur = getRef();
+      const next = cur.find(x => x.id === item.id)
+        ? cur.map(x => x.id === item.id ? item : x)
+        : [...cur, item];
+      setter(next);
+      await sv(key, next);
+      setModal(null);
+      notify("Guardado ✓");
     },
     del: id => setConfirm({ msg: "¿Eliminar este registro?", onOk: async () => { const next = getRef().filter(x => x.id !== id); setter(next); await sv(key, next); setConfirm(null); notify("Eliminado") } })
   });
