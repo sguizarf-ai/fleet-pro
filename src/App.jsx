@@ -10406,6 +10406,8 @@ export default function App() {
   // Las fotos van a Cloudinary (URLs cortas), así que fp6:docs nunca supera 1MB
   const DoC = {
     save: async item => {
+      const saved = await docSave(item);
+      if (!saved) return; // docSave shows error if fails
       const cur = dcRef.current;
       const next = cur.find(x => x.id === item.id)
         ? cur.map(x => x.id === item.id ? item : x)
@@ -10414,15 +10416,14 @@ export default function App() {
       dcRef.current = next;
       setModal(null);
       notify("Guardado ✓");
-      await docSave(item);
     },
     del: id => setConfirm({ msg: "¿Eliminar este documento?", onOk: async () => {
+      await docDelete(id);
       const next = dcRef.current.filter(x => x.id !== id);
       setDocs(next);
       dcRef.current = next;
       setConfirm(null);
       notify("Eliminado");
-      await docDelete(id);
     }})
   };
   const MC = mkCRUD(() => mRef.current, setMaints, "fp6:maints");

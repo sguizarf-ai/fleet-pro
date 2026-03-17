@@ -78,7 +78,8 @@ export async function docSave(item) {
     await setDoc(ref, item);
     return true;
   } catch (e) {
-    console.warn("docSave error:", e?.message);
+    console.error("docSave error:", e?.code, e?.message);
+    alert("⚠️ Error al guardar documento: " + (e?.message || e?.code || "desconocido") + "\nRevisa tu conexión.");
     return false;
   }
 }
