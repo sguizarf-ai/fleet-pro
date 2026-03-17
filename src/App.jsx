@@ -36,7 +36,24 @@ body{background:var(--bg0);color:var(--text);font-family:var(--font-bd);font-siz
 ::-webkit-scrollbar-track{background:var(--bg2)}
 ::-webkit-scrollbar-thumb{background:var(--muted);border-radius:3px}
 .app{display:flex;min-height:100vh}
-.sidebar{width:250px;min-height:100vh;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;left:0;top:0;bottom:0;z-index:200;overflow-y:auto;box-shadow:2px 0 8px rgba(0,0,0,.04)}
+.sidebar{width:250px;min-height:100vh;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;left:0;top:0;bottom:0;z-index:200;overflow-y:auto;box-shadow:2px 0 8px rgba(0,0,0,.04);transition:transform .25s ease}
+.sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:199;cursor:pointer}
+.sb-toggle{display:none;position:fixed;top:10px;left:10px;z-index:300;background:var(--cyan);border:none;border-radius:8px;width:38px;height:38px;color:#fff;font-size:18px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3);align-items:center;justify-content:center}
+@media(max-width:768px){
+  .sidebar{transform:translateX(-260px)}
+  .sidebar.sb-open{transform:translateX(0)}
+  .sb-overlay{display:block;opacity:0;pointer-events:none;transition:opacity .25s}
+  .sb-overlay.sb-show{opacity:1;pointer-events:all}
+  .sb-toggle{display:flex}
+  .main{margin-left:0!important;padding:56px 12px 16px}
+  .topbar{padding:10px 12px 10px 56px}
+  .modal{width:96vw!important;margin:0 auto;max-height:88vh;overflow-y:auto}
+  .fg{grid-template-columns:1fr!important}
+  .field.s2,.field.s3{grid-column:span 1!important}
+  .sbar{display:none}
+  table{font-size:12px}
+  th,td{padding:6px 8px!important}
+}
 .main{margin-left:250px;flex:1;padding:24px 28px;min-height:100vh}
 .sb-logo{padding:18px 16px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
 .sb-logo-title{font-family:var(--font-hd);font-size:24px;font-weight:700;letter-spacing:.06em;background:linear-gradient(135deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
@@ -10254,6 +10271,7 @@ export default function App() {
   const [tiposPersonalizados, setTiposPersonalizados] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [confirm, setConfirm] = useState(null);
   const [toast, setToast] = useState(null);
   const [currentUser, setCurrentUser] = useState(null); // null = no logueado
@@ -10573,7 +10591,9 @@ export default function App() {
     <>
       <style>{CSS}</style>
       <div className="app">
-        <div className="sidebar">
+        <button className="sb-toggle" onClick={() => setSidebarOpen(o => !o)}>☰</button>
+        {sidebarOpen && <div className="sb-overlay sb-show" onClick={() => setSidebarOpen(false)} />}
+        <div className={`sidebar${sidebarOpen ? " sb-open" : ""}`}>
           <div
             className="sb-logo"
             style={{ cursor: "pointer", position: "relative" }}
@@ -10617,7 +10637,7 @@ export default function App() {
               <div key={s.lbl}>
                 <div className="sb-sect">{s.lbl}</div>
                 {s.items.map(n => (
-                  <div key={n.id} className={`nav-btn${tab === n.id ? " on" : ""}`} onClick={() => setTab(n.id)}>
+                  <div key={n.id} className={`nav-btn${tab === n.id ? " on" : ""}`} onClick={() => { setSidebarOpen(false); setTab(n.id); }}>
                     <span className="nav-icon">{icons[n.id]}</span>
                     <span style={{ flex: 1 }}>{titles[n.id]}</span>
                     {(n.badge || 0) > 0 && <span style={{ background: "var(--red)", color: "#fff", borderRadius: 12, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>{n.badge}</span>}
