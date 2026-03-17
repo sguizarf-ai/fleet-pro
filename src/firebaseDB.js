@@ -74,8 +74,10 @@ export function fsListen(key, callback) {
 /** Guarda un documento individual */
 export async function docSave(item) {
   try {
-    const ref = doc(db, DOCS_COL, item.id);
-    await setDoc(ref, item);
+    // Sanitizar: eliminar valores no serializables (eventos, funciones, etc.)
+    const clean = JSON.parse(JSON.stringify(item));
+    const ref = doc(db, DOCS_COL, clean.id);
+    await setDoc(ref, clean);
     return true;
   } catch (e) {
     console.error("docSave error:", e?.code, e?.message);
