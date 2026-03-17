@@ -71,29 +71,23 @@ export function fsListen(key, callback) {
 
 // ── API para documentos (colección separada, sin límite 1MB) ─────────────────
 
-/** Sanitiza un objeto para Firestore: solo strings, numbers, booleans, arrays y objetos planos */
-function sanitizeForFirestore(val) {
-  if (val === null || val === undefined) return null;
-  if (typeof val === "string" || typeof val === "number" || typeof val === "boolean") return val;
-  if (Array.isArray(val)) return val.map(sanitizeForFirestore).filter(v => v !== undefined);
-  if (typeof val === "object") {
-    // Solo rechazar si claramente es un evento de React/DOM
-    if ("nativeEvent" in val || "_reactName" in val) return undefined;
-    const out = {};
-    for (const [k, v] of Object.entries(val)) {
-      if (k === "nativeEvent" || k === "_reactName" || k === "_reactFiber") continue;
-      const clean = sanitizeForFirestore(v);
-      if (clean !== undefined) out[k] = clean;
-    }
-    return out;
-  }
-  return undefined;
-}
-
-/** Guarda un documento individual */
+/** Guarda un documento individual - solo campos conocidos */
 export async function docSave(item) {
   try {
-    const clean = sanitizeForFirestore(item);
+    // Extraer solo los campos que pertenecen a un documento
+    const clean = {
+      id: item.id,
+      entidadTipo: item.entidadTipo || "unidad",
+      unidadId: item.unidadId || "",
+      operadorId: item.operadorId || "",
+      nombre: item.nombre || "",
+      numero: item.numero || "",
+      vence: item.vence || "",
+      empresa: item.empresa || "",
+      notas: item.notas || "",
+      fotos: Array.isArray(item.fotos) ? item.fotos.filter(f => typeof f === "string") : [],
+      foto: typeof item.foto === "string" ? item.foto : "",
+    };
     const ref = doc(db, DOCS_COL, clean.id);
     await setDoc(ref, clean);
     return true;
