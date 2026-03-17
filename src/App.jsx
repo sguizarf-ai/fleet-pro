@@ -1208,14 +1208,16 @@ function FuelModal({ fuel, units, onSave, onClose, onUpdateUnit }) {
   );
 }
 function DocModal({ doc, units, drivers, onSave, onClose }) {
-  // Normalizar el doc/prefill para garantizar que nombre siempre tenga valor
-  const initDoc = () => {
+  const docList = (() => {
+    const tipo = (doc?.entidadTipo) || "unidad";
+    return tipo === "operador" ? DOCS_LIST_OPERADOR : DOCS_LIST_UNIDAD;
+  })();
+
+  const [f, setF] = useState(() => {
     const base = doc || {};
     const tipo = base.entidadTipo || "unidad";
     const lista = tipo === "operador" ? DOCS_LIST_OPERADOR : DOCS_LIST_UNIDAD;
-    // Migrar campo foto (string) a fotos (array) si viene de versión anterior
-    const fotosBase = base.fotos
-      ? base.fotos
+    const fotosBase = Array.isArray(base.fotos) ? base.fotos
       : base.foto ? [base.foto] : [];
     return {
       entidadTipo: "unidad",
@@ -1231,74 +1233,104 @@ function DocModal({ doc, units, drivers, onSave, onClose }) {
       fotos: fotosBase,
       nombre: (base.nombre && base.nombre.trim()) ? base.nombre : lista[0],
     };
-  };
-  const [f, setF] = useState(initDoc);
-  const [uploading, setUploading] = useState(false);
-  const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
-  const docList = f.entidadTipo === "operador" ? DOCS_LIST_OPERADOR : DOCS_LIST_UNIDAD;
+  });
 
-  const ok = async (_e) => { 
-    if (uploading) return alert("⏳ Espera a que termine de subir la foto...");
-    if (f.entidadTipo === "unidad" && !f.unidadId) return alert("Selecciona una unidad");
-    if (f.entidadTipo === "operador" && !f.operadorId) return alert("Selecciona un operador");
-    // Si hay fotos en base64, intentar subirlas a Cloudinary antes de guardar
-    const fotos = f.fotos || [];
-    const hayBase64 = fotos.some(v => typeof v === "string" && v.startsWith("data:image"));
-    if (hayBase64) {
-      setUploading(true);
-      try {
-        const fotasOk = await Promise.all(fotos.map(v =>
-          (typeof v === "string" && v.startsWith("data:image"))
-            ? uploadToCloudinary(v, "fleet-pro/fotos")
-            : Promise.resolve(v)
-        ));
-        setF(p => ({ ...p, fotos: fotasOk }));
-        const nombreFinal = (f.nombre && f.nombre.trim()) ? f.nombre : docList[0];
-        setUploading(false);
-        onSave({ ...f, fotos: fotasOk, nombre: nombreFinal, id: f.id || uid() });
-        return;
-      } catch(e) {
-        setUploading(false);
-        return alert("❌ Error subiendo foto a Cloudinary: " + e.message + "\nVerifica tu conexión.");
+  const [uploading, setUploading] = useState(false);
+  const docListActual = f.entidadTipo === "operador" ? DOCS_LIST_OPERADOR : DOCS_LIST_UNIDAD;
+  const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
+
+  const handleSave = async () => {
+    if (uploading) { alert("⏳ Espera a que termine de subir la foto..."); return; }
+    if (f.entidadTipo === "unidad" && !f.unidadId) { alert("Selecciona una unidad"); return; }
+    if (f.entidadTipo === "operador" && !f.operadorId) { alert("Selecciona un operador"); return; }
+    const nombreFinal = (f.nombre && f.nombre.trim()) ? f.nombre : docListActual[0];
+    const item = { ...f, nombre: nombreFinal, id: f.id || uid() };
+    // Si quedan fotos en base64 (por falla de Cloudinary), intentar subirlas ahora
+    const fotosOk = await Promise.all((item.fotos || []).map(async v => {
+      if (typeof v === "string" && v.startsWith("data:image")) {
+        try { return await uploadToCloudinary(v, "fleet-pro/fotos"); } catch { return v; }
       }
-    }
-    const nombreFinal = (f.nombre && f.nombre.trim()) ? f.nombre : docList[0];
-    onSave({ ...f, nombre: nombreFinal, id: f.id || uid() });
+      return v;
+    }));
+    item.fotos = fotosOk;
+    onSave(item);
   };
 
   return (
     <div className="modal-ov" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="mhdr"><h3>{f.id ? "✏️ Editar" : "📄 Nuevo Documento"}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
+        <div className="mhdr">
+          <h3>{f.id ? "✏️ Editar Documento" : "📄 Nuevo Documento"}</h3>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+        </div>
         <div className="mbody">
           <div className="fg">
             {/* Tipo de entidad */}
             <div className="field s2">
               <label>Pertenece a</label>
               <div style={{ display: "flex", gap: 8 }}>
-                <button className={`btn ${f.entidadTipo === "unidad" ? "btn-cyan" : "btn-ghost"} btn-sm`} onClick={() => setF(p => ({ ...p, entidadTipo: "unidad", operadorId: "", nombre: DOCS_LIST_UNIDAD[0] }))}>🚛 Unidad</button>
-                <button className={`btn ${f.entidadTipo === "operador" ? "btn-cyan" : "btn-ghost"} btn-sm`} onClick={() => setF(p => ({ ...p, entidadTipo: "operador", unidadId: "", nombre: DOCS_LIST_OPERADOR[0] }))}>👤 Operador</button>
+                <button className={`btn${f.entidadTipo === "unidad" ? " btn-cyan" : " btn-ghost"}`}
+                  onClick={() => setF(p => ({ ...p, entidadTipo: "unidad", operadorId: "", nombre: DOCS_LIST_UNIDAD[0] }))}>
+                  🚛 Unidad
+                </button>
+                <button className={`btn${f.entidadTipo === "operador" ? " btn-cyan" : " btn-ghost"}`}
+                  onClick={() => setF(p => ({ ...p, entidadTipo: "operador", unidadId: "", nombre: DOCS_LIST_OPERADOR[0] }))}>
+                  👤 Operador
+                </button>
               </div>
             </div>
-            {/* Selector condicional */}
+
+            {/* Selector unidad u operador */}
             {f.entidadTipo === "unidad" ? (
-              <div className="field s2"><label>Unidad *</label><select value={f.unidadId} onChange={ch("unidadId")}><option value="">— Seleccionar —</option>{units.map(u => <option key={u.id} value={u.id}>{u.num} — {u.placas}</option>)}</select></div>
+              <div className="field s2">
+                <label>Unidad *</label>
+                <select value={f.unidadId} onChange={ch("unidadId")}>
+                  <option value="">— Seleccionar —</option>
+                  {units.map(u => <option key={u.id} value={u.id}>{u.num} — {u.placas}</option>)}
+                </select>
+              </div>
             ) : (
-              <div className="field s2"><label>Operador *</label><select value={f.operadorId} onChange={ch("operadorId")}><option value="">— Seleccionar —</option>{(drivers||[]).map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}</select></div>
+              <div className="field s2">
+                <label>Operador *</label>
+                <select value={f.operadorId} onChange={ch("operadorId")}>
+                  <option value="">— Seleccionar —</option>
+                  {drivers.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}
+                </select>
+              </div>
             )}
-            <div className="field"><label>Tipo *</label><select value={f.nombre} onChange={ch("nombre")}>{docList.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
+
+            <div className="field s2">
+              <label>Tipo *</label>
+              <select value={f.nombre} onChange={ch("nombre")}>
+                {docListActual.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
             <div className="field"><label>Número / Folio</label><input value={f.numero} onChange={ch("numero")} /></div>
-            <div className="field"><label>Fecha Vencimiento</label><DatePicker value={f.vence} onChange={v=>setF(p=>({...p,vence:v}))} /></div>
+            <div className="field">
+              <label>Fecha Vencimiento</label>
+              <DatePicker value={f.vence} onChange={v => setF(p => ({ ...p, vence: v }))} />
+            </div>
             <div className="field"><label>Empresa / Emisor</label><input value={f.empresa} onChange={ch("empresa")} /></div>
             <div className="field s2"><label>Notas</label><textarea value={f.notas} onChange={ch("notas")} rows={2} /></div>
-            <MultiPhotoInput values={f.fotos || []} onChange={v => setF(p => ({ ...p, fotos: v }))} onUploading={setUploading} label="📷 Fotos del documento (puedes subir varias)" />
+            <MultiPhotoInput
+              values={f.fotos || []}
+              onChange={v => setF(p => ({ ...p, fotos: v }))}
+              onUploading={setUploading}
+              label="📷 Fotos del documento (puedes subir varias)"
+            />
           </div>
         </div>
-        <div className="mftr"><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-cyan" onClick={ok} disabled={uploading} style={uploading?{opacity:.6,cursor:"not-allowed"}:{}}>{uploading?"⏳ Subiendo...":"💾 Guardar"}</button></div>
+        <div className="mftr">
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-cyan" onClick={handleSave} disabled={uploading}>
+            {uploading ? "⏳ Subiendo..." : "💾 Guardar"}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
+
 
 function MaintModal({ maint, units, proveedores, onSave, onClose }) {
   const [f, setF] = useState(maint || { unidadId: "", tipo: "PREVENTIVO", desc: "", prioridad: "MEDIA", fechaProg: "", fechaEjec: "", realizado: "NO", proveedorId: "", taller: "", km: "", costoRef: 0, costoMO: 0, obs: "" });
@@ -10321,7 +10353,7 @@ export default function App() {
     })();
   }, []);
 
-  const sv = useCallback(async (k, v) => { try { await fsSet(k, v); } catch { } }, []);
+  const sv = useCallback(async (k, v) => { await fsSet(k, v); }, []);
   const notify = (msg, type = "success") => setToast({ msg, type });
 
   const uRef = useRef(units); uRef.current = units;
@@ -10338,7 +10370,22 @@ export default function App() {
   const tpRef = useRef(tiposPersonalizados); tpRef.current = tiposPersonalizados;
 
   const mkCRUD = (getRef, setter, key) => ({
-    save: async item => { const safe = JSON.parse(JSON.stringify(item)); const cur = getRef(); const next = cur.find(x => x.id === safe.id) ? cur.map(x => x.id === safe.id ? safe : x) : [...cur, safe]; setter(next); await sv(key, next); setModal(null); notify("Guardado ✓") },
+    save: async item => {
+      try {
+        const safe = JSON.parse(JSON.stringify(item));
+        const cur = getRef();
+        const next = cur.find(x => x.id === safe.id)
+          ? cur.map(x => x.id === safe.id ? safe : x)
+          : [...cur, safe];
+        setter(next);
+        await sv(key, next);
+        setModal(null);
+        notify("Guardado ✓");
+      } catch(err) {
+        console.error("mkCRUD.save error:", key, err);
+        // El error ya fue mostrado por fsSet - no mostrar doble alert
+      }
+    },
     del: id => setConfirm({ msg: "¿Eliminar este registro?", onOk: async () => { const next = getRef().filter(x => x.id !== id); setter(next); await sv(key, next); setConfirm(null); notify("Eliminado") } })
   });
 
@@ -10730,13 +10777,13 @@ export default function App() {
           onClose={() => setModal(null)}
         />;
       })()}
-      {modal?.type === "driver" && <DriverModal driver={modal.data} units={units} onSave={d => DC.save({ ...d, id: d.id || uid() })} onClose={() => setModal(null)} />}
-      {modal?.type === "unit" && <UnitModal unit={modal.data} drivers={drivers} tiposPersonalizados={tiposPersonalizados} onAddTipo={async (t) => { const newTipos = [...tiposPersonalizados, t]; setTiposPersonalizados(newTipos); await sv("fp6:tipos", newTipos); }} onSave={u => UC.save({ ...u, id: u.id || uid() })} onClose={() => setModal(null)} />}
-      {modal?.type === "doc" && <DocModal doc={modal.data} units={units} drivers={drivers} onSave={d => DoC.save({ ...d, id: d.id || uid() })} onClose={() => setModal(null)} />}
-      {modal?.type === "maint" && <MaintModal maint={modal.data} units={units} proveedores={proveedores} onSave={m => MC.save({ ...m, id: m.id || uid() })} onClose={() => setModal(null)} />}
-      {modal?.type === "fuel" && <FuelModal fuel={modal.data} units={units} onSave={f => FC.save({ ...f, id: f.id || uid() })} onClose={() => setModal(null)} onUpdateUnit={UC.save} />}
-      {modal?.type === "trip" && <TripModal trip={modal.data} units={units} onSave={t => TC.save({ ...t, id: t.id || uid(), esExterno: false })} onClose={() => setModal(null)} />}
-      {modal?.type === "gasto" && <GastoModal gasto={modal.data} proveedores={proveedores} onSave={g => GC.save({ ...g, id: g.id || uid() })} onClose={() => setModal(null)} />}
+      {modal?.type === "driver" && <DriverModal key={modal.data?.id || "new-driver"} driver={modal.data} units={units} onSave={d => DC.save({ ...d, id: d.id || uid() })} onClose={() => setModal(null)} />}
+      {modal?.type === "unit" && <UnitModal key={modal.data?.id || "new-unit"} unit={modal.data} drivers={drivers} tiposPersonalizados={tiposPersonalizados} onAddTipo={async (t) => { const newTipos = [...tiposPersonalizados, t]; setTiposPersonalizados(newTipos); await sv("fp6:tipos", newTipos); }} onSave={u => UC.save({ ...u, id: u.id || uid() })} onClose={() => setModal(null)} />}
+      {modal?.type === "doc" && <DocModal key={modal.data?.id || "new-doc"} doc={modal.data} units={units} drivers={drivers} onSave={d => DoC.save({ ...d, id: d.id || uid() })} onClose={() => setModal(null)} />}
+      {modal?.type === "maint" && <MaintModal key={modal.data?.id || "new-maint"} maint={modal.data} units={units} proveedores={proveedores} onSave={m => MC.save({ ...m, id: m.id || uid() })} onClose={() => setModal(null)} />}
+      {modal?.type === "fuel" && <FuelModal key={modal.data?.id || "new-fuel"} fuel={modal.data} units={units} onSave={f => FC.save({ ...f, id: f.id || uid() })} onClose={() => setModal(null)} onUpdateUnit={UC.save} />}
+      {modal?.type === "trip" && <TripModal key={modal.data?.id || "new-trip"} trip={modal.data} units={units} onSave={t => TC.save({ ...t, id: t.id || uid(), esExterno: false })} onClose={() => setModal(null)} />}
+      {modal?.type === "gasto" && <GastoModal key={modal.data?.id || "new-gasto"} gasto={modal.data} proveedores={proveedores} onSave={g => GC.save({ ...g, id: g.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "pagoTransp" && (
         <PagoTransportistaModal
           externo={modal.data}
@@ -10748,11 +10795,11 @@ export default function App() {
           onClose={() => setModal(null)}
         />
       )}
-      {modal?.type === "externo" && <ExternoModal externo={modal.data} tiposPersonalizados={tiposPersonalizados} proveedores={proveedores} onNuevoProveedor={p=>{PVC.save(p);}} onSave={e => saveExternoWithTipo({ ...e, id: e.id || uid() })} onClose={() => setModal(null)} />}
+      {modal?.type === "externo" && <ExternoModal key={modal.data?.id || "new-ext"} externo={modal.data} tiposPersonalizados={tiposPersonalizados} proveedores={proveedores} onNuevoProveedor={p=>{PVC.save(p);}} onSave={e => saveExternoWithTipo({ ...e, id: e.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "changeDriver" && <ChangeDriverModal unit={modal.data} drivers={drivers} onSave={u => UC.save(u)} onClose={() => setModal(null)} />}
-      {modal?.type === "cliente" && <ClienteModal cliente={modal.data} onSave={c => CliC.save({ ...c, id: c.id || uid() })} onClose={() => setModal(null)} />}
-      {modal?.type === "factura" && <FacturaModal factura={modal.data} clientes={clientes} viajes={trips} onSave={f => FacC.save(f)} onClose={() => setModal(null)} />}
-      {modal?.type === "proveedor" && <ProveedorModal proveedor={modal.data} onSave={p => PVC.save({ ...p, id: p.id || uid() })} onClose={() => setModal(null)} />}
+      {modal?.type === "cliente" && <ClienteModal key={modal.data?.id || "new-cliente"} cliente={modal.data} onSave={c => CliC.save({ ...c, id: c.id || uid() })} onClose={() => setModal(null)} />}
+      {modal?.type === "factura" && <FacturaModal key={modal.data?.id || "new-fact"} factura={modal.data} clientes={clientes} viajes={trips} onSave={f => FacC.save(f)} onClose={() => setModal(null)} />}
+      {modal?.type === "proveedor" && <ProveedorModal key={modal.data?.id || "new-prov"} proveedor={modal.data} onSave={p => PVC.save({ ...p, id: p.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "hojaViaje" && <HojaViajeModal units={units} drivers={drivers} remitentes={remitentes} onClose={() => setModal(null)} companyLogo={branding.logo} companyName={branding.nombre} />}
       {modal?.type === "nomina" && <NominaModal driver={modal.data} trips={trips} units={units} onClose={() => setModal(null)} companyLogo={branding.logo} companyName={branding.nombre} />}
       {confirm && <Confirm msg={confirm.msg} onOk={confirm.onOk} onCancel={() => setConfirm(null)} />}
