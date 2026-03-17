@@ -77,12 +77,11 @@ function sanitizeForFirestore(val) {
   if (typeof val === "string" || typeof val === "number" || typeof val === "boolean") return val;
   if (Array.isArray(val)) return val.map(sanitizeForFirestore).filter(v => v !== undefined);
   if (typeof val === "object") {
-    // Rechazar eventos de React/DOM (tienen nativeEvent, _reactName, etc.)
-    if ("nativeEvent" in val || "_reactName" in val || "_reactFiber" in val) return undefined;
-    // Rechazar objetos con constructor que no sea Object o Array
-    if (val.constructor && val.constructor !== Object && val.constructor !== Array) return undefined;
+    // Solo rechazar si claramente es un evento de React/DOM
+    if ("nativeEvent" in val || "_reactName" in val) return undefined;
     const out = {};
     for (const [k, v] of Object.entries(val)) {
+      if (k === "nativeEvent" || k === "_reactName" || k === "_reactFiber") continue;
       const clean = sanitizeForFirestore(v);
       if (clean !== undefined) out[k] = clean;
     }
