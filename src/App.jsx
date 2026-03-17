@@ -10647,36 +10647,36 @@ export default function App() {
           {tab === "dashboard" && <Dashboard units={units} drivers={drivers} docs={docs} maints={maints} fuels={fuels} trips={trips} gastos={gastos} externos={externos} facturas={facturas} clientes={clientes} proveedores={proveedores} isAdmin={isAdmin} />}
           {tab === "alerts" && <AlertsPage units={units} docs={docs} maints={maints} />}
           {tab === "units" && <UnitsPage units={units} drivers={drivers} docs={docs} maints={maints} fuels={fuels} trips={trips}
-            onAdd={isAdmin ? () => setModal({ type: "unit", data: null }) : null}
+            onAdd={isAdmin ? () => setModal({ type: "unit", data: null, _ts: Date.now() }) : null}
             onEdit={isAdmin ? u => setModal({ type: "unit", data: u }) : null}
             onDelete={isAdmin ? UC.del : null}
             onChangeDriver={isAdmin ? u => setModal({ type: "changeDriver", data: u }) : null}
             isAdmin={isAdmin}
             branding={branding} />}
           {tab === "drivers" && <DriversPage drivers={drivers} units={units} trips={trips}
-            onAdd={isAdmin ? () => setModal({ type: "driver", data: null }) : null}
+            onAdd={isAdmin ? () => setModal({ type: "driver", data: null, _ts: Date.now() }) : null}
             onEdit={isAdmin ? d => setModal({ type: "driver", data: d }) : null}
             onDelete={isAdmin ? DC.del : null}
             onHojaViaje={userCan("hojaViaje") ? d => setModal({ type: "hojaViaje", data: d }) : null}
             onNomina={userCan("verNominas") ? d => setModal({ type: "nomina", data: d }) : null}
             branding={branding} />}
           {tab === "docs" && <DocsPage units={units} drivers={drivers} docs={docs} clientes={clientes}
-            onAdd={(prefill) => setModal({ type: "doc", data: prefill || null })}
+            onAdd={(prefill) => setModal({ type: "doc", data: prefill || null, _ts: Date.now() })}
             onEdit={d => setModal({ type: "doc", data: d })}
             onDelete={DoC.del} />}
           {tab === "maints" && <MaintPage units={units} maints={maints} proveedores={proveedores}
-            onAdd={userCan("crearMantenimientos") ? () => setModal({ type: "maint", data: null }) : null}
+            onAdd={userCan("crearMantenimientos") ? () => setModal({ type: "maint", data: null, _ts: Date.now() }) : null}
             onEdit={isSupervisor ? m => setModal({ type: "maint", data: m }) : null}
             onDelete={isAdmin ? MC.del : null} />}
           {tab === "fuels" && <FuelPage units={units} fuels={fuels}
-            onAdd={() => setModal({ type: "fuel", data: null })}
+            onAdd={() => setModal({ type: "fuel", data: null, _ts: Date.now() })}
             onEdit={f => setModal({ type: "fuel", data: f })}
             onDelete={FC.del} />}
           {tab === "trips" && <TripsPage trips={trips} units={units} externos={externos} maints={maints} fuels={fuels}
-            onAdd={() => setModal({ type: "trip", data: null })}
+            onAdd={() => setModal({ type: "trip", data: null, _ts: Date.now() })}
             onEdit={t => setModal({ type: "trip", data: t })}
             onDelete={TC.del}
-            onAddExt={() => setModal({ type: "externo", data: null })}
+            onAddExt={() => setModal({ type: "externo", data: null, _ts: Date.now() })}
             onEditExt={e => setModal({ type: "externo", data: e })}
             onDeleteExt={EC.del}
             onPagoExt={e => setModal({ type: "pagoTransp", data: e })}
@@ -10685,7 +10685,7 @@ export default function App() {
           {tab === "clientes" && userCan("verFacturacion") && <ClientesPage
             clientes={clientes}
             facturas={facturas}
-            onAdd={() => setModal({ type: "cliente", data: null })}
+            onAdd={() => setModal({ type: "cliente", data: null, _ts: Date.now() })}
             onEdit={c => setModal({ type: "cliente", data: c })}
             onDelete={CliC.del}
           />}
@@ -10706,13 +10706,13 @@ export default function App() {
             facturas={facturas}
             clientes={clientes}
             viajes={trips}
-            onAdd={() => setModal({ type: "factura", data: null })}
+            onAdd={() => setModal({ type: "factura", data: null, _ts: Date.now() })}
             onEdit={f => FacC.save(f)}
             onDelete={FacC.del}
             onMarcarPagada={marcarPagada}
           />}
           {tab === "gastos" && isSupervisor && <GastosPage gastos={gastos} proveedores={proveedores}
-            onAdd={() => setModal({ type: "gasto", data: null })}
+            onAdd={() => setModal({ type: "gasto", data: null, _ts: Date.now() })}
             onEdit={g => setModal({ type: "gasto", data: g })}
             onDelete={GC.del} />}
           {tab === "nominas" && (userCan("verNominas") || userCan("verNominasAdmin")) && (
@@ -10734,7 +10734,7 @@ export default function App() {
             externos={externos}
             trips={trips}
             branding={branding}
-            onAdd={() => setModal({ type: "proveedor", data: null })}
+            onAdd={() => setModal({ type: "proveedor", data: null, _ts: Date.now() })}
             onEdit={p => setModal({ type: "proveedor", data: p })}
             onDelete={PVC.del}
             onSaveExterno={async e => { EC.save(e); }}
@@ -10777,13 +10777,13 @@ export default function App() {
           onClose={() => setModal(null)}
         />;
       })()}
-      {modal?.type === "driver" && <DriverModal key={modal.data?.id || "new-driver"} driver={modal.data} units={units} onSave={d => DC.save({ ...d, id: d.id || uid() })} onClose={() => setModal(null)} />}
-      {modal?.type === "unit" && <UnitModal key={modal.data?.id || "new-unit"} unit={modal.data} drivers={drivers} tiposPersonalizados={tiposPersonalizados} onAddTipo={async (t) => { const newTipos = [...tiposPersonalizados, t]; setTiposPersonalizados(newTipos); await sv("fp6:tipos", newTipos); }} onSave={u => UC.save({ ...u, id: u.id || uid() })} onClose={() => setModal(null)} />}
-      {modal?.type === "doc" && <DocModal key={modal.data?.id || "new-doc"} doc={modal.data} units={units} drivers={drivers} onSave={d => DoC.save({ ...d, id: d.id || uid() })} onClose={() => setModal(null)} />}
-      {modal?.type === "maint" && <MaintModal key={modal.data?.id || "new-maint"} maint={modal.data} units={units} proveedores={proveedores} onSave={m => MC.save({ ...m, id: m.id || uid() })} onClose={() => setModal(null)} />}
-      {modal?.type === "fuel" && <FuelModal key={modal.data?.id || "new-fuel"} fuel={modal.data} units={units} onSave={f => FC.save({ ...f, id: f.id || uid() })} onClose={() => setModal(null)} onUpdateUnit={UC.save} />}
-      {modal?.type === "trip" && <TripModal key={modal.data?.id || "new-trip"} trip={modal.data} units={units} onSave={t => TC.save({ ...t, id: t.id || uid(), esExterno: false })} onClose={() => setModal(null)} />}
-      {modal?.type === "gasto" && <GastoModal key={modal.data?.id || "new-gasto"} gasto={modal.data} proveedores={proveedores} onSave={g => GC.save({ ...g, id: g.id || uid() })} onClose={() => setModal(null)} />}
+      {modal?.type === "driver" && <DriverModal key={modal.data?.id || modal._ts || "new-driver"} driver={modal.data} units={units} onSave={d => DC.save({ ...d, id: d.id || uid() })} onClose={() => setModal(null)} />}
+      {modal?.type === "unit" && <UnitModal key={modal.data?.id || modal._ts || "new-unit"} unit={modal.data} drivers={drivers} tiposPersonalizados={tiposPersonalizados} onAddTipo={async (t) => { const newTipos = [...tiposPersonalizados, t]; setTiposPersonalizados(newTipos); await sv("fp6:tipos", newTipos); }} onSave={u => UC.save({ ...u, id: u.id || uid() })} onClose={() => setModal(null)} />}
+      {modal?.type === "doc" && <DocModal key={modal.data?.id || modal._ts || "new-doc"} doc={modal.data} units={units} drivers={drivers} onSave={d => DoC.save({ ...d, id: d.id || uid() })} onClose={() => setModal(null)} />}
+      {modal?.type === "maint" && <MaintModal key={modal.data?.id || modal._ts || "new-maint"} maint={modal.data} units={units} proveedores={proveedores} onSave={m => MC.save({ ...m, id: m.id || uid() })} onClose={() => setModal(null)} />}
+      {modal?.type === "fuel" && <FuelModal key={modal.data?.id || modal._ts || "new-fuel"} fuel={modal.data} units={units} onSave={f => FC.save({ ...f, id: f.id || uid() })} onClose={() => setModal(null)} onUpdateUnit={UC.save} />}
+      {modal?.type === "trip" && <TripModal key={modal.data?.id || modal._ts || "new-trip"} trip={modal.data} units={units} onSave={t => TC.save({ ...t, id: t.id || uid(), esExterno: false })} onClose={() => setModal(null)} />}
+      {modal?.type === "gasto" && <GastoModal key={modal.data?.id || modal._ts || "new-gasto"} gasto={modal.data} proveedores={proveedores} onSave={g => GC.save({ ...g, id: g.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "pagoTransp" && (
         <PagoTransportistaModal
           externo={modal.data}
@@ -10797,7 +10797,7 @@ export default function App() {
       )}
       {modal?.type === "externo" && <ExternoModal key={modal.data?.id || "new-ext"} externo={modal.data} tiposPersonalizados={tiposPersonalizados} proveedores={proveedores} onNuevoProveedor={p=>{PVC.save(p);}} onSave={e => saveExternoWithTipo({ ...e, id: e.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "changeDriver" && <ChangeDriverModal unit={modal.data} drivers={drivers} onSave={u => UC.save(u)} onClose={() => setModal(null)} />}
-      {modal?.type === "cliente" && <ClienteModal key={modal.data?.id || "new-cliente"} cliente={modal.data} onSave={c => CliC.save({ ...c, id: c.id || uid() })} onClose={() => setModal(null)} />}
+      {modal?.type === "cliente" && <ClienteModal key={modal.data?.id || modal._ts || "new-cliente"} cliente={modal.data} onSave={c => CliC.save({ ...c, id: c.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "factura" && <FacturaModal key={modal.data?.id || "new-fact"} factura={modal.data} clientes={clientes} viajes={trips} onSave={f => FacC.save(f)} onClose={() => setModal(null)} />}
       {modal?.type === "proveedor" && <ProveedorModal key={modal.data?.id || "new-prov"} proveedor={modal.data} onSave={p => PVC.save({ ...p, id: p.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "hojaViaje" && <HojaViajeModal units={units} drivers={drivers} remitentes={remitentes} onClose={() => setModal(null)} companyLogo={branding.logo} companyName={branding.nombre} />}
