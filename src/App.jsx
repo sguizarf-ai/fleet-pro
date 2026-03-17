@@ -10290,7 +10290,7 @@ export default function App() {
       const pairs = [
         [setUnits,               "fp6:units",          D_UNITS],
         [setDrivers,             "fp6:drivers",         D_DRIVERS],
-        [setDocs,                "fp6:docs",            D_DOCS],
+        // docs se cargan individualmente abajo
         [setMaints,              "fp6:maints",          D_MAINTS],
         [setFuels,               "fp6:fuels",           D_FUELS],
         [setTrips,               "fp6:trips",           D_TRIPS],
@@ -10324,6 +10324,26 @@ export default function App() {
           else setter(defaultVal);
         } catch { setter(defaultVal); }
       }));
+      // Cargar documentos individualmente (evita límite 1MB de Firestore)
+      try {
+        const ids = await fsGet("fp6:docs:ids");
+        if (Array.isArray(ids) && ids.length > 0) {
+          const items = await Promise.all(ids.map(id => fsGet("fp6:doc:" + id)));
+          const valid = items.filter(Boolean);
+          setDocs(valid.length > 0 ? valid : D_DOCS);
+        } else {
+          // Migración automática desde fp6:docs legacy
+          const legacy = await fsGet("fp6:docs");
+          if (Array.isArray(legacy) && legacy.length > 0) {
+            setDocs(legacy);
+            for (const d of legacy) await fsSet("fp6:doc:" + d.id, d);
+            await fsSet("fp6:docs:ids", legacy.map(d => d.id));
+          } else {
+            setDocs(D_DOCS);
+          }
+        }
+      } catch(e) { console.warn("docs load error:", e); setDocs(D_DOCS); }
+
       setLoading(false);
       // Escuchar cambios en tiempo real
       const unsubs = pairs.map(([setter, key]) => fsListen(key, (val) => { if (val !== null && val !== undefined) setter(val); }));
@@ -10379,7 +10399,29 @@ export default function App() {
   const DC = mkCRUD(() => dRef.current, setDrivers, "fp6:drivers");
   // DoC — CRUD de documentos (simple, igual que otros módulos)
   // Las fotos van a Cloudinary (URLs cortas), así que fp6:docs nunca supera 1MB
-  const DoC = mkCRUD(() => dcRef.current, setDocs, "fp6:docs");
+  const DoC = {
+    save: async item => {
+      const cur = dcRef.current;
+      const next = cur.find(x => x.id === item.id)
+        ? cur.map(x => x.id === item.id ? item : x)
+        : [...cur, item];
+      setDocs(next);
+      dcRef.current = next;
+      await sv("fp6:doc:" + item.id, item);
+      await sv("fp6:docs:ids", next.map(x => x.id));
+      setModal(null);
+      notify("Guardado ✓");
+    },
+    del: id => setConfirm({ msg: "¿Eliminar este documento?", onOk: async () => {
+      const next = dcRef.current.filter(x => x.id !== id);
+      setDocs(next);
+      dcRef.current = next;
+      await sv("fp6:doc:" + id, null);
+      await sv("fp6:docs:ids", next.map(x => x.id));
+      setConfirm(null);
+      notify("Eliminado");
+    }})
+  };
   const MC = mkCRUD(() => mRef.current, setMaints, "fp6:maints");
   const FC = mkCRUD(() => fRef.current, setFuels, "fp6:fuels");
   const TC = mkCRUD(() => tRef.current, setTrips, "fp6:trips");
@@ -10415,6 +10457,10 @@ export default function App() {
         [[], "fp6:tipos", setTiposPersonalizados]
       ];
       for (const [d, k, s] of pairs) { s(d); await sv(k, d); }
+      // Restaurar documentos individualmente
+      setDocs(D_DOCS);
+      for (const d of D_DOCS) await sv("fp6:doc:" + d.id, d);
+      await sv("fp6:docs:ids", D_DOCS.map(d => d.id));
       setConfirm(null); notify("Datos restaurados", "info");
     }
   });
