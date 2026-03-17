@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { fsGet, fsSet, fsListen, deleteStoragePhoto } from "./firebaseDB";
+import { fsGet, fsSet, fsSetSilent, fsListen, deleteStoragePhoto, docSave, docDelete, docsGetAll, docsListen } from "./firebaseDB";
 
 /* ═══════════════════════════════════════════════════════════════
    FLEET PRO v6.0 — Sistema Integral de Gestión de Flota
@@ -10324,20 +10324,17 @@ export default function App() {
           else setter(defaultVal);
         } catch { setter(defaultVal); }
       }));
-      // Cargar documentos individualmente (evita límite 1MB de Firestore)
+      // Cargar documentos desde colección separada (sin límite 1MB)
       try {
-        const ids = await fsGet("fp6:docs:ids");
-        if (Array.isArray(ids) && ids.length > 0) {
-          const items = await Promise.all(ids.map(id => fsGet("fp6:doc:" + id)));
-          const valid = items.filter(Boolean);
-          setDocs(valid.length > 0 ? valid : D_DOCS);
+        const items = await docsGetAll();
+        if (items && items.length > 0) {
+          setDocs(items);
         } else {
-          // Migración automática desde fp6:docs legacy
+          // Migrar desde fp6:docs legacy si existe
           const legacy = await fsGet("fp6:docs");
           if (Array.isArray(legacy) && legacy.length > 0) {
             setDocs(legacy);
-            for (const d of legacy) await fsSet("fp6:doc:" + d.id, d);
-            await fsSet("fp6:docs:ids", legacy.map(d => d.id));
+            for (const d of legacy) await docSave(d);
           } else {
             setDocs(D_DOCS);
           }
@@ -10407,19 +10404,17 @@ export default function App() {
         : [...cur, item];
       setDocs(next);
       dcRef.current = next;
-      await sv("fp6:doc:" + item.id, item);
-      await sv("fp6:docs:ids", next.map(x => x.id));
       setModal(null);
       notify("Guardado ✓");
+      await docSave(item);
     },
     del: id => setConfirm({ msg: "¿Eliminar este documento?", onOk: async () => {
       const next = dcRef.current.filter(x => x.id !== id);
       setDocs(next);
       dcRef.current = next;
-      await sv("fp6:doc:" + id, null);
-      await sv("fp6:docs:ids", next.map(x => x.id));
       setConfirm(null);
       notify("Eliminado");
+      await docDelete(id);
     }})
   };
   const MC = mkCRUD(() => mRef.current, setMaints, "fp6:maints");
@@ -10457,10 +10452,9 @@ export default function App() {
         [[], "fp6:tipos", setTiposPersonalizados]
       ];
       for (const [d, k, s] of pairs) { s(d); await sv(k, d); }
-      // Restaurar documentos individualmente
+      // Restaurar documentos
       setDocs(D_DOCS);
-      for (const d of D_DOCS) await sv("fp6:doc:" + d.id, d);
-      await sv("fp6:docs:ids", D_DOCS.map(d => d.id));
+      for (const d of D_DOCS) await docSave(d);
       setConfirm(null); notify("Datos restaurados", "info");
     }
   });

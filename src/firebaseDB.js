@@ -1,8 +1,8 @@
 // firebaseDB.js — Adaptador Firebase Firestore para Fleet Pro v6
-// Las fotos se almacenan en Cloudinary (URLs). Firestore solo guarda texto/URLs.
 import { initializeApp } from "firebase/app";
 import {
-  getFirestore, doc, getDoc, setDoc, onSnapshot
+  getFirestore, doc, getDoc, setDoc, deleteDoc,
+  collection, getDocs, onSnapshot, query
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -17,42 +17,51 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
-const COL = "config";
+const COL = "config";  // colección principal para todos los datos
+const DOCS_COL = "documents"; // colección separada para documentos (sin límite 1MB)
 
-// ── Lee una clave de Firestore ────────────────────────────────────────────────
+// ── API principal (config collection) ────────────────────────────────────────
+
 export async function fsGet(key) {
   try {
-    const ref  = doc(db, COL, key);
+    const ref = doc(db, COL, key);
     const snap = await getDoc(ref);
     if (snap.exists()) return snap.data().value ?? null;
     return null;
   } catch (e) {
-    console.warn("fsGet error:", e);
+    console.warn("fsGet error:", key, e?.message);
     return null;
   }
 }
 
-// ── Guarda una clave en Firestore ─────────────────────────────────────────────
-// Las fotos ya vienen como URLs de Cloudinary (no base64), así que
-// el tamaño del documento es mínimo y nunca supera el límite de 1MB.
 export async function fsSet(key, value) {
   try {
     const ref = doc(db, COL, key);
     await setDoc(ref, { value });
     return true;
   } catch (e) {
-    console.warn("fsSet error:", e);
+    console.warn("fsSet error:", key, e?.message);
     const msg = e?.message || "";
     if (msg.includes("exceeds") || msg.includes("size") || msg.includes("large") || e?.code === "invalid-argument") {
-      alert("⚠️ No se pudo guardar: el documento supera el límite de Firebase.\nSi subiste fotos sin conexión a Cloudinary, elimínalas e intenta de nuevo.");
+      alert("⚠️ No se pudo guardar: el documento supera el límite.\nSi hay fotos sin subir a Cloudinary, elimínalas e intenta de nuevo.");
     } else {
-      alert("⚠️ Error al guardar: " + msg + "\nRevisa tu conexión e intenta de nuevo.");
+      alert("⚠️ Error al guardar: " + msg + "\nRevisa tu conexión.");
     }
     return false;
   }
 }
 
-// ── Escucha cambios en tiempo real ────────────────────────────────────────────
+export async function fsSetSilent(key, value) {
+  try {
+    const ref = doc(db, COL, key);
+    await setDoc(ref, { value });
+    return true;
+  } catch (e) {
+    console.warn("fsSetSilent:", key, e?.message);
+    return false;
+  }
+}
+
 export function fsListen(key, callback) {
   const ref = doc(db, COL, key);
   return onSnapshot(ref, snap => {
@@ -60,11 +69,50 @@ export function fsListen(key, callback) {
   });
 }
 
-// ── deleteStoragePhoto — no-op con Cloudinary ─────────────────────────────────
-// Cloudinary no permite borrar desde el cliente sin API secret.
-// Las fotos huérfanas se pueden limpiar manualmente en cloudinary.com/console
-// o con una Cloud Function en el futuro.
+// ── API para documentos (colección separada, sin límite 1MB) ─────────────────
+
+/** Guarda un documento individual */
+export async function docSave(item) {
+  try {
+    const ref = doc(db, DOCS_COL, item.id);
+    await setDoc(ref, item);
+    return true;
+  } catch (e) {
+    console.warn("docSave error:", e?.message);
+    return false;
+  }
+}
+
+/** Elimina un documento individual */
+export async function docDelete(id) {
+  try {
+    const ref = doc(db, DOCS_COL, id);
+    await deleteDoc(ref);
+    return true;
+  } catch (e) {
+    console.warn("docDelete error:", e?.message);
+    return false;
+  }
+}
+
+/** Carga todos los documentos */
+export async function docsGetAll() {
+  try {
+    const snap = await getDocs(collection(db, DOCS_COL));
+    return snap.docs.map(d => d.data());
+  } catch (e) {
+    console.warn("docsGetAll error:", e?.message);
+    return null;
+  }
+}
+
+/** Escucha cambios en tiempo real en todos los documentos */
+export function docsListen(callback) {
+  return onSnapshot(collection(db, DOCS_COL), snap => {
+    callback(snap.docs.map(d => d.data()));
+  });
+}
+
 export async function deleteStoragePhoto(_url) {
-  // No-op: con Cloudinary no borramos desde el cliente
-  return;
+  return; // no-op con Cloudinary
 }
