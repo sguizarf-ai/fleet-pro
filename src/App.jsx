@@ -4097,12 +4097,12 @@ function Dashboard({
 
   // NUEVO: Alertas de mantenimiento por KM
   const alertasKm = units.filter(u => {
-    const kmRestantes = (u.kmUltMant + u.intervaloMant) - u.kmActual;
+    const kmRestantes = ((Number(u.kmUltMant)||0) + (Number(u.intervaloMant)||5000)) - (Number(u.kmActual)||0);
     return kmRestantes <= 500;
   }).length;
 
   const alertasKmCriticas = units.filter(u => {
-    const kmRestantes = (u.kmUltMant + u.intervaloMant) - u.kmActual;
+    const kmRestantes = ((Number(u.kmUltMant)||0) + (Number(u.intervaloMant)||5000)) - (Number(u.kmActual)||0);
     return kmRestantes <= 0;
   }).length;
 
@@ -4240,19 +4240,20 @@ function Dashboard({
               </table>;
         }
         case "mant_km": {
-          const mkm = units.filter(u => ((u.kmUltMant||0)+(u.intervaloMant||20000)) - (u.kmActual||0) <= 500)
-            .sort((a,b) => {
-              const ra = ((a.kmUltMant||0)+(a.intervaloMant||20000))-(a.kmActual||0);
-              const rb = ((b.kmUltMant||0)+(b.intervaloMant||20000))-(b.kmActual||0);
-              return ra - rb;
-            });
+          const mkm = units
+            .map(u => ({
+              ...u,
+              _prox: (Number(u.kmUltMant)||0)+(Number(u.intervaloMant)||5000),
+              _rest: ((Number(u.kmUltMant)||0)+(Number(u.intervaloMant)||5000))-(Number(u.kmActual)||0)
+            }))
+            .sort((a,b) => a._rest - b._rest);
           return mkm.length === 0
             ? <div className="empty"><div className="empty-icon">✅</div><p>Todas las unidades en orden por kilometraje</p></div>
             : <table>
                 <thead><tr><th>Unidad</th><th>Placas</th><th>KM Actual</th><th>Último Mant.</th><th>Próximo Mant.</th><th>KM Restantes</th><th>Estado</th></tr></thead>
                 <tbody>{mkm.map(u => {
-                  const prox = (u.kmUltMant||0)+(u.intervaloMant||20000);
-                  const rest = prox-(u.kmActual||0);
+                  const prox = u._prox;
+                  const rest = u._rest;
                   const critico = rest <= 0;
                   return <tr key={u.id}>
                     <td><strong>{u.num}</strong></td>
