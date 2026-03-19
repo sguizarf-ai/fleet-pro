@@ -6397,10 +6397,13 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
   const fil = proveedores.filter(p => (p.nombre + p.contacto + (p.tipoProv||"")).toLowerCase().includes(q.toLowerCase()) && (cf === "TODOS" || p.tipoProv === cf));
 
   const getStats = (pvId) => {
-    const gm = maints.filter(m => m.proveedorId === pvId).reduce((a, m) => a + (Number(m.costoRef)||0) + (Number(m.costoMO)||0), 0);
+    // Taller/MO: solo costoMO; Refacciones: solo costoRef (via proveedorRefId)
+    const gmMO  = maints.filter(m => m.proveedorId === pvId).reduce((a, m) => a + (Number(m.costoMO)||0), 0);
+    const gmRef = maints.filter(m => m.proveedorRefId === pvId).reduce((a, m) => a + (Number(m.costoRef)||0), 0);
+    const gm = gmMO + gmRef;
     const gg = gastos.filter(g => g.proveedorId === pvId).reduce((a, g) => a + (Number(g.monto)||0), 0);
     const ge = externos.filter(e => e.proveedorId === pvId).reduce((a, e) => a + (Number(e.costoPagar)||0), 0);
-    return { total: gm + gg + ge, mantenimientos: maints.filter(m => m.proveedorId === pvId).length, gastos: gastos.filter(g => g.proveedorId === pvId).length, externos: externos.filter(e => e.proveedorId === pvId).length };
+    return { total: gm + gg + ge, mantenimientos: maints.filter(m => m.proveedorId === pvId || m.proveedorRefId === pvId).length, gastos: gastos.filter(g => g.proveedorId === pvId).length, externos: externos.filter(e => e.proveedorId === pvId).length };
   };
 
   // Credit status helpers
@@ -6420,25 +6423,25 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
     // From externos (transportistas)
     ...externos.filter(e => e.pagoStatus !== "pagado" && (e.costoPagar||0) > 0).map(e => ({
       tipo: "viaje", id: e.id, label: `${e.empresa||"—"}: ${e.origen||""} → ${e.destino||""}`,
-      fecha: e.fecha, monto: e.costoPagar||0, status: e.pagoStatus||"pendiente",
+      fecha: e.fecha, monto: Number(e.costoPagar)||0, status: e.pagoStatus||"pendiente",
       proveedorId: e.proveedorId, data: e,
     })),
     // From maints - refacciones (separate proveedor)
-    ...maints.filter(m => m.pagoStatus !== "pagado" && (m.costoRef||0) > 0 && m.proveedorRefId).map(m => ({
+    ...maints.filter(m => m.pagoStatus !== "pagado" && (Number(m.costoRef)||0) > 0 && m.proveedorRefId).map(m => ({
       tipo: "mantenimiento", id: m.id+"_ref", label: `Refac: ${m.descripcion||m.tipo||"—"}`,
-      fecha: m.fecha, monto: m.costoRef||0, status: m.pagoRefStatus||"pendiente",
+      fecha: m.fecha, monto: Number(m.costoRef)||0, status: m.pagoRefStatus||"pendiente",
       proveedorId: m.proveedorRefId, data: m,
     })),
     // From maints - mano de obra / taller
-    ...maints.filter(m => m.pagoStatus !== "pagado" && (m.costoMO||0) > 0 && m.proveedorId).map(m => ({
+    ...maints.filter(m => m.pagoStatus !== "pagado" && (Number(m.costoMO)||0) > 0 && m.proveedorId).map(m => ({
       tipo: "mantenimiento", id: m.id+"_mo", label: `Taller: ${m.descripcion||m.tipo||"—"}`,
-      fecha: m.fecha, monto: m.costoMO||0, status: m.pagoMOStatus||"pendiente",
+      fecha: m.fecha, monto: Number(m.costoMO)||0, status: m.pagoMOStatus||"pendiente",
       proveedorId: m.proveedorId, data: m,
     })),
     // From gastos with pending balance
     ...gastos.filter(g => g.pagoStatus !== "pagado" && (g.monto||0) > 0 && g.proveedorId).map(g => ({
       tipo: "gasto", id: g.id, label: `Gasto: ${g.descripcion||g.tipo||"—"}`,
-      fecha: g.fecha, monto: g.monto||0, status: g.pagoStatus||"pendiente",
+      fecha: g.fecha, monto: Number(g.monto)||0, status: g.pagoStatus||"pendiente",
       proveedorId: g.proveedorId, data: g,
     })),
   ];
@@ -6618,7 +6621,7 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
       {/* ── Tab: Cuentas por Pagar — TODOS los proveedores ── */}
       {tab==="cxp" && (() => {
         const fmx = n => "$"+Number(n||0).toLocaleString("es-MX",{minimumFractionDigits:2});
-        const totalPend = allPendingPayments.reduce((a,p)=>a+p.monto,0);
+        const totalPend = allPendingPayments.reduce((a,p)=>a+(Number(p.monto)||0),0);
         const tipoIcon = t => t==="viaje"?"🚛":t==="mantenimiento"?"🔧":t==="gasto"?"💵":"📋";
         return (
           <>
