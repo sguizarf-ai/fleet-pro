@@ -4472,211 +4472,143 @@ function Dashboard({
 
       {/* CONSOLIDADO FINANCIERO - Solo Admin */}
       {isAdmin && (
-        <div className="card">
+        <div className="card" style={{overflow:"hidden"}}>
           <div className="card-hdr">
-            <h3>💰 Consolidado Financiero — Utilidades vs Costos</h3>
+            <h3>💰 Consolidado Financiero</h3>
           </div>
-          <div style={{ padding: "20px 24px" }}>
-            
-            {/* Indicadores circulares de porcentaje */}
-            <div className="percentage-card">
-              <div 
-                className="perc-circle" 
-                style={{ 
-                  background: `conic-gradient(var(--green) 0% ${percUtilidad}%, var(--bg3) ${percUtilidad}% 100%)`, 
-                  border: "4px solid var(--green)" 
-                }}
-              >
-                {percUtilidad}%
+          <div style={{padding:"20px 24px"}}>
+
+            {/* Salud financiera + KPIs principales */}
+            <div style={{display:"grid",gridTemplateColumns:"220px 1fr",gap:24,marginBottom:24,alignItems:"center"}}>
+              {/* Círculo de salud financiera */}
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
+                <div style={{position:"relative",width:160,height:160}}>
+                  <svg width="160" height="160" viewBox="0 0 160 160">
+                    <circle cx="80" cy="80" r="65" fill="none" stroke="var(--bg3)" strokeWidth="16"/>
+                    <circle cx="80" cy="80" r="65" fill="none"
+                      stroke={utilidadTotal>=0?"var(--green)":"var(--red)"}
+                      strokeWidth="16"
+                      strokeDasharray={`${Math.min(Math.abs(percUtilidad),100)*4.08} 408`}
+                      strokeDashoffset="102"
+                      strokeLinecap="round"
+                      style={{transition:"stroke-dasharray .8s ease"}}
+                    />
+                    <text x="80" y="72" textAnchor="middle" fill={utilidadTotal>=0?"var(--green)":"var(--red)"} fontSize="26" fontWeight="700" fontFamily="var(--font-hd)">{percUtilidad}%</text>
+                    <text x="80" y="92" textAnchor="middle" fill="var(--muted)" fontSize="10">Margen</text>
+                    <text x="80" y="106" textAnchor="middle" fill="var(--muted)" fontSize="10">Utilidad</text>
+                  </svg>
+                </div>
+                <div style={{textAlign:"center"}}>
+                  <div style={{fontSize:11,color:"var(--muted)"}}>Salud Financiera</div>
+                  <div style={{fontWeight:700,fontSize:13,color:utilidadTotal>=0?"var(--green)":"var(--red)"}}>
+                    {utilidadTotal>=0?"✅ Positiva":"⚠️ Negativa"}
+                  </div>
+                </div>
               </div>
-              <div className="perc-info">
-                <div className="perc-lbl">Margen de Utilidad</div>
-                <div className="perc-val" style={{ color: "var(--green)" }}>
-                  {fmt$(utilidadTotal)}
-                </div>
-                <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
-                  De {fmt$(ingresosTotal)} en ingresos totales
-                </div>
+
+              {/* KPIs en grid */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
+                {[
+                  {lbl:"Ingresos Totales",val:fmt$(ingresosTotal),c:"var(--green)",icon:"📈"},
+                  {lbl:"Costos Totales",val:fmt$(costosTotal),c:"var(--red)",icon:"📉"},
+                  {lbl:"Utilidad Neta",val:fmt$(utilidadTotal),c:utilidadTotal>=0?"var(--cyan)":"var(--orange)",icon:"💰"},
+                  {lbl:"Unidades Propias",val:fmt$(ingresosPropios),c:"var(--blue)",icon:"🚛"},
+                  {lbl:"Logística Externa",val:fmt$(ingresosExternos),c:"var(--purple)",icon:"🚚"},
+                  {lbl:"% Costos/Ingresos",val:percCostos+"%",c:percCostos>80?"var(--red)":percCostos>60?"var(--orange)":"var(--green)",icon:"📊"},
+                ].map((k,i)=>(
+                  <div key={i} style={{background:"var(--bg2)",borderRadius:10,padding:"12px 14px",border:"1px solid var(--border)"}}>
+                    <div style={{fontSize:18,marginBottom:4}}>{k.icon}</div>
+                    <div style={{fontSize:11,color:"var(--muted)",marginBottom:2}}>{k.lbl}</div>
+                    <div style={{fontWeight:700,fontSize:15,color:k.c,fontFamily:"var(--font-hd)"}}>{k.val}</div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            <div className="percentage-card">
-              <div 
-                className="perc-circle" 
-                style={{ 
-                  background: `conic-gradient(var(--red) 0% ${percCostos}%, var(--bg3) ${percCostos}% 100%)`, 
-                  border: "4px solid var(--red)" 
-                }}
-              >
-                {percCostos}%
+            {/* Barras de distribución de costos */}
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",letterSpacing:".08em",marginBottom:10}}>Distribución de Costos</div>
+              {[
+                {lbl:"Combustible",val:combustibleTotal,c:"#3B82F6",icon:"⛽"},
+                {lbl:"Mantenimiento",val:mantenimientoTotal,c:"#F97316",icon:"🔧"},
+                {lbl:"Gastos Generales",val:gastosGeneralesTotal,c:"#8B5CF6",icon:"💼"},
+                {lbl:"Depreciación",val:deprecPropios,c:"#EAB308",icon:"📉"},
+              ].map((row,i)=>{
+                const pct = costosTotal > 0 ? Math.round(row.val/costosTotal*100) : 0;
+                return (
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
+                    <div style={{width:130,display:"flex",alignItems:"center",gap:6,fontSize:12}}>
+                      <span>{row.icon}</span>
+                      <span style={{color:"var(--text)"}}>{row.lbl}</span>
+                    </div>
+                    <div style={{flex:1,background:"var(--bg3)",borderRadius:99,height:18,overflow:"hidden",position:"relative"}}>
+                      <div style={{width:pct+"%",height:"100%",background:row.c,borderRadius:99,transition:"width .6s ease",
+                        boxShadow:`0 2px 8px ${row.c}66`}}/>
+                      <span style={{position:"absolute",left:"50%",top:"50%",transform:"translate(-50%,-50%)",fontSize:10,fontWeight:700,color:"#fff",mixBlendMode:"difference"}}>{pct}%</span>
+                    </div>
+                    <div style={{width:90,textAlign:"right",fontWeight:700,fontSize:12,color:row.c,fontFamily:"var(--font-hd)"}}>{fmt$(row.val)}</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Pie chart SVG de distribución */}
+            <div style={{display:"flex",gap:24,alignItems:"center",background:"var(--bg2)",borderRadius:12,padding:"16px 20px",border:"1px solid var(--border)"}}>
+              <div style={{flexShrink:0}}>
+                {(() => {
+                  const items = [
+                    {val:combustibleTotal,c:"#3B82F6"},
+                    {val:mantenimientoTotal,c:"#F97316"},
+                    {val:gastosGeneralesTotal,c:"#8B5CF6"},
+                    {val:deprecPropios,c:"#EAB308"},
+                  ];
+                  const total = items.reduce((a,x)=>a+x.val,0)||1;
+                  let angle = -90;
+                  const slices = items.map(it=>{
+                    const deg = it.val/total*360;
+                    const r = 55, cx=70, cy=70;
+                    const a1=angle*Math.PI/180, a2=(angle+deg)*Math.PI/180;
+                    const x1=cx+r*Math.cos(a1), y1=cy+r*Math.sin(a1);
+                    const x2=cx+r*Math.cos(a2), y2=cy+r*Math.sin(a2);
+                    const lg = deg>180?1:0;
+                    const path = `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${lg},1 ${x2},${y2} Z`;
+                    angle += deg;
+                    return {path, c:it.c, val:it.val};
+                  });
+                  return (
+                    <svg width="140" height="140" viewBox="0 0 140 140">
+                      <defs>
+                        <filter id="shadow3d">
+                          <feDropShadow dx="2" dy="4" stdDeviation="3" floodOpacity="0.3"/>
+                        </filter>
+                      </defs>
+                      {slices.map((s,i)=>(
+                        <path key={i} d={s.path} fill={s.c} stroke="var(--bg1)" strokeWidth="2" filter="url(#shadow3d)" opacity="0.92"/>
+                      ))}
+                      <circle cx="70" cy="70" r="28" fill="var(--bg2)" stroke="var(--border)" strokeWidth="1"/>
+                      <text x="70" y="74" textAnchor="middle" fill="var(--text)" fontSize="9" fontWeight="700">COSTOS</text>
+                    </svg>
+                  );
+                })()}
               </div>
-              <div className="perc-info">
-                <div className="perc-lbl">Porcentaje de Costos</div>
-                <div className="perc-val" style={{ color: "var(--red)" }}>
-                  {fmt$(costosTotal)}
-                </div>
-                <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
-                  Gastos totales de operación
-                </div>
+              <div style={{flex:1,display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                {[
+                  {lbl:"Combustible",val:combustibleTotal,c:"#3B82F6"},
+                  {lbl:"Mantenimiento",val:mantenimientoTotal,c:"#F97316"},
+                  {lbl:"Gastos Grales.",val:gastosGeneralesTotal,c:"#8B5CF6"},
+                  {lbl:"Depreciación",val:deprecPropios,c:"#EAB308"},
+                ].map((it,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:8}}>
+                    <div style={{width:12,height:12,borderRadius:3,background:it.c,flexShrink:0,boxShadow:`0 2px 4px ${it.c}88`}}/>
+                    <div>
+                      <div style={{fontSize:10,color:"var(--muted)"}}>{it.lbl}</div>
+                      <div style={{fontSize:13,fontWeight:700,color:it.c}}>{fmt$(it.val)}</div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Desglose por tipo de operación */}
-            <div className="sec-lbl">Desglose por Tipo de Operación</div>
-            
-            <div className="profit-card">
-              <div className="profit-row">
-                <span className="profit-lbl">🚛 Ingresos Unidades Propias</span>
-                <span className="profit-val" style={{ color: "var(--green)" }}>
-                  {fmt$(ingresosPropios)}
-                </span>
-              </div>
-              <div className="profit-row">
-                <span className="profit-lbl">📉 Costos Unidades Propias</span>
-                <span className="profit-val" style={{ color: "var(--red)" }}>
-                  -{fmt$(costosTotalesPropios)}
-                </span>
-              </div>
-              <div className="profit-row">
-                <span className="profit-lbl">💰 Utilidad Unidades Propias</span>
-                <span className="profit-val" style={{ 
-                  color: utilidadPropios >= 0 ? "var(--green)" : "var(--red)" 
-                }}>
-                  {fmt$(utilidadPropios)}
-                </span>
-              </div>
-            </div>
-
-            <div className="profit-card">
-              <div className="profit-row">
-                <span className="profit-lbl">🚚 Ingresos Logística Externa</span>
-                <span className="profit-val" style={{ color: "var(--green)" }}>
-                  {fmt$(ingresosExternos)}
-                </span>
-              </div>
-              <div className="profit-row">
-                <span className="profit-lbl">📉 Costos Logística Externa</span>
-                <span className="profit-val" style={{ color: "var(--red)" }}>
-                  -{fmt$(costosExternos)}
-                </span>
-              </div>
-              <div className="profit-row">
-                <span className="profit-lbl">💰 Utilidad Logística Externa</span>
-                <span className="profit-val" style={{ 
-                  color: utilidadExternos >= 0 ? "var(--green)" : "var(--red)" 
-                }}>
-                  {fmt$(utilidadExternos)}
-                </span>
-              </div>
-            </div>
-
-            {/* Totales consolidados */}
-            <div className="profit-card">
-              <div className="profit-row">
-                <span className="profit-lbl">💵 INGRESOS TOTALES</span>
-                <span className="profit-val" style={{ color: "var(--green)" }}>
-                  {fmt$(ingresosTotal)}
-                </span>
-              </div>
-              <div className="profit-row">
-                <span className="profit-lbl">📉 COSTOS TOTALES</span>
-                <span className="profit-val" style={{ color: "var(--red)" }}>
-                  -{fmt$(costosTotal)}
-                </span>
-              </div>
-              <div className="profit-row">
-                <span className="profit-lbl">💰 UTILIDAD NETA TOTAL</span>
-                <span className="profit-val" style={{ 
-                  color: utilidadTotal >= 0 ? "var(--green)" : "var(--red)" 
-                }}>
-                  {fmt$(utilidadTotal)}
-                </span>
-              </div>
-            </div>
-
-            {/* Desglose detallado de costos */}
-            <div className="sec-lbl">Desglose de Costos</div>
-            <div style={{ 
-              display: "grid", 
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", 
-              gap: 12 
-            }}>
-              <div style={{ 
-                padding: "12px 16px", 
-                background: "var(--bg2)", 
-                borderRadius: 8,
-                border: "1px solid var(--border)" 
-              }}>
-                <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 4 }}>
-                  Combustible
-                </div>
-                <div style={{ 
-                  fontFamily: "var(--font-hd)", 
-                  fontSize: 18, 
-                  fontWeight: 700,
-                  color: "var(--cyan)" 
-                }}>
-                  {fmt$(totalC)}
-                </div>
-              </div>
-
-              <div style={{ 
-                padding: "12px 16px", 
-                background: "var(--bg2)", 
-                borderRadius: 8,
-                border: "1px solid var(--border)" 
-              }}>
-                <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 4 }}>
-                  Mantenimiento
-                </div>
-                <div style={{ 
-                  fontFamily: "var(--font-hd)", 
-                  fontSize: 18, 
-                  fontWeight: 700,
-                  color: "var(--orange)" 
-                }}>
-                  {fmt$(totalM)}
-                </div>
-              </div>
-
-              <div style={{ 
-                padding: "12px 16px", 
-                background: "var(--bg2)", 
-                borderRadius: 8,
-                border: "1px solid var(--border)" 
-              }}>
-                <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 4 }}>
-                  Gastos Generales
-                </div>
-                <div style={{ 
-                  fontFamily: "var(--font-hd)", 
-                  fontSize: 18, 
-                  fontWeight: 700,
-                  color: "var(--purple)" 
-                }}>
-                  {fmt$(totalG)}
-                </div>
-              </div>
-
-              <div style={{ 
-                padding: "12px 16px", 
-                background: "var(--bg2)", 
-                borderRadius: 8,
-                border: "1px solid var(--border)" 
-              }}>
-                <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 4 }}>
-                  Depreciación
-                </div>
-                <div style={{ 
-                  fontFamily: "var(--font-hd)", 
-                  fontSize: 18, 
-                  fontWeight: 700,
-                  color: "var(--yellow)" 
-                }}>
-                  {fmt$(deprecPropios)}
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       )}
@@ -6870,6 +6802,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
   const [customA,     setCustomA]     = useState("");
 
   // ── helpers ───────────────────────────────────────────────────────────────
+  const [chartQuarter, setChartQuarter] = useState(Math.floor(new Date().getMonth()/3));
   const todosAnios = [...new Set([
     ...facturas.map(f=>{ const d=toISO(f.fechaEmision); return d?new Date(d).getFullYear():null; }),
     ...gastos.map(g=>{ const d=toISO(g.fecha); return d?new Date(d).getFullYear():null; }),
@@ -7071,33 +7004,81 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
 
         {/* Gráfica ingresos vs costos 12 meses */}
         <div className="card">
-          <div className="card-hdr"><h3>📊 Ingresos vs Costos vs Facturación — {filtroAnio}</h3></div>
-          <div style={{padding:"16px 20px"}}>
-            {MESES.map((m,i)=>{
-              const d=meses12[i]; const util=d.ing-d.costos;
+          <div className="card-hdr">
+            <h3>📊 Ingresos vs Costos vs Facturación — {filtroAnio}</h3>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setChartQuarter(q=>Math.max(0,q-1))} disabled={chartQuarter===0}>◀</button>
+              <span style={{fontSize:12,fontWeight:700,color:"var(--cyan)",minWidth:100,textAlign:"center"}}>
+                {MESES.slice(chartQuarter*3,(chartQuarter+1)*3).map(m=>m.slice(0,3)).join(" · ")}
+              </span>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setChartQuarter(q=>Math.min(3,q+1))} disabled={chartQuarter===3}>▶</button>
+            </div>
+          </div>
+          <div style={{padding:"20px 24px"}}>
+            {/* 3D-style bar chart for 3 months */}
+            {MESES.slice(chartQuarter*3,(chartQuarter+1)*3).map((m,qi)=>{
+              const i = chartQuarter*3+qi;
+              const d = meses12[i];
+              const util = d.ing - d.costos;
+              const maxV = Math.max(d.ing, d.costos, d.fact, 1);
+              const bars = [
+                {val:d.ing,  c:"#22c55e", label:"Ingresos",   icon:"📈"},
+                {val:d.costos,c:"#ef4444",label:"Costos",     icon:"📉"},
+                {val:Math.abs(util), c:util>=0?"#06b6d4":"#f97316", label:(util>=0?"":"−")+"Utilidad", icon:"💰"},
+                {val:d.fact, c:"#eab308", label:"Facturado",  icon:"🧾"},
+              ];
               return (
-                <div key={m} style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:10}}>
-                  <div style={{width:28,fontSize:9,color:"var(--muted)",fontWeight:700,paddingTop:2}}>{m.slice(0,3)}</div>
-                  <div style={{flex:1,display:"flex",flexDirection:"column",gap:3}}>
-                    {[
-                      [d.ing,"var(--green)","Ingresos"],
-                      [d.costos,"var(--red)","Costos"],
-                      [Math.abs(util),util>=0?"var(--cyan)":"var(--orange)",(util>=0?"":"−")+"Utilidad"],
-                      [d.fact,"var(--yellow)","Facturado"],
-                    ].map(([v,c,nm],j)=>(
-                      <div key={j} style={{display:"flex",alignItems:"center",gap:6}}>
-                        <div style={{width:64,fontSize:9,color:c}}>{nm}</div>
-                        <HBar v={v} max={maxBar} c={c} h={9}/>
-                        <div style={{width:82,textAlign:"right",fontSize:9,fontWeight:700,color:c}}>{v>0?fmt$(v):"—"}</div>
-                      </div>
-                    ))}
+                <div key={m} style={{marginBottom:28}}>
+                  <div style={{fontSize:13,fontWeight:700,color:"var(--text)",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{background:"var(--cyan)",color:"#fff",borderRadius:6,padding:"2px 10px",fontSize:11}}>{m}</span>
+                    <span style={{fontSize:11,color:"var(--muted)"}}>
+                      Utilidad: <span style={{color:util>=0?"var(--green)":"var(--red)",fontWeight:700}}>{util>=0?"":"-"}{fmt$(Math.abs(util))}</span>
+                    </span>
+                  </div>
+                  <div style={{display:"flex",gap:16,alignItems:"flex-end",height:120,padding:"0 8px"}}>
+                    {bars.map((b,j)=>{
+                      const h = Math.round(b.val/maxV*100);
+                      return (
+                        <div key={j} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                          <div style={{fontSize:10,fontWeight:700,color:b.c}}>{b.val>0?fmt$(b.val):"—"}</div>
+                          <div style={{width:"100%",position:"relative",height:100,display:"flex",alignItems:"flex-end"}}>
+                            {/* 3D effect */}
+                            <div style={{
+                              width:"100%",height:h+"%",background:`linear-gradient(180deg,${b.c}dd,${b.c}88)`,
+                              borderRadius:"6px 6px 0 0",position:"relative",
+                              boxShadow:`0 -4px 12px ${b.c}44, inset 0 1px 0 rgba(255,255,255,0.3)`,
+                              transition:"height .5s ease",
+                            }}>
+                              {/* 3D top face */}
+                              <div style={{
+                                position:"absolute",top:-6,left:"8%",right:"-8%",height:12,
+                                background:`linear-gradient(180deg,${b.c},${b.c}bb)`,
+                                borderRadius:"4px 8px 4px 0",transform:"skewX(40deg)",
+                                boxShadow:`2px -2px 4px ${b.c}66`
+                              }}/>
+                              {/* 3D right face */}
+                              <div style={{
+                                position:"absolute",top:-6,right:"-8%",width:"8%",bottom:0,
+                                background:`linear-gradient(90deg,${b.c}88,${b.c}44)`,
+                                transform:"skewY(-50deg)",transformOrigin:"top right"
+                              }}/>
+                            </div>
+                          </div>
+                          <div style={{fontSize:9,color:"var(--muted)",textAlign:"center"}}>{b.icon} {b.label}</div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
             })}
-            <div style={{display:"flex",gap:14,marginTop:4,paddingLeft:36,flexWrap:"wrap"}}>
-              {[["💵 Ingresos","var(--green)"],["📉 Costos","var(--red)"],["💰 Utilidad","var(--cyan)"],["🧾 Facturado","var(--yellow)"]].map(([l,c])=>(
-                <span key={l} style={{fontSize:11,color:c,fontWeight:600}}>{l}</span>
+            {/* Leyenda */}
+            <div style={{display:"flex",gap:16,marginTop:8,flexWrap:"wrap",justifyContent:"center"}}>
+              {[["📈 Ingresos","#22c55e"],["📉 Costos","#ef4444"],["💰 Utilidad","#06b6d4"],["🧾 Facturado","#eab308"]].map(([l,c])=>(
+                <span key={l} style={{fontSize:11,color:c,fontWeight:600,display:"flex",alignItems:"center",gap:4}}>
+                  <span style={{width:10,height:10,background:c,borderRadius:2,display:"inline-block",boxShadow:`0 2px 4px ${c}88`}}/>
+                  {l}
+                </span>
               ))}
             </div>
           </div>
