@@ -1328,10 +1328,12 @@ function DocModal({ doc, units, drivers, onSave, onClose }) {
 
 
 function MaintModal({ maint, units, proveedores, onSave, onClose }) {
-  const [f, setF] = useState(maint || { unidadId: "", tipo: "PREVENTIVO", desc: "", prioridad: "MEDIA", fechaProg: "", fechaEjec: "", realizado: "NO", proveedorId: "", taller: "", km: "", costoRef: 0, costoMO: 0, obs: "" });
+  const [f, setF] = useState(maint || { unidadId: "", tipo: "PREVENTIVO", desc: "", prioridad: "MEDIA", fechaProg: "", fechaEjec: "", realizado: "NO", proveedorId: "", proveedorRefId: "", taller: "", km: "", costoRef: 0, costoMO: 0, obs: "" });
   const [uploading, setUploading] = useState(false);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const provs = (proveedores || []).filter(p => ["Talleres","Mano de Obra","Refacciones"].includes(p.categoria));
+  const provsRef = (proveedores || []).filter(p => ["Refacciones"].includes(p.categoria));
+  const provsTaller = (proveedores || []).filter(p => ["Talleres","Mano de Obra"].includes(p.categoria));
   const selectedProv = provs.find(p => p.id === f.proveedorId);
   const ok = (_e) => { if (!f.unidadId || !f.desc) return alert("Unidad y descripción requeridos"); onSave({ ...f, id: f.id || uid() }) };
   return (
@@ -1348,26 +1350,22 @@ function MaintModal({ maint, units, proveedores, onSave, onClose }) {
             <div className="field"><label>F. Ejecución</label><DatePicker value={f.fechaEjec} onChange={v=>setF(p=>({...p,fechaEjec:v}))} /></div>
             <div className="field"><label>Realizado</label><select value={f.realizado} onChange={ch("realizado")}><option>NO</option><option>SI</option></select></div>
             <div className="field"><label>KM Servicio</label><input value={f.km} onChange={ch("km")} type="number" /></div>
-            <div className="field s2">
-              <label>Proveedor / Taller</label>
-              <select value={f.proveedorId} onChange={e => { const id = e.target.value; const pv = provs.find(p => p.id === id); setF(prev => ({ ...prev, proveedorId: id, taller: pv ? pv.nombre : prev.taller })) }}>
+            <div className="field">
+              <label>🔧 Proveedor Refacciones</label>
+              <select value={f.proveedorRefId||""} onChange={e => { const id = e.target.value; const pv = provsRef.find(p => p.id === id); setF(prev => ({ ...prev, proveedorRefId: id })) }}>
                 <option value="">— Sin vincular —</option>
-                {provs.map(p => <option key={p.id} value={p.id}>{p.nombre} ({p.categoria})</option>)}
+                {provsRef.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label>🏪 Proveedor Taller / M.O.</label>
+              <select value={f.proveedorId||""} onChange={e => { const id = e.target.value; const pv = provsTaller.find(p => p.id === id); setF(prev => ({ ...prev, proveedorId: id, taller: pv ? pv.nombre : prev.taller })) }}>
+                <option value="">— Sin vincular —</option>
+                {provsTaller.map(p => <option key={p.id} value={p.id}>{p.nombre} ({p.categoria})</option>)}
               </select>
             </div>
             {!f.proveedorId && (
-              <div className="field s2"><label>Nombre Taller / Proveedor (manual)</label><input value={f.taller} onChange={ch("taller")} placeholder="Nombre del taller o proveedor" /></div>
-            )}
-            {selectedProv && (
-              <div className="field s2">
-                <div style={{ padding: "10px 14px", background: "#E8F5FA", borderRadius: 8, fontSize: 11, border: "1px solid #B3E0F2" }}>
-                  <strong style={{ color: "var(--cyan)" }}>🏪 {selectedProv.nombre}</strong>
-                  <div style={{ marginTop: 4, color: "var(--muted)" }}>
-                    {selectedProv.contacto && <span>Contacto: {selectedProv.contacto} · </span>}
-                    {selectedProv.tel && <span>Tel: {selectedProv.tel}</span>}
-                  </div>
-                </div>
-              </div>
+              <div className="field s2"><label>Nombre Taller (manual)</label><input value={f.taller} onChange={ch("taller")} placeholder="Nombre del taller" /></div>
             )}
             <div className="field"><label>Costo Refac. ($)</label><input value={f.costoRef} onChange={ch("costoRef")} type="number" /></div>
             <div className="field"><label>Costo M.O. ($)</label><input value={f.costoMO} onChange={ch("costoMO")} type="number" /></div>
@@ -6142,7 +6140,7 @@ function NominaPage({ drivers, units, trips, onOpenNomina, nominasAdmin = [], on
                           <td style={{fontWeight:700,color:"var(--green)"}}>{s.comisionCalc > 0 ? fmt$(s.comisionCalc) : <span style={{color:"var(--muted)"}}>—</span>}</td>
                           <td style={{fontFamily:"var(--font-hd)",fontSize:15,fontWeight:700,color:"var(--orange)"}}>{fmt$(totalEst)}</td>
                           <td><Bdg c={d.status==="ACTIVO"?"bg":d.status==="VACACIONES"?"by":"bm"} t={d.status}/></td>
-                          <td><div className="acts"><button className="btn btn-cyan btn-sm" onClick={e=>{e.stopPropagation();setSelectorNomina({tipo:"operador",presel:d.id});}}>💵 Nómina</button></div></td>
+                          <td><div className="acts"><button className="btn btn-cyan btn-sm" onClick={e=>{e.stopPropagation();setSelectorNomina({tipo:"operador",presel:d.id});}}>💵 Nómina</button><button className="btn btn-ghost btn-xs" onClick={e=>{e.stopPropagation();onOpenNomina(d);}}>✏️</button></div></td>
                         </tr>
                       );
                     })}</tbody>
@@ -6425,10 +6423,16 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
       fecha: e.fecha, monto: e.costoPagar||0, status: e.pagoStatus||"pendiente",
       proveedorId: e.proveedorId, data: e,
     })),
-    // From maints with pending balance
-    ...maints.filter(m => m.pagoStatus !== "pagado" && ((m.costoRef||0)+(m.costoMO||0)) > 0 && m.proveedorId).map(m => ({
-      tipo: "mantenimiento", id: m.id, label: `Mant: ${m.descripcion||m.tipo||"—"}`,
-      fecha: m.fecha, monto: (m.costoRef||0)+(m.costoMO||0), status: m.pagoStatus||"pendiente",
+    // From maints - refacciones (separate proveedor)
+    ...maints.filter(m => m.pagoStatus !== "pagado" && (m.costoRef||0) > 0 && m.proveedorRefId).map(m => ({
+      tipo: "mantenimiento", id: m.id+"_ref", label: `Refac: ${m.descripcion||m.tipo||"—"}`,
+      fecha: m.fecha, monto: m.costoRef||0, status: m.pagoRefStatus||"pendiente",
+      proveedorId: m.proveedorRefId, data: m,
+    })),
+    // From maints - mano de obra / taller
+    ...maints.filter(m => m.pagoStatus !== "pagado" && (m.costoMO||0) > 0 && m.proveedorId).map(m => ({
+      tipo: "mantenimiento", id: m.id+"_mo", label: `Taller: ${m.descripcion||m.tipo||"—"}`,
+      fecha: m.fecha, monto: m.costoMO||0, status: m.pagoMOStatus||"pendiente",
       proveedorId: m.proveedorId, data: m,
     })),
     // From gastos with pending balance
@@ -9565,12 +9569,18 @@ ${c.notasImportantes&&c.notasImportantes.length>0 ? `
 </html>`;
 
   const handleImprimir = () => {
-    const w = window.open("","_blank","width=900,height=750");
-    if (!w) { alert("El navegador bloqueó la ventana emergente. Permite pop-ups para fleet-pro.vercel.app"); return; }
-    w.document.write(htmlContent());
-    w.document.close();
-    // Esperar a que cargue el DOM (incluyendo logo en base64) antes de imprimir
-    w.addEventListener("load", () => setTimeout(() => w.print(), 400));
+    const html = htmlContent();
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    // En móvil: abrir en nueva pestaña (Safari puede guardarlo como PDF)
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
   };
 
 
@@ -9724,7 +9734,7 @@ const AYUDA_DATA = [
     color: "var(--yellow)",
     preguntas: [
       { q: "¿Cómo programo un mantenimiento?",
-        a: "Ve a Control → Mantenimientos → '➕ Nuevo'. Selecciona la unidad, tipo de servicio (preventivo/correctivo), fecha programada y proveedor. Cuando se realice, cambia el status a COMPLETADO e ingresa el costo real." },
+        a: "Ve a Control → Mantenimientos → '➕ Nuevo'. Selecciona la unidad, tipo de servicio (preventivo/correctivo), fecha programada. Puedes vincular dos proveedores: uno para Refacciones (costo de partes) y otro para el Taller/Mano de Obra. Ambos generan su cuenta por pagar en Proveedores." },
       { q: "¿Cómo sé qué unidades necesitan mantenimiento pronto?",
         a: "El Dashboard muestra alertas de mantenimientos próximos. En el módulo Alertas (🔔 en el sidebar) verás todas las unidades con mantenimiento vencido o por vencer." },
       { q: "¿Cómo funciona el seguimiento por KM?",
@@ -9742,7 +9752,7 @@ const AYUDA_DATA = [
       { q: "¿Con cuántos días de anticipación me avisa el sistema?",
         a: "Las alertas se activan 30 días antes del vencimiento. Aparecen en el módulo Alertas, en el Dashboard y en el badge de la campana en el sidebar." },
       { q: "¿Puedo subir fotos de los documentos?",
-        a: "Sí. Cada documento puede tener múltiples fotos (frente y reverso de licencia, póliza, etc.). Al agregar o editar un documento, usa el campo de fotos para subirlas desde tu dispositivo. Las fotos se comprimen automáticamente antes de guardarse." },
+        a: "Sí. Cada documento puede tener múltiples fotos (frente y reverso de licencia, póliza, etc.). Al agregar o editar un documento, usa el campo de fotos para subirlas desde tu dispositivo. Las fotos se suben automáticamente a Cloudinary para que estén disponibles desde cualquier dispositivo." },
       { q: "¿Cómo selecciono documentos para enviar por WhatsApp?",
         a: "En el módulo Documentos, haz clic sobre cualquier tarjeta para seleccionarla (se marca con un borde azul y ✓). Puedes seleccionar varios documentos de distintas unidades. También hay un botón '☐ Seleccionar todos' por unidad. Una vez seleccionados, aparece la barra azul con el botón '📲 Enviar por WhatsApp'." },
       { q: "¿Cómo envío las fotos de los documentos por WhatsApp?",
@@ -9802,7 +9812,7 @@ const AYUDA_DATA = [
     color: "var(--cyan)",
     preguntas: [
       { q: "¿Cómo funciona la nómina de operadores?",
-        a: "Ve a Finanzas → Nóminas → pestaña Operadores. Haz clic en un conductor para generar su recibo. El sistema calcula sueldo base más comisión por viajes completados (según % configurado en el perfil). Puedes editar los montos antes de imprimir." },
+        a: "Ve a Finanzas → Nóminas → pestaña Operadores. Haz clic en '💵 Nómina' para generar el recibo de un operador, o en '✏️' para editarlo directamente. El sistema calcula sueldo base más comisión por viajes completados (según % configurado en el perfil). Puedes editar los montos antes de imprimir." },
       { q: "¿Qué es la nómina administrativa?",
         a: "Es para personal de oficina: secretarias, gerentes, supervisores, contadores, etc. No tiene cálculo de viajes ni comisiones, solo sueldo base, bonos y deducciones. Se gestiona en Finanzas → Nóminas → pestaña Administrativos." },
       { q: "¿Cómo agrego personal administrativo?",
@@ -9841,8 +9851,8 @@ const AYUDA_DATA = [
         a: "Ve a GPS en Vivo en el sidebar. Haz clic en '⚙️ Configurar Traccar'. Necesitas una cuenta en Traccar (traccar.org) o un servidor propio. Ingresa la URL, usuario y contraseña de tu servidor Traccar." },
       { q: "¿Qué información muestra el módulo GPS?",
         a: "Muestra la posición en tiempo real de cada dispositivo GPS registrado en Traccar, velocidad actual, última actualización y el mapa con las posiciones." },
-      { q: "¿Traccar es gratis?",
-        a: "Traccar es una plataforma open source. Puedes usar el servidor público traccar.org gratis con limitaciones, o instalar tu propio servidor en un VPS para mayor privacidad y control." },
+      { q: "¿Qué dispositivos GPS son compatibles?",
+        a: "El módulo es compatible con cualquier dispositivo que reporte a un servidor Traccar: GPS de vehículos, trackers OBD, apps móviles con Traccar Client, y más de 200 modelos de distintas marcas. Consulta a tu proveedor Fleet Pro para recomendaciones de hardware según tu flota." },
     ]
   },
   {
