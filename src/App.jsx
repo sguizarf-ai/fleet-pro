@@ -4529,9 +4529,9 @@ function Dashboard({
             <div style={{marginBottom:16}}>
               <div style={{fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",letterSpacing:".08em",marginBottom:10}}>Distribución de Costos</div>
               {[
-                {lbl:"Combustible",val:combustibleTotal,c:"#3B82F6",icon:"⛽"},
-                {lbl:"Mantenimiento",val:mantenimientoTotal,c:"#F97316",icon:"🔧"},
-                {lbl:"Gastos Generales",val:gastosGeneralesTotal,c:"#8B5CF6",icon:"💼"},
+                {lbl:"Combustible",val:totalC,c:"#3B82F6",icon:"⛽"},
+                {lbl:"Mantenimiento",val:totalM,c:"#F97316",icon:"🔧"},
+                {lbl:"Gastos Generales",val:totalG,c:"#8B5CF6",icon:"💼"},
                 {lbl:"Depreciación",val:deprecPropios,c:"#EAB308",icon:"📉"},
               ].map((row,i)=>{
                 const pct = costosTotal > 0 ? Math.round(row.val/costosTotal*100) : 0;
@@ -4557,9 +4557,9 @@ function Dashboard({
               <div style={{flexShrink:0}}>
                 {(() => {
                   const items = [
-                    {val:combustibleTotal,c:"#3B82F6"},
-                    {val:mantenimientoTotal,c:"#F97316"},
-                    {val:gastosGeneralesTotal,c:"#8B5CF6"},
+                    {val:totalC,c:"#3B82F6"},
+                    {val:totalM,c:"#F97316"},
+                    {val:totalG,c:"#8B5CF6"},
                     {val:deprecPropios,c:"#EAB308"},
                   ];
                   const total = items.reduce((a,x)=>a+x.val,0)||1;
@@ -4593,9 +4593,9 @@ function Dashboard({
               </div>
               <div style={{flex:1,display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                 {[
-                  {lbl:"Combustible",val:combustibleTotal,c:"#3B82F6"},
-                  {lbl:"Mantenimiento",val:mantenimientoTotal,c:"#F97316"},
-                  {lbl:"Gastos Grales.",val:gastosGeneralesTotal,c:"#8B5CF6"},
+                  {lbl:"Combustible",val:totalC,c:"#3B82F6"},
+                  {lbl:"Mantenimiento",val:totalM,c:"#F97316"},
+                  {lbl:"Gastos Grales.",val:totalG,c:"#8B5CF6"},
                   {lbl:"Depreciación",val:deprecPropios,c:"#EAB308"},
                 ].map((it,i)=>(
                   <div key={i} style={{display:"flex",alignItems:"center",gap:8}}>
