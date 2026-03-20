@@ -3856,13 +3856,8 @@ function printUnitSheet({ unit, driver, docs, maints, fuels, trips, showFinancia
     <div class="grid">
       <div class="field"><label>KM Actual</label>${fmtN(unit.kmActual)} km</div>
       <div class="field"><label>KM Último Mant.</label>${fmtN(unit.kmUltMant)} km</div>
-      <div class="field"><label>KM desde último mant.</label>${fmtN((Number(unit.kmActual)||0)-(Number(unit.kmUltMant)||0))} km</div>
-      <div class="field"><label>Intervalo Mant.</label>${fmtN(unit.intervaloMant||5000)} km</div>
-      <div class="field" style="background:${(()=>{const r=(Number(unit.kmUltMant)||0)+(Number(unit.intervaloMant)||5000)-(Number(unit.kmActual)||0);return r<=0?'#FFE5E5':r<=500?'#FFF3E0':'#E8F5EA';})()}">
-        <label>KM Faltantes para Próx. Mant.</label>
-        ${(()=>{const r=(Number(unit.kmUltMant)||0)+(Number(unit.intervaloMant)||5000)-(Number(unit.kmActual)||0);return r<=0?'<span style="color:#C62828;font-weight:700">⚠️ VENCIDO — excedido por '+fmtN(Math.abs(r))+' km</span>':'<span style="color:'+(r<=500?'#E65100':'#2E7D32')+';font-weight:700">'+fmtN(r)+' km restantes</span>';})()}
-      </div>
-      <div class="field"><label>Próx. Mant. a KM Total</label>${fmtN((Number(unit.kmUltMant)||0)+(Number(unit.intervaloMant)||5000))} km</div>
+      <div class="field"><label>KM desde último mant.</label>${fmtN((Number(unit.kmActual) || 0) - (Number(unit.kmUltMant) || 0))} km</div>
+      <div class="field"><label>Próx. Mantenimiento</label>${unit.proxMant || "—"}</div>
     </div>
     <h2>📄 Documentos</h2>
     <table><thead><tr><th>Documento</th><th>Número</th><th>Empresa</th><th>Vence</th><th>Estado</th></tr></thead><tbody>
@@ -6792,257 +6787,6 @@ function FuelPage({ units, fuels, onAdd, onEdit, onDelete }) {
 // ════════════════════════════════════════════════════════════════════════════
 //  CHARTS PAGE v6  —  10 vistas de análisis
 // ════════════════════════════════════════════════════════════════════════════
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ALMACÉN — Control de Inventario, Refacciones y Herramientas
-// ══════════════════════════════════════════════════════════════════════════════
-
-const ALMACEN_CATS = ["Refacciones","Herramientas","Lubricantes","Filtros","Llantas","Eléctrico","Consumibles","Seguridad","Otro"];
-const ALMACEN_UNIDADES = ["pieza","litro","galón","kit","par","juego","caja","metro"];
-
-function AlmacenModal({ item, onSave, onClose }) {
-  const [f, setF] = useState(item || {
-    nombre:"", categoria:ALMACEN_CATS[0], marca:"", numParte:"",
-    unidad:"pieza", stockMin:1, stockActual:0, ubicacion:"",
-    precio:0, proveedor:"", notas:"", foto:"",
-  });
-  const [uploading, setUploading] = useState(false);
-  const ch = k => e => setF(p=>({...p,[k]:e.target.value}));
-  const ok = () => {
-    if (!f.nombre) return alert("Nombre requerido");
-    onSave({...f, id: f.id||uid()});
-  };
-  return (
-    <div className="modal-ov" onClick={onClose}>
-      <div className="modal wide" onClick={e=>e.stopPropagation()}>
-        <div className="mhdr">
-          <h3>{f.id?"✏️ Editar Artículo":"📦 Nuevo Artículo"}</h3>
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
-        </div>
-        <div className="mbody">
-          <div className="fg">
-            <PhotoInput value={f.foto} onChange={v=>setF(p=>({...p,foto:v}))} onUploading={setUploading} label="Foto del Artículo"/>
-            <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              <div className="field s2"><label>Nombre *</label><input value={f.nombre} onChange={ch("nombre")} placeholder="Ej: Filtro de aceite Wix 51334"/></div>
-              <div className="fg">
-                <div className="field"><label>Categoría</label>
-                  <select value={ALMACEN_CATS.includes(f.categoria)?f.categoria:"__otro__"}
-                    onChange={e=>setF(p=>({...p,categoria:e.target.value==="__otro__"?"":e.target.value}))}>
-                    {ALMACEN_CATS.map(cat=><option key={cat} value={cat}>{cat}</option>)}
-                    <option value="__otro__">+ Otra categoría...</option>
-                  </select>
-                  {!ALMACEN_CATS.includes(f.categoria)&&(
-                    <input value={f.categoria} onChange={ch("categoria")} placeholder="Escribe la categoría" style={{marginTop:4}}/>
-                  )}
-                </div>
-                <div className="field"><label>Marca</label><input value={f.marca} onChange={ch("marca")} placeholder="Ej: Wix, Mobil, SKF"/></div>
-              </div>
-            </div>
-            <div className="field"><label>No. Parte / SKU</label><input value={f.numParte} onChange={ch("numParte")} placeholder="Ej: WIX-51334"/></div>
-            <div className="field"><label>Unidad</label>
-              <select value={f.unidad} onChange={ch("unidad")}>
-                {ALMACEN_UNIDADES.map(u=><option key={u}>{u}</option>)}
-              </select>
-            </div>
-            <div className="field"><label>Stock Actual</label><input value={f.stockActual} onChange={ch("stockActual")} type="number" min="0"/></div>
-            <div className="field"><label>Stock Mínimo</label><input value={f.stockMin} onChange={ch("stockMin")} type="number" min="0"/></div>
-            <div className="field"><label>Precio Unitario ($) <span style={{fontSize:10,color:"var(--muted)",fontWeight:400}}>(referencia)</span></label><input value={f.precio} onChange={ch("precio")} type="number" min="0" placeholder="Solo referencia, no afecta finanzas"/></div>
-            <div className="field"><label>Ubicación / Rack</label><input value={f.ubicacion} onChange={ch("ubicacion")} placeholder="Ej: Estante A-3"/></div>
-            <div className="field"><label>Proveedor habitual</label><input value={f.proveedor} onChange={ch("proveedor")} placeholder="Ej: Autozone"/></div>
-            <div className="field s2"><label>Notas</label><textarea value={f.notas} onChange={ch("notas")} rows={2}/></div>
-          </div>
-        </div>
-        <div className="mftr">
-          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-cyan" onClick={ok} disabled={uploading}>{uploading?"⏳ Subiendo...":"💾 Guardar"}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MovimientoModal({ item, almacen, onSave, onClose }) {
-  const [f, setF] = useState({
-    articuloId: item?.id||"", tipo:"salida", cantidad:1, motivo:"",
-    fecha: new Date().toLocaleDateString("es-MX",{day:"2-digit",month:"2-digit",year:"numeric"}).split("/").join("/"),
-    ref:"",
-  });
-  const ch = k => e => setF(p=>({...p,[k]:e.target.value}));
-  const art = almacen.find(a=>a.id===f.articuloId);
-  const ok = () => {
-    if (!f.articuloId) return alert("Selecciona un artículo");
-    if (!f.cantidad||f.cantidad<=0) return alert("Cantidad inválida");
-    onSave({...f, id:uid()});
-  };
-  return (
-    <div className="modal-ov" onClick={onClose}>
-      <div className="modal" onClick={e=>e.stopPropagation()}>
-        <div className="mhdr">
-          <h3>📋 Registrar Movimiento</h3>
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
-        </div>
-        <div className="mbody">
-          <div className="fg">
-            <div className="field s2"><label>Artículo *</label>
-              <select value={f.articuloId} onChange={ch("articuloId")}>
-                <option value="">— Seleccionar —</option>
-                {almacen.map(a=><option key={a.id} value={a.id}>{a.nombre} (Stock: {a.stockActual} {a.unidad})</option>)}
-              </select>
-            </div>
-            <div className="field"><label>Tipo</label>
-              <select value={f.tipo} onChange={ch("tipo")}>
-                <option value="entrada">📥 Entrada (compra/recepción)</option>
-                <option value="salida">📤 Salida (uso en mant.)</option>
-                <option value="ajuste">🔧 Ajuste de inventario</option>
-              </select>
-              {f.tipo==="entrada"&&<div style={{fontSize:10,color:"var(--cyan)",marginTop:4,padding:"4px 8px",background:"rgba(0,153,204,.1)",borderRadius:6}}>
-                💡 Para registrar el gasto financiero, agrégalo también en <strong>Gastos Generales</strong>
-              </div>}
-            </div>
-            <div className="field"><label>Cantidad</label><input value={f.cantidad} onChange={ch("cantidad")} type="number" min="1"/></div>
-            <div className="field s2"><label>Motivo / Referencia</label><input value={f.motivo} onChange={ch("motivo")} placeholder="Ej: Mant. unidad 003, Compra factura #123"/></div>
-            <div className="field">
-              <label>Fecha</label>
-              <DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))}/>
-            </div>
-            {art&&<div className="field s2" style={{background:"var(--bg2)",borderRadius:8,padding:"10px 12px",border:"1px solid var(--border)"}}>
-              <div style={{fontSize:11,color:"var(--muted)"}}>Stock actual: <strong>{art.stockActual} {art.unidad}</strong></div>
-              <div style={{fontSize:11,color:"var(--muted)"}}>Tras movimiento: <strong style={{color:f.tipo==="entrada"?"var(--green)":"var(--orange)"}}>{f.tipo==="entrada"?Number(art.stockActual)+Number(f.cantidad||0):Number(art.stockActual)-Number(f.cantidad||0)} {art.unidad}</strong></div>
-            </div>}
-          </div>
-        </div>
-        <div className="mftr">
-          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-cyan" onClick={ok}>💾 Registrar</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AlmacenPage({ almacen, isAdmin, onAdd, onEdit, onDelete }) {
-  const [q, setQ] = useState("");
-  const [catF, setCatF] = useState("TODOS");
-  const [movModal, setMovModal] = useState(null);
-  const [movimientos, setMovimientos] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("fp6:movimientos")||"[]"); } catch { return []; }
-  });
-
-  const saveMovimiento = (mov) => {
-    // Update stock
-    const updated = almacen.map(a => {
-      if (a.id !== mov.articuloId) return a;
-      const delta = mov.tipo==="entrada" ? Number(mov.cantidad) : -Number(mov.cantidad);
-      return {...a, stockActual: Math.max(0, (Number(a.stockActual)||0) + delta)};
-    });
-    // Save updated item
-    const art = updated.find(a=>a.id===mov.articuloId);
-    if (art && onEdit) onEdit(art);
-    // Save movimiento locally
-    const newMovs = [...movimientos, mov];
-    setMovimientos(newMovs);
-    try { localStorage.setItem("fp6:movimientos", JSON.stringify(newMovs)); } catch {}
-    setMovModal(null);
-  };
-
-  const fil = almacen.filter(a =>
-    a.nombre?.toLowerCase().includes(q.toLowerCase()) &&
-    (catF==="TODOS" || a.categoria===catF)
-  );
-
-  const stockBajo = almacen.filter(a=>(Number(a.stockActual)||0)<=(Number(a.stockMin)||1)).length;
-  const totalItems = almacen.length;
-  const valorTotal = almacen.reduce((s,a)=>(s+(Number(a.stockActual)||0)*(Number(a.precio)||0)),0);
-
-  return (
-    <div>
-      {/* KPIs */}
-      <div className="stats" style={{marginBottom:18}}>
-        <div className="stat" style={{"--c":"var(--cyan)"}}><div className="stat-icon">📦</div><div className="stat-val">{totalItems}</div><div className="stat-lbl">Artículos</div></div>
-        <div className="stat" style={{"--c":stockBajo>0?"var(--red)":"var(--green)"}}><div className="stat-icon">⚠️</div><div className="stat-val">{stockBajo}</div><div className="stat-lbl">Stock Bajo</div></div>
-        <div className="stat" style={{"--c":"var(--orange)"}}><div className="stat-icon">💰</div><div className="stat-val sm">{fmt$(valorTotal)}</div><div className="stat-lbl">Valor Inventario</div></div>
-        <div className="stat" style={{"--c":"var(--purple)"}}><div className="stat-icon">📋</div><div className="stat-val">{movimientos.length}</div><div className="stat-lbl">Movimientos</div></div>
-      </div>
-
-      <div className="card">
-        <div className="card-hdr">
-          <h3>📦 Almacén ({fil.length})</h3>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            <button className="btn btn-ghost btn-sm" onClick={()=>setMovModal({})}>📋 Registrar Movimiento</button>
-            {isAdmin&&onAdd&&<button className="btn btn-cyan btn-sm" onClick={onAdd}>➕ Nuevo Artículo</button>}
-          </div>
-        </div>
-        <div style={{padding:"12px 16px",display:"flex",gap:10,flexWrap:"wrap",borderBottom:"1px solid var(--border)"}}>
-          <input className="search" value={q} onChange={e=>setQ(e.target.value)} placeholder="🔍 Buscar..."/>
-          <select className="btn btn-ghost btn-sm" value={catF} onChange={e=>setCatF(e.target.value)} style={{padding:"6px 10px"}}>
-            <option value="TODOS">Todas las categorías</option>
-            {ALMACEN_CATS.map(cat=><option key={cat}>{cat}</option>)}
-          </select>
-        </div>
-
-        {fil.length===0
-          ? <div className="empty"><div className="empty-icon">📦</div><p>Sin artículos registrados</p></div>
-          : <div style={{padding:"12px 16px",display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:12}}>
-            {fil.map(a => {
-              const stockOk = (Number(a.stockActual)||0) > (Number(a.stockMin)||1);
-              const stockCrit = (Number(a.stockActual)||0) === 0;
-              return (
-                <div key={a.id} style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden",background:"var(--bg1)",
-                  borderLeft:`4px solid ${stockCrit?"var(--red)":stockOk?"var(--green)":"var(--yellow)"}`}}>
-                  <div style={{display:"flex",gap:10,padding:"10px 12px"}}>
-                    {a.foto
-                      ? <img src={a.foto} style={{width:60,height:60,objectFit:"cover",borderRadius:8,flexShrink:0}} alt=""/>
-                      : <div style={{width:60,height:60,background:"var(--bg3)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,flexShrink:0}}>📦</div>
-                    }
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontWeight:700,fontSize:13,marginBottom:2}}>{a.nombre}</div>
-                      <div style={{fontSize:11,color:"var(--muted)",marginBottom:4}}>{a.categoria}{a.marca?" · "+a.marca:""}{a.numParte?" · "+a.numParte:""}</div>
-                      <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                        <span style={{fontWeight:700,fontSize:14,color:stockCrit?"var(--red)":stockOk?"var(--green)":"var(--yellow)"}}>{a.stockActual||0} {a.unidad}</span>
-                        <span style={{fontSize:10,color:"var(--muted)"}}>mín: {a.stockMin||1}</span>
-                        {a.precio>0&&<span style={{fontSize:10,color:"var(--cyan)"}}>💲{Number(a.precio).toFixed(2)}</span>}
-                      </div>
-                      {a.ubicacion&&<div style={{fontSize:10,color:"var(--muted)",marginTop:2}}>📍 {a.ubicacion}</div>}
-                    </div>
-                  </div>
-                  <div style={{display:"flex",gap:6,padding:"8px 12px",borderTop:"1px solid var(--border)",background:"var(--bg2)"}}>
-                    <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>setMovModal({articuloId:a.id})}>📋 Mov.</button>
-                    {isAdmin&&<><button className="btn btn-ghost btn-xs" onClick={()=>onEdit&&onEdit(a)}>✏️</button>
-                    <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>onDelete&&onDelete(a.id)}>🗑️</button></>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        }
-
-        {/* Movimientos recientes */}
-        {movimientos.length>0&&(
-          <div style={{padding:"12px 16px",borderTop:"1px solid var(--border)"}}>
-            <div style={{fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",marginBottom:8}}>Últimos movimientos</div>
-            <div style={{maxHeight:200,overflowY:"auto"}}>
-              {[...movimientos].reverse().slice(0,20).map((m,i)=>{
-                const art=almacen.find(a=>a.id===m.articuloId);
-                return (
-                  <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"5px 0",borderBottom:"1px solid var(--border)",fontSize:12}}>
-                    <span>{m.tipo==="entrada"?"📥":"📤"}</span>
-                    <span style={{flex:1,fontWeight:600}}>{art?.nombre||"—"}</span>
-                    <span style={{color:m.tipo==="entrada"?"var(--green)":"var(--orange)",fontWeight:700}}>{m.tipo==="entrada"?"+":"-"}{m.cantidad} {art?.unidad||""}</span>
-                    <span style={{color:"var(--muted)",fontSize:10}}>{m.fecha}</span>
-                    <span style={{color:"var(--muted)",fontSize:10,maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.motivo}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {movModal&&<MovimientoModal item={movModal.articuloId?almacen.find(a=>a.id===movModal.articuloId):null} almacen={almacen} onSave={saveMovimiento} onClose={()=>setMovModal(null)}/>}
-    </div>
-  );
-}
-
 function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, drivers = [], proveedores = [], externos = [], nominasAdmin = [] }) {
 
   const hoy        = new Date();
@@ -7056,8 +6800,9 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
   const [filtroSemana,setFiltroSemana]= useState(() => { const d=new Date(); d.setDate(d.getDate()-d.getDay()); return d.toISOString().slice(0,10); });
   const [customDe,    setCustomDe]    = useState("");
   const [customA,     setCustomA]     = useState("");
+  const [chartQuarter, setChartQuarter] = useState(Math.floor(new Date().getMonth()/3));
 
-  // \\u2500\\u2500 helpers \\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500
+  // ── helpers ───────────────────────────────────────────────────────────────
   const todosAnios = [...new Set([
     ...facturas.map(f=>{ const d=toISO(f.fechaEmision); return d?new Date(d).getFullYear():null; }),
     ...gastos.map(g=>{ const d=toISO(g.fecha); return d?new Date(d).getFullYear():null; }),
@@ -7084,12 +6829,12 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     if (filtroPer==="semana") return `Semana del ${filtroSemana}`;
     if (filtroPer==="mes")    return `${MESES[filtroMes]} ${filtroAnio}`;
     if (filtroPer==="trimestre") return `Q${filtroTrim+1} ${filtroAnio}`;
-    if (filtroPer==="anio")  return `A\\u00f1o ${filtroAnio}`;
-    if (filtroPer==="custom"&&customDe&&customA) return `${customDe} \\u2192 ${customA}`;
-    return "Per\\u00edodo";
+    if (filtroPer==="anio")  return `Año ${filtroAnio}`;
+    if (filtroPer==="custom"&&customDe&&customA) return `${customDe} → ${customA}`;
+    return "Período";
   };
 
-  // \\u2500\\u2500 datos filtrados \\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500
+  // ── datos filtrados ────────────────────────────────────────────────────────
   const fFacturas  = facturas.filter(f=>enRango(f.fechaEmision));
   const fFactPag   = facturas.filter(f=>f.status==="PAGADA"&&enRango(f.fechaPago));
   const fGastos    = gastos.filter(g=>enRango(g.fecha));
@@ -7113,7 +6858,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
   const utilidadBruta= totIngresos-totCostoOper;
   const margen       = totIngresos>0?((utilidadBruta/totIngresos)*100).toFixed(1):0;
 
-  // n\\u00f3mina estimada del per\\u00edodo
+  // nómina estimada del período
   const nomPorDriver = drivers.map(d=>{
     const unit   = units.find(u=>u.operador===d.id);
     const viajesD= unit?fTripsProp.filter(t=>t.unidadId===unit.id):[];
@@ -7124,7 +6869,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
   const totNomina     = nomPorDriver.reduce((a,x)=>a+x.total,0);
   const totNominaAdmin= nominasAdmin.reduce((a,n)=>a+(Number(n.sueldoBruto)||0),0);
 
-  // datos por mes (a\\u00f1o completo para el a\\u00f1o seleccionado)
+  // datos por mes (año completo para el año seleccionado)
   const meses12 = Array(12).fill(0).map((_,i)=>{
     const yr = filtroAnio;
     const byMes = (arr, fechaFn) => arr.filter(x=>{ const d=toISO(fechaFn(x)); return d&&new Date(d).getFullYear()===yr&&new Date(d).getMonth()===i; });
@@ -7143,7 +6888,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
   // colores palette
   const PAL = ["var(--cyan)","var(--orange)","var(--purple)","var(--yellow)","var(--green)","var(--red)","#06b6d4","#f97316","#8b5cf6","#eab308"];
 
-  // \\u2500\\u2500 componentes UI reutilizables \\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500
+  // ── componentes UI reutilizables ───────────────────────────────────────────
   const KR = ({ icon, lbl, val, sub, c="var(--cyan)" }) => (
     <div className="stat" style={{"--c":c}}>
       <div className="stat-icon">{icon}</div>
@@ -7186,11 +6931,11 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     </div>
   );
 
-  // \\u2500\\u2500 control de per\\u00edodo \\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500
+  // ── control de período ─────────────────────────────────────────────────────
   const ControlPer = () => (
     <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",padding:"12px 16px",background:"var(--bg2)",borderRadius:10,marginBottom:16,border:"1px solid var(--border)"}}>
       <div className="ftabs">
-        {[["semana","Semana"],["mes","Mes"],["trimestre","Trimestre"],["anio","A\\u00f1o"],["custom","Personalizado"]].map(([k,l])=>(
+        {[["semana","Semana"],["mes","Mes"],["trimestre","Trimestre"],["anio","Año"],["custom","Personalizado"]].map(([k,l])=>(
           <button key={k} className={`ftab${filtroPer===k?" on":""}`} onClick={()=>setFiltroPer(k)}>{l}</button>
         ))}
       </div>
@@ -7217,49 +6962,144 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
         {filtroPer==="custom"&&(
           <>
             <input type="text" placeholder="De dd/mm/aaaa" value={customDe} onChange={e=>setCustomDe(e.target.value)} style={{padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",fontSize:13,width:130}}/>
-            <span style={{color:"var(--muted)"}}>\\u2192</span>
+            <span style={{color:"var(--muted)"}}>→</span>
             <input type="text" placeholder="A dd/mm/aaaa" value={customA} onChange={e=>setCustomA(e.target.value)} style={{padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",fontSize:13,width:130}}/>
           </>
         )}
-        <span style={{fontSize:12,color:"var(--cyan)",fontWeight:700,marginLeft:4}}>\\ud83d\\udcc5 {lblPeriodo()}</span>
+        <span style={{fontSize:12,color:"var(--cyan)",fontWeight:700,marginLeft:4}}>📅 {lblPeriodo()}</span>
       </div>
     </div>
   );
 
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
+  // ══════════════════════════════════════════════════════════════
   //  1. RESUMEN EJECUTIVO
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
+  // ══════════════════════════════════════════════════════════════
   const VistaResumen = () => {
     const maxBar = Math.max(...meses12.map(m=>Math.max(m.ing,m.costos,m.fact)),1);
     const segCostos = [
-      {v:totComb,     c:"var(--cyan)",  lbl:"\\u26fd Combustible"},
-      {v:totMant,     c:"var(--orange)",lbl:"\\ud83d\\udd27 Mantenimiento"},
-      {v:totGastos,   c:"var(--purple)",lbl:"\\ud83d\\udcb8 Gastos grales"},
-      {v:totCostoViaj,c:"var(--yellow)",lbl:"\\ud83d\\ude9b Gastos viajes"},
+      {v:totComb,     c:"var(--cyan)",  lbl:"⛽ Combustible"},
+      {v:totMant,     c:"var(--orange)",lbl:"🔧 Mantenimiento"},
+      {v:totGastos,   c:"var(--purple)",lbl:"💸 Gastos grales"},
+      {v:totCostoViaj,c:"var(--yellow)",lbl:"🚛 Gastos viajes"},
     ];
     const segCartera = [
-      {v:totCobrado,    c:"var(--green)", lbl:"\\u2705 Cobrado"},
-      {v:totPendFact,   c:"var(--orange)",lbl:"\\u23f3 Pendiente"},
-      {v:fFacturas.filter(f=>f.status==="VENCIDA").reduce((a,f)=>a+(Number(f.total)||0),0), c:"var(--red)",lbl:"\\u274c Vencido"},
+      {v:totCobrado,  c:"var(--green)", lbl:"✅ Cobrado"},
+      {v:totPendFact, c:"var(--orange)",lbl:"⏳ Pendiente"},
+      {v:fFacturas.filter(f=>f.status==="VENCIDA").reduce((a,f)=>a+(Number(f.total)||0),0), c:"var(--red)",lbl:"❌ Vencido"},
     ];
+    const maxIngMes = Math.max(...meses12.map(m=>m.ing),1);
+    // SVG pie helper (same pattern as Dashboard - proven working)
+    const makePieSlices = (items) => {
+      const tot = items.reduce((a,x)=>a+x.v,0)||1;
+      let ang = -90;
+      return items.map(it => {
+        const deg = it.v/tot*360;
+        const r=52, cx=65, cy=65;
+        const a1=ang*Math.PI/180, a2=(ang+deg)*Math.PI/180;
+        const x1=cx+r*Math.cos(a1), y1=cy+r*Math.sin(a1);
+        const x2=cx+r*Math.cos(a2), y2=cy+r*Math.sin(a2);
+        const lg=deg>180?1:0;
+        const path=deg>1?"M"+cx+","+cy+" L"+x1.toFixed(1)+","+y1.toFixed(1)+" A"+r+","+r+" 0 "+lg+",1 "+x2.toFixed(1)+","+y2.toFixed(1)+" Z":"";
+        ang+=deg;
+        return {...it, path, pct:Math.round(it.v/tot*100)};
+      });
+    };
+    const pieSlicesCostos  = makePieSlices(segCostos);
+    const pieSlicesCartera = makePieSlices(segCartera);
+    const margenNum = totIngresos>0?Math.round(utilidadBruta/totIngresos*100):0;
     return (
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
         {/* KPIs */}
         <div className="stats">
-          <KR icon="\\ud83d\\udcb5" lbl="Ingresos" val={fmt$(totIngresos)} sub={`${fTrips.length} viajes`} c="var(--green)"/>
-          <KR icon="\\ud83d\\udcc9" lbl="Costo operaci\\u00f3n" val={fmt$(totCostoOper)} c="var(--red)"/>
-          <KR icon="\\ud83d\\udcb0" lbl="Utilidad bruta" val={fmt$(utilidadBruta)} sub={`${margen}% margen`} c={utilidadBruta>=0?"var(--cyan)":"var(--red)"}/>
-          <KR icon="\\ud83e\\uddfe" lbl="Facturado" val={fmt$(totFacturado)} sub={`${fFacturas.length} fact.`} c="var(--yellow)"/>
-          <KR icon="\\u2705" lbl="Cobrado" val={fmt$(totCobrado)} c="var(--green)"/>
-          <KR icon="\\u23f3" lbl="Por cobrar" val={fmt$(totPendFact)} c="var(--orange)"/>
-          <KR icon="\\ud83d\\udc77" lbl="N\\u00f3mina est." val={fmt$(totNomina+totNominaAdmin)} c="var(--purple)"/>
-          <KR icon="\\u26fd" lbl="Combustible" val={fmt$(totComb)} sub={`${totLitros.toFixed(0)}L`} c="var(--cyan)"/>
-          <KR icon="\\ud83d\\udd27" lbl="Mantenimiento" val={fmt$(totMant)} c="var(--orange)"/>
+          <KR icon="💵" lbl="Ingresos" val={fmt$(totIngresos)} sub={`${fTrips.length} viajes`} c="var(--green)"/>
+          <KR icon="📉" lbl="Costo operación" val={fmt$(totCostoOper)} c="var(--red)"/>
+          <KR icon="💰" lbl="Utilidad bruta" val={fmt$(utilidadBruta)} sub={`${margen}% margen`} c={utilidadBruta>=0?"var(--cyan)":"var(--red)"}/>
+          <KR icon="🧾" lbl="Facturado" val={fmt$(totFacturado)} sub={`${fFacturas.length} fact.`} c="var(--yellow)"/>
+          <KR icon="✅" lbl="Cobrado" val={fmt$(totCobrado)} c="var(--green)"/>
+          <KR icon="⏳" lbl="Por cobrar" val={fmt$(totPendFact)} c="var(--orange)"/>
+          <KR icon="👷" lbl="Nómina est." val={fmt$(totNomina+totNominaAdmin)} c="var(--purple)"/>
+          <KR icon="⛽" lbl="Combustible" val={fmt$(totComb)} sub={`${totLitros.toFixed(0)}L`} c="var(--cyan)"/>
+          <KR icon="🔧" lbl="Mantenimiento" val={fmt$(totMant)} c="var(--orange)"/>
         </div>
 
-        {/* Gr\\u00e1fica ingresos vs costos 12 meses */}
+        {/* Fila 1: Salud financiera (pie) + Distribución costos (pie) + Cartera (pie) */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
+          {/* Pie salud financiera */}
+          <div className="card">
+            <div className="card-hdr"><h3>💰 Salud Financiera</h3></div>
+            <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
+              <svg width="140" height="140" viewBox="0 0 130 130">
+                <circle cx="65" cy="65" r="52" fill="none" stroke="var(--bg3)" strokeWidth="14"/>
+                <circle cx="65" cy="65" r="52" fill="none"
+                  stroke={utilidadBruta>=0?"var(--green)":"var(--red)"}
+                  strokeWidth="14"
+                  strokeDasharray={`${Math.min(Math.abs(margenNum),100)*3.27} 327`}
+                  strokeDashoffset="81.75"
+                  strokeLinecap="round"/>
+                <text x="65" y="58" textAnchor="middle" fill={utilidadBruta>=0?"var(--green)":"var(--red)"} fontSize="22" fontWeight="700" fontFamily="var(--font-hd)">{margenNum}%</text>
+                <text x="65" y="74" textAnchor="middle" fill="var(--muted)" fontSize="10">Margen</text>
+              </svg>
+              {[
+                {lbl:"Ingresos", v:totIngresos, c:"var(--green)"},
+                {lbl:"Costos",   v:totCostoOper,c:"var(--red)"},
+                {lbl:"Utilidad", v:utilidadBruta,c:utilidadBruta>=0?"var(--cyan)":"var(--orange)"},
+              ].map((x,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",width:"100%",fontSize:11}}>
+                  <span style={{color:"var(--muted)"}}>{x.lbl}</span>
+                  <span style={{fontWeight:700,color:x.c}}>{fmt$(x.v)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Pie distribución costos */}
+          <div className="card">
+            <div className="card-hdr"><h3>🥧 Distribución Costos</h3></div>
+            <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
+              <svg width="130" height="130" viewBox="0 0 130 130">
+                {pieSlicesCostos.map((s,i)=>s.path?<path key={i} d={s.path} fill={s.c} stroke="var(--bg1)" strokeWidth="2" opacity="0.9"/>:null)}
+                <circle cx="65" cy="65" r="26" fill="var(--bg1)" stroke="var(--border)" strokeWidth="1"/>
+                <text x="65" y="69" textAnchor="middle" fill="var(--muted)" fontSize="9" fontWeight="700">COSTOS</text>
+              </svg>
+              {segCostos.map((x,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:6,width:"100%",fontSize:11}}>
+                  <div style={{width:9,height:9,borderRadius:2,background:x.c,flexShrink:0}}/>
+                  <span style={{flex:1,color:"var(--muted)"}}>{x.lbl}</span>
+                  <span style={{fontWeight:700,color:x.c}}>{totCostoOper>0?pieSlicesCostos[i].pct+"%":"—"}</span>
+                  <span style={{color:"var(--muted)",fontSize:10}}>{fmt$(x.v)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Pie cartera */}
+          <div className="card">
+            <div className="card-hdr"><h3>💳 Estado de Cartera</h3></div>
+            <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
+              <svg width="130" height="130" viewBox="0 0 130 130">
+                {pieSlicesCartera.map((s,i)=>s.path?<path key={i} d={s.path} fill={s.c} stroke="var(--bg1)" strokeWidth="2" opacity="0.9"/>:null)}
+                <circle cx="65" cy="65" r="26" fill="var(--bg1)" stroke="var(--border)" strokeWidth="1"/>
+                <text x="65" y="63" textAnchor="middle" fill="var(--muted)" fontSize="9">Cobrado</text>
+                <text x="65" y="75" textAnchor="middle" fill="var(--green)" fontSize="10" fontWeight="700">{totFacturado>0?Math.round(totCobrado/totFacturado*100)+"%":"—"}</text>
+              </svg>
+              {segCartera.map((x,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:6,width:"100%",fontSize:11}}>
+                  <div style={{width:9,height:9,borderRadius:2,background:x.c,flexShrink:0}}/>
+                  <span style={{flex:1,color:"var(--muted)"}}>{x.lbl}</span>
+                  <span style={{fontWeight:700,color:x.c}}>{fmt$(x.v)}</span>
+                </div>
+              ))}
+              <div style={{borderTop:"1px solid var(--border)",paddingTop:6,width:"100%",display:"flex",justifyContent:"space-between",fontSize:11}}>
+                <span style={{color:"var(--muted)"}}>Eficiencia cobranza</span>
+                <strong style={{color:"var(--green)"}}>{totFacturado>0?`${((totCobrado/totFacturado)*100).toFixed(0)}%`:"—"}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Fila 2: Barras ingresos 12 meses */}
         <div className="card">
-          <div className="card-hdr"><h3>\\ud83d\\udcca Ingresos vs Costos vs Facturaci\\u00f3n \\u2014 {filtroAnio}</h3></div>
+          <div className="card-hdr"><h3>📊 Ingresos vs Costos vs Facturación — {filtroAnio}</h3></div>
           <div style={{padding:"16px 20px"}}>
             {MESES.map((m,i)=>{
               const d=meses12[i]; const util=d.ing-d.costos;
@@ -7270,13 +7110,13 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
                     {[
                       [d.ing,"var(--green)","Ingresos"],
                       [d.costos,"var(--red)","Costos"],
-                      [Math.abs(util),util>=0?"var(--cyan)":"var(--orange)",(util>=0?"":"\\u2212")+"Utilidad"],
+                      [Math.abs(util),util>=0?"var(--cyan)":"var(--orange)",(util>=0?"":"−")+"Utilidad"],
                       [d.fact,"var(--yellow)","Facturado"],
-                    ].map(([v,c,nm],j)=>(
+                    ].map(([v,col,nm],j)=>(
                       <div key={j} style={{display:"flex",alignItems:"center",gap:6}}>
-                        <div style={{width:64,fontSize:9,color:c}}>{nm}</div>
-                        <HBar v={v} max={maxBar} c={c} h={9}/>
-                        <div style={{width:82,textAlign:"right",fontSize:9,fontWeight:700,color:c}}>{v>0?fmt$(v):"\\u2014"}</div>
+                        <div style={{width:64,fontSize:9,color:col}}>{nm}</div>
+                        <HBar v={v} max={maxBar} c={col} h={9}/>
+                        <div style={{width:82,textAlign:"right",fontSize:9,fontWeight:700,color:col}}>{v>0?fmt$(v):"—"}</div>
                       </div>
                     ))}
                   </div>
@@ -7284,64 +7124,71 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
               );
             })}
             <div style={{display:"flex",gap:14,marginTop:4,paddingLeft:36,flexWrap:"wrap"}}>
-              {[["\\ud83d\\udcb5 Ingresos","var(--green)"],["\\ud83d\\udcc9 Costos","var(--red)"],["\\ud83d\\udcb0 Utilidad","var(--cyan)"],["\\ud83e\\uddfe Facturado","var(--yellow)"]].map(([l,c])=>(
-                <span key={l} style={{fontSize:11,color:c,fontWeight:600}}>{l}</span>
+              {[["💵 Ingresos","var(--green)"],["📉 Costos","var(--red)"],["💰 Utilidad","var(--cyan)"],["🧾 Facturado","var(--yellow)"]].map(([l,col])=>(
+                <span key={l} style={{fontSize:11,color:col,fontWeight:600}}>{l}</span>
               ))}
             </div>
           </div>
         </div>
 
-        {/* 2 cards lado a lado */}
+        {/* Fila 3: Ingresos por mes (barras stacked) + Nómina vs Ingresos */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-          {/* Distribuci\\u00f3n costos */}
           <div className="card">
-            <div className="card-hdr"><h3>\\ud83e\\udd67 Distribuci\\u00f3n de Costos</h3></div>
+            <div className="card-hdr"><h3>📈 Ingresos Mensuales — {filtroAnio}</h3></div>
             <div style={{padding:"16px 20px"}}>
-              <SegBar items={segCostos} h={18}/>
-              <Legend items={segCostos}/>
-              <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:8}}>
-                {segCostos.map(x=>(
-                  <div key={x.lbl} style={{display:"flex",alignItems:"center",gap:8}}>
-                    <div style={{width:8,height:8,borderRadius:"50%",background:x.c,flexShrink:0}}/>
-                    <div style={{flex:1,fontSize:12}}>{x.lbl}</div>
-                    <HBar v={x.v} max={totCostoOper} c={x.c} h={7}/>
-                    <div style={{width:85,textAlign:"right",fontSize:11,fontWeight:700,color:x.c}}>{fmt$(x.v)}</div>
-                    <div style={{width:34,textAlign:"right",fontSize:10,color:"var(--muted)"}}>{totCostoOper>0?`${((x.v/totCostoOper)*100).toFixed(0)}%`:"\\u2014"}</div>
+              {meses12.map((m,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                  <div style={{width:28,fontSize:10,color:"var(--muted)",fontWeight:700}}>{MESES[i].slice(0,3)}</div>
+                  <div style={{flex:1,background:"var(--bg3)",borderRadius:99,height:14,overflow:"hidden",position:"relative"}}>
+                    <div style={{width:`${Math.round(m.ing/maxIngMes*100)}%`,height:"100%",background:"linear-gradient(90deg,var(--green),#22c55e99)",borderRadius:99,transition:"width .4s"}}/>
                   </div>
-                ))}
-              </div>
+                  <div style={{width:80,textAlign:"right",fontSize:10,fontWeight:700,color:"var(--green)"}}>{m.ing>0?fmt$(m.ing):"—"}</div>
+                  <div style={{width:26,textAlign:"right",fontSize:9,color:"var(--muted)"}}>{m.viajes>0?`${m.viajes}v`:""}</div>
+                </div>
+              ))}
             </div>
           </div>
-          {/* Cartera */}
+
           <div className="card">
-            <div className="card-hdr"><h3>\\ud83d\\udcb3 Estado de Cartera</h3></div>
+            <div className="card-hdr"><h3>👷 Nómina vs Ingresos — {lblPeriodo()}</h3></div>
             <div style={{padding:"16px 20px"}}>
-              <SegBar items={segCartera} h={18}/>
-              <Legend items={segCartera}/>
+              <SegBar items={[
+                {v:totNomina+totNominaAdmin, c:"var(--purple)", lbl:"Nómina total"},
+                {v:Math.max(totIngresos-(totNomina+totNominaAdmin),0), c:"var(--green)", lbl:"Margen restante"},
+              ]} h={20}/>
+              <Legend items={[
+                {v:totNomina+totNominaAdmin, c:"var(--purple)", lbl:"Nómina"},
+                {v:Math.max(totIngresos-(totNomina+totNominaAdmin),0), c:"var(--green)", lbl:"Margen"},
+              ]}/>
               <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:8}}>
-                {segCartera.map(x=>(
-                  <div key={x.lbl} style={{display:"flex",alignItems:"center",gap:8}}>
+                {[
+                  {lbl:"👷 Operadores", v:totNomina,        c:"var(--purple)"},
+                  {lbl:"👔 Admón.",     v:totNominaAdmin,   c:"var(--cyan)"},
+                  {lbl:"⛽ Combustible",v:totComb,          c:"var(--yellow)"},
+                  {lbl:"🔧 Mant.",      v:totMant,          c:"var(--orange)"},
+                  {lbl:"💸 Gastos grales",v:totGastos,      c:"var(--red)"},
+                ].map((x,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:8}}>
                     <div style={{width:8,height:8,borderRadius:"50%",background:x.c,flexShrink:0}}/>
-                    <div style={{flex:1,fontSize:12}}>{x.lbl}</div>
-                    <HBar v={x.v} max={totFacturado} c={x.c} h={7}/>
-                    <div style={{width:85,textAlign:"right",fontSize:11,fontWeight:700,color:x.c}}>{fmt$(x.v)}</div>
+                    <div style={{flex:1,fontSize:11}}>{x.lbl}</div>
+                    <HBar v={x.v} max={totIngresos||1} c={x.c} h={7}/>
+                    <div style={{width:80,textAlign:"right",fontSize:10,fontWeight:700,color:x.c}}>{fmt$(x.v)}</div>
+                    <div style={{width:30,textAlign:"right",fontSize:9,color:"var(--muted)"}}>{totIngresos>0?`${((x.v/totIngresos)*100).toFixed(0)}%`:"—"}</div>
                   </div>
                 ))}
-              </div>
-              <div style={{borderTop:"1px solid var(--border)",paddingTop:8,marginTop:8,display:"flex",justifyContent:"space-between",fontSize:12}}>
-                <span style={{color:"var(--muted)"}}>Eficiencia cobranza</span>
-                <strong style={{color:"var(--green)"}}>{totFacturado>0?`${((totCobrado/totFacturado)*100).toFixed(0)}%`:"\\u2014"}</strong>
               </div>
             </div>
           </div>
         </div>
+
       </div>
     );
   };
 
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
+
+  // ══════════════════════════════════════════════════════════════
   //  2. RENDIMIENTO DE FLOTA (por unidad)
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
+  // ══════════════════════════════════════════════════════════════
   const VistaRendimiento = () => {
     const stats = units.map(u=>{
       const vUs     = fTripsProp.filter(t=>t.unidadId===u.id);
@@ -7363,23 +7210,23 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     return (
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
         <div className="stats">
-          <KR icon="\\ud83d\\ude9b" lbl="Unidades activas" val={stats.filter(s=>s.viajes>0).length} sub={`de ${units.length} total`} c="var(--cyan)"/>
-          <KR icon="\\ud83d\\uddfa\\ufe0f" lbl="Viajes propios" val={fTripsProp.length} c="var(--green)"/>
-          <KR icon="\\u26fd" lbl="Combustible total" val={`${totLitros.toFixed(0)}L`} sub={fmt$(totComb)} c="var(--yellow)"/>
-          <KR icon="\\ud83d\\udd27" lbl="Mantenimientos" val={fMaints.length} sub={fmt$(totMant)} c="var(--orange)"/>
+          <KR icon="🚛" lbl="Unidades activas" val={stats.filter(s=>s.viajes>0).length} sub={`de ${units.length} total`} c="var(--cyan)"/>
+          <KR icon="🗺️" lbl="Viajes propios" val={fTripsProp.length} c="var(--green)"/>
+          <KR icon="⛽" lbl="Combustible total" val={`${totLitros.toFixed(0)}L`} sub={fmt$(totComb)} c="var(--yellow)"/>
+          <KR icon="🔧" lbl="Mantenimientos" val={fMaints.length} sub={fmt$(totMant)} c="var(--orange)"/>
         </div>
 
         {/* barras comparativas por unidad */}
         <div className="card">
-          <div className="card-hdr"><h3>\\ud83d\\udcca Ingresos Comparativos por Unidad \\u2014 {lblPeriodo()}</h3></div>
+          <div className="card-hdr"><h3>📊 Ingresos Comparativos por Unidad — {lblPeriodo()}</h3></div>
           <div style={{padding:"16px 20px"}}>
             {stats.filter(s=>s.ingresos>0).length===0
-              ? <div className="empty"><div className="empty-icon">\\ud83d\\ude9b</div><p>Sin viajes en el per\\u00edodo</p></div>
+              ? <div className="empty"><div className="empty-icon">🚛</div><p>Sin viajes en el período</p></div>
               : stats.filter(s=>s.ingresos>0).map((s,i)=>(
               <div key={s.id} style={{marginBottom:14}}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:4,fontSize:12}}>
                   <span style={{fontWeight:700}}>{s.num} <span style={{color:"var(--muted)",fontWeight:400}}>{s.placas}</span> <span style={{fontSize:10,color:"var(--muted)"}}>{s.tipo}</span></span>
-                  <span style={{color:"var(--green)",fontWeight:700}}>{fmt$(s.ingresos)} \\u00b7 {s.viajes}v</span>
+                  <span style={{color:"var(--green)",fontWeight:700}}>{fmt$(s.ingresos)} · {s.viajes}v</span>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:3}}>
                   <div style={{display:"flex",gap:6,alignItems:"center"}}>
@@ -7399,9 +7246,9 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
                   </div>
                 </div>
                 <div style={{display:"flex",gap:12,marginTop:3,fontSize:10,color:"var(--muted)"}}>
-                  {s.rendL&&<span>\\ud83d\\udd25 {s.rendL}L/100km</span>}
-                  {s.ingKm&&<span>\\ud83d\\udcb2${s.ingKm}/km</span>}
-                  <span>\\ud83d\\udd27 {fmt$(s.maintU)}</span>
+                  {s.rendL&&<span>🔥 {s.rendL}L/100km</span>}
+                  {s.ingKm&&<span>💲${s.ingKm}/km</span>}
+                  <span>🔧 {fmt$(s.maintU)}</span>
                 </div>
               </div>
             ))}
@@ -7410,7 +7257,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
 
         {/* tabla detalle */}
         <div className="card">
-          <div className="card-hdr"><h3>\\ud83d\\udccb Tabla Detalle Unidades</h3></div>
+          <div className="card-hdr"><h3>📋 Tabla Detalle Unidades</h3></div>
           <div className="card-body" style={{padding:0}}>
             <table>
               <thead><tr><th>Unidad</th><th>Tipo</th><th>Viajes</th><th>Km</th><th>Ingresos</th><th>Comb $</th><th>Mant $</th><th>Utilidad</th><th>L/100km</th><th>$/km</th></tr></thead>
@@ -7420,15 +7267,15 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
                   : stats.map(s=>(
                   <tr key={s.id}>
                     <td><strong>{s.num}</strong><div style={{fontSize:10,color:"var(--muted)"}}>{s.placas}</div></td>
-                    <td style={{fontSize:11}}><Bdg c="bb" t={s.tipo||"\\u2014"}/></td>
+                    <td style={{fontSize:11}}><Bdg c="bb" t={s.tipo||"—"}/></td>
                     <td style={{textAlign:"center",fontWeight:700,color:"var(--cyan)"}}>{s.viajes}</td>
                     <td style={{fontSize:12}}>{s.km>0?`${s.km.toLocaleString()}`:"-"}</td>
                     <td style={{fontWeight:700,color:"var(--green)"}}>{fmt$(s.ingresos)}</td>
                     <td style={{color:"var(--yellow)",fontSize:12}}>{fmt$(s.costComb)}</td>
                     <td style={{color:"var(--orange)",fontSize:12}}>{fmt$(s.maintU)}</td>
                     <td style={{fontWeight:700,color:s.utilidad>=0?"var(--cyan)":"var(--red)"}}>{fmt$(s.utilidad)}</td>
-                    <td style={{fontSize:11,color:"var(--muted)"}}>{s.rendL?`${s.rendL}L`:"\\u2014"}</td>
-                    <td style={{fontSize:11,color:"var(--muted)"}}>{s.ingKm?`$${s.ingKm}`:"\\u2014"}</td>
+                    <td style={{fontSize:11,color:"var(--muted)"}}>{s.rendL?`${s.rendL}L`:"—"}</td>
+                    <td style={{fontSize:11,color:"var(--muted)"}}>{s.ingKm?`$${s.ingKm}`:"—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -7439,9 +7286,9 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     );
   };
 
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
+  // ══════════════════════════════════════════════════════════════
   //  3. OPERADORES / CONDUCTORES
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
+  // ══════════════════════════════════════════════════════════════
   const VistaOperadores = () => {
     const stats = drivers.map(d=>{
       const unit    = units.find(u=>u.operador===d.id);
@@ -7460,16 +7307,16 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     return (
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
         <div className="stats">
-          <KR icon="\\ud83d\\udc68\\u200d\\u2708\\ufe0f" lbl="Operadores" val={drivers.length} sub={`${stats.filter(s=>s.viajes>0).length} activos`} c="var(--cyan)"/>
-          <KR icon="\\ud83d\\uddfa\\ufe0f" lbl="Viajes propios" val={fTripsProp.length} c="var(--green)"/>
-          <KR icon="\\ud83d\\udcb0" lbl="N\\u00f3mina total" val={fmt$(totNomina)} c="var(--purple)"/>
-          <KR icon="\\ud83c\\udfaf" lbl="Ingreso promedio" val={stats.filter(s=>s.viajes>0).length>0?fmt$(totIngresos/stats.filter(s=>s.viajes>0).length):"\\u2014"} c="var(--yellow)"/>
+          <KR icon="👨‍✈️" lbl="Operadores" val={drivers.length} sub={`${stats.filter(s=>s.viajes>0).length} activos`} c="var(--cyan)"/>
+          <KR icon="🗺️" lbl="Viajes propios" val={fTripsProp.length} c="var(--green)"/>
+          <KR icon="💰" lbl="Nómina total" val={fmt$(totNomina)} c="var(--purple)"/>
+          <KR icon="🎯" lbl="Ingreso promedio" val={stats.filter(s=>s.viajes>0).length>0?fmt$(totIngresos/stats.filter(s=>s.viajes>0).length):"—"} c="var(--yellow)"/>
         </div>
 
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
           {/* ranking ingresos */}
           <div className="card">
-            <div className="card-hdr"><h3>\\ud83c\\udfc6 Ranking por Ingresos Generados</h3></div>
+            <div className="card-hdr"><h3>🏆 Ranking por Ingresos Generados</h3></div>
             <div style={{padding:"16px 20px"}}>
               {stats.length===0 ? <div className="empty"><p>Sin operadores</p></div>
               : stats.map((s,i)=>(
@@ -7481,7 +7328,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
                   </div>
                   <div style={{paddingLeft:28}}>
                     <HBar v={s.ingresos} max={maxIng} c={i===0?"#f4c542":i===1?"#b0bec5":i===2?"#cd7f32":"var(--cyan)"} h={8}/>
-                    <div style={{fontSize:9,color:"var(--muted)",marginTop:2}}>{s.viajes} viajes \\u00b7 {s.km>0?`${s.km.toLocaleString()}km`:"sin km"} \\u00b7 {s.destinos} destinos</div>
+                    <div style={{fontSize:9,color:"var(--muted)",marginTop:2}}>{s.viajes} viajes · {s.km>0?`${s.km.toLocaleString()}km`:"sin km"} · {s.destinos} destinos</div>
                   </div>
                 </div>
               ))}
@@ -7490,7 +7337,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
 
           {/* ranking viajes */}
           <div className="card">
-            <div className="card-hdr"><h3>\\ud83d\\uddfa\\ufe0f Ranking por Viajes Realizados</h3></div>
+            <div className="card-hdr"><h3>🗺️ Ranking por Viajes Realizados</h3></div>
             <div style={{padding:"16px 20px"}}>
               {stats.length===0 ? <div className="empty"><p>Sin operadores</p></div>
               : [...stats].sort((a,b)=>b.viajes-a.viajes).map((s,i)=>(
@@ -7500,7 +7347,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
                     <span style={{color:"var(--cyan)",fontWeight:700}}>{s.viajes} viajes</span>
                   </div>
                   <HBar v={s.viajes} max={maxViaj} c="var(--cyan)" h={8}/>
-                  <div style={{fontSize:9,color:"var(--muted)",marginTop:2}}>Base: {fmt$(s.sueldo)} \\u00b7 Comisi\\u00f3n: {fmt$(s.comision)} \\u2192 Total: {fmt$(s.total)}</div>
+                  <div style={{fontSize:9,color:"var(--muted)",marginTop:2}}>Base: {fmt$(s.sueldo)} · Comisión: {fmt$(s.comision)} → Total: {fmt$(s.total)}</div>
                 </div>
               ))}
             </div>
@@ -7509,19 +7356,19 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
 
         {/* tabla detalle */}
         <div className="card">
-          <div className="card-hdr"><h3>\\ud83d\\udccb Detalle Operadores \\u2014 {lblPeriodo()}</h3></div>
+          <div className="card-hdr"><h3>📋 Detalle Operadores — {lblPeriodo()}</h3></div>
           <div className="card-body" style={{padding:0}}>
             <table>
-              <thead><tr><th>Operador</th><th>Unidad</th><th>Viajes</th><th>Km</th><th>Ingresos</th><th>Sueldo base</th><th>Comisi\\u00f3n</th><th>Costo total</th><th>Destinos \\u00fanicos</th></tr></thead>
+              <thead><tr><th>Operador</th><th>Unidad</th><th>Viajes</th><th>Km</th><th>Ingresos</th><th>Sueldo base</th><th>Comisión</th><th>Costo total</th><th>Destinos únicos</th></tr></thead>
               <tbody>
                 {stats.length===0
                   ? <tr><td colSpan={9} style={{textAlign:"center",color:"var(--muted)",padding:20}}>Sin datos</td></tr>
                   : stats.map(s=>(
                   <tr key={s.id}>
-                    <td><strong style={{fontSize:12}}>{s.nombre}</strong><div style={{fontSize:10,color:"var(--muted)"}}>{s.licTipo||"\\u2014"}</div></td>
-                    <td style={{fontSize:11}}>{s.unit?`${s.unit.num}\\u00b7${s.unit.placas}`:"Sin asignar"}</td>
+                    <td><strong style={{fontSize:12}}>{s.nombre}</strong><div style={{fontSize:10,color:"var(--muted)"}}>{s.licTipo||"—"}</div></td>
+                    <td style={{fontSize:11}}>{s.unit?`${s.unit.num}·${s.unit.placas}`:"Sin asignar"}</td>
                     <td style={{textAlign:"center",fontWeight:700,color:"var(--cyan)"}}>{s.viajes}</td>
-                    <td style={{fontSize:12}}>{s.km>0?`${s.km.toLocaleString()} km`:"\\u2014"}</td>
+                    <td style={{fontSize:12}}>{s.km>0?`${s.km.toLocaleString()} km`:"—"}</td>
                     <td style={{fontWeight:700,color:"var(--green)"}}>{fmt$(s.ingresos)}</td>
                     <td style={{fontSize:12}}>{fmt$(s.sueldo)}</td>
                     <td style={{color:"var(--purple)",fontSize:12}}>{fmt$(s.comision)}<div style={{fontSize:9,color:"var(--muted)"}}>{s.porcentajeViaje||0}%</div></td>
@@ -7537,9 +7384,9 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     );
   };
 
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
+  // ══════════════════════════════════════════════════════════════
   //  4. COMBUSTIBLE & RENDIMIENTO
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
+  // ══════════════════════════════════════════════════════════════
   const VistaCombustible = () => {
     const porUnidad = units.map(u=>{
       const fUs    = fFuels.filter(f=>f.unidadId===u.id);
@@ -7565,30 +7412,30 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     return (
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
         <div className="stats">
-          <KR icon="\\u26fd" lbl="Litros cargados" val={`${totLitros.toFixed(0)}L`} sub={`${fFuels.length} cargas`} c="var(--cyan)"/>
-          <KR icon="\\ud83d\\udcb5" lbl="Gasto combustible" val={fmt$(totComb)} c="var(--yellow)"/>
-          <KR icon="\\ud83d\\udcca" lbl="Precio promedio" val={totLitros>0?`$${(totComb/totLitros).toFixed(2)}/L`:"\\u2014"} c="var(--orange)"/>
-          <KR icon="\\ud83c\\udfed" lbl="Unidades con carga" val={porUnidad.length} c="var(--green)"/>
+          <KR icon="⛽" lbl="Litros cargados" val={`${totLitros.toFixed(0)}L`} sub={`${fFuels.length} cargas`} c="var(--cyan)"/>
+          <KR icon="💵" lbl="Gasto combustible" val={fmt$(totComb)} c="var(--yellow)"/>
+          <KR icon="📊" lbl="Precio promedio" val={totLitros>0?`$${(totComb/totLitros).toFixed(2)}/L`:"—"} c="var(--orange)"/>
+          <KR icon="🏭" lbl="Unidades con carga" val={porUnidad.length} c="var(--green)"/>
         </div>
 
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
           {/* consumo por unidad */}
           <div className="card">
-            <div className="card-hdr"><h3>\\u26fd Consumo por Unidad \\u2014 {lblPeriodo()}</h3></div>
+            <div className="card-hdr"><h3>⛽ Consumo por Unidad — {lblPeriodo()}</h3></div>
             <div style={{padding:"16px 20px"}}>
               {porUnidad.length===0
-                ? <div className="empty"><div className="empty-icon">\\u26fd</div><p>Sin cargas en el per\\u00edodo</p></div>
+                ? <div className="empty"><div className="empty-icon">⛽</div><p>Sin cargas en el período</p></div>
                 : porUnidad.map(u=>(
                 <div key={u.id} style={{marginBottom:14}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:12}}>
                     <span style={{fontWeight:700}}>{u.num} <span style={{color:"var(--muted)",fontWeight:400,fontSize:10}}>{u.placas}</span></span>
-                    <span style={{color:"var(--cyan)",fontWeight:700}}>{u.litros.toFixed(0)}L \\u2014 {fmt$(u.costo)}</span>
+                    <span style={{color:"var(--cyan)",fontWeight:700}}>{u.litros.toFixed(0)}L — {fmt$(u.costo)}</span>
                   </div>
                   <HBar v={u.litros} max={maxLit} c="var(--cyan)" h={10}/>
                   <div style={{display:"flex",gap:10,marginTop:3,fontSize:10,color:"var(--muted)"}}>
                     <span>{u.cargas} cargas</span>
-                    {u.rend&&<span>\\ud83d\\udd25 {u.rend}L/100km</span>}
-                    {u.precProm&&<span>\\ud83d\\udcb2${u.precProm}/L</span>}
+                    {u.rend&&<span>🔥 {u.rend}L/100km</span>}
+                    {u.precProm&&<span>💲${u.precProm}/L</span>}
                   </div>
                 </div>
               ))}
@@ -7597,7 +7444,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
 
           {/* precio/litro por mes */}
           <div className="card">
-            <div className="card-hdr"><h3>\\ud83d\\udcc8 Precio Promedio por Litro \\u2014 {filtroAnio}</h3></div>
+            <div className="card-hdr"><h3>📈 Precio Promedio por Litro — {filtroAnio}</h3></div>
             <div style={{padding:"16px 20px"}}>
               {precMeses.map((m,i)=>(
                 <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
@@ -7605,18 +7452,18 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
                   <div style={{flex:1,display:"flex",flexDirection:"column",gap:2}}>
                     <div style={{display:"flex",gap:4,alignItems:"center"}}>
                       <HBar v={Number(m.prec)} max={maxPrec} c="var(--yellow)" h={8}/>
-                      <div style={{width:52,textAlign:"right",fontSize:10,fontWeight:700,color:"var(--yellow)"}}>{m.prec>0?`$${m.prec}`:"\\u2014"}</div>
+                      <div style={{width:52,textAlign:"right",fontSize:10,fontWeight:700,color:"var(--yellow)"}}>{m.prec>0?`$${m.prec}`:"—"}</div>
                     </div>
                     <div style={{display:"flex",gap:4,alignItems:"center"}}>
                       <HBar v={meses12[i].litros} max={maxLitM} c="var(--cyan)" h={6}/>
-                      <div style={{width:52,textAlign:"right",fontSize:9,color:"var(--cyan)"}}>{meses12[i].litros>0?`${meses12[i].litros.toFixed(0)}L`:"\\u2014"}</div>
+                      <div style={{width:52,textAlign:"right",fontSize:9,color:"var(--cyan)"}}>{meses12[i].litros>0?`${meses12[i].litros.toFixed(0)}L`:"—"}</div>
                     </div>
                   </div>
                 </div>
               ))}
               <div style={{display:"flex",gap:12,marginTop:6}}>
-                <span style={{fontSize:10,color:"var(--yellow)"}}>\\u25a0 Precio/L</span>
-                <span style={{fontSize:10,color:"var(--cyan)"}}>\\u25a0 Litros</span>
+                <span style={{fontSize:10,color:"var(--yellow)"}}>■ Precio/L</span>
+                <span style={{fontSize:10,color:"var(--cyan)"}}>■ Litros</span>
               </div>
             </div>
           </div>
@@ -7624,7 +7471,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
 
         {/* tabla */}
         <div className="card">
-          <div className="card-hdr"><h3>\\ud83d\\udccb Detalle Combustible por Unidad</h3></div>
+          <div className="card-hdr"><h3>📋 Detalle Combustible por Unidad</h3></div>
           <div className="card-body" style={{padding:0}}>
             <table>
               <thead><tr><th>Unidad</th><th>Tipo</th><th>Cargas</th><th>Litros</th><th>Costo total</th><th>Precio prom.</th><th>Km recorridos</th><th>Rendimiento</th></tr></thead>
@@ -7634,13 +7481,13 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
                   : porUnidad.map(u=>(
                   <tr key={u.id}>
                     <td><strong>{u.num}</strong><div style={{fontSize:10,color:"var(--muted)"}}>{u.placas}</div></td>
-                    <td><Bdg c="bb" t={u.tipo||"\\u2014"}/></td>
+                    <td><Bdg c="bb" t={u.tipo||"—"}/></td>
                     <td style={{textAlign:"center"}}>{u.cargas}</td>
                     <td style={{fontWeight:700,color:"var(--cyan)"}}>{u.litros.toFixed(0)}L</td>
                     <td style={{fontWeight:700,color:"var(--yellow)"}}>{fmt$(u.costo)}</td>
-                    <td style={{color:"var(--muted)",fontSize:12}}>{u.precProm?`$${u.precProm}/L`:"\\u2014"}</td>
-                    <td style={{fontSize:12}}>{u.km>0?`${u.km.toLocaleString()} km`:"\\u2014"}</td>
-                    <td style={{fontWeight:700,color:u.rend&&Number(u.rend)<30?"var(--green)":"var(--orange)"}}>{u.rend?`${u.rend}L/100km`:"\\u2014"}</td>
+                    <td style={{color:"var(--muted)",fontSize:12}}>{u.precProm?`$${u.precProm}/L`:"—"}</td>
+                    <td style={{fontSize:12}}>{u.km>0?`${u.km.toLocaleString()} km`:"—"}</td>
+                    <td style={{fontWeight:700,color:u.rend&&Number(u.rend)<30?"var(--green)":"var(--orange)"}}>{u.rend?`${u.rend}L/100km`:"—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -7651,9 +7498,9 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     );
   };
 
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
+  // ══════════════════════════════════════════════════════════════
   //  5. MANTENIMIENTOS
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
+  // ══════════════════════════════════════════════════════════════
   const VistaMantenimientos = () => {
     const porUnidad = units.map(u=>{
       const mUs  = fMaints.filter(m=>m.unidadId===u.id);
@@ -7674,16 +7521,16 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     return (
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
         <div className="stats">
-          <KR icon="\\ud83d\\udd27" lbl="Servicios" val={fMaints.length} c="var(--orange)"/>
-          <KR icon="\\ud83d\\udcb5" lbl="Costo total" val={fmt$(totMant)} c="var(--red)"/>
-          <KR icon="\\ud83d\\ude9b" lbl="Unidades atendidas" val={porUnidad.length} c="var(--cyan)"/>
-          <KR icon="\\ud83d\\udcca" lbl="Costo promedio" val={fMaints.length>0?fmt$(totMant/fMaints.length):"\\u2014"} c="var(--yellow)"/>
+          <KR icon="🔧" lbl="Servicios" val={fMaints.length} c="var(--orange)"/>
+          <KR icon="💵" lbl="Costo total" val={fmt$(totMant)} c="var(--red)"/>
+          <KR icon="🚛" lbl="Unidades atendidas" val={porUnidad.length} c="var(--cyan)"/>
+          <KR icon="📊" lbl="Costo promedio" val={fMaints.length>0?fmt$(totMant/fMaints.length):"—"} c="var(--yellow)"/>
         </div>
 
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
           {/* por tipo */}
           <div className="card">
-            <div className="card-hdr"><h3>\\ud83d\\udd27 Costo por Tipo de Servicio</h3></div>
+            <div className="card-hdr"><h3>🔧 Costo por Tipo de Servicio</h3></div>
             <div style={{padding:"16px 20px"}}>
               {tipoArr.length===0 ? <div className="empty"><p>Sin mantenimientos</p></div>
               : <>
@@ -7695,7 +7542,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
                       <div style={{flex:1,fontSize:12}}>{tipo}</div>
                       <HBar v={v} max={maxTip} c={PAL[i%PAL.length]} h={7}/>
                       <div style={{width:80,textAlign:"right",fontSize:11,fontWeight:700,color:PAL[i%PAL.length]}}>{fmt$(v)}</div>
-                      <div style={{width:30,textAlign:"right",fontSize:10,color:"var(--muted)"}}>{totMant>0?`${((v/totMant)*100).toFixed(0)}%`:"\\u2014"}</div>
+                      <div style={{width:30,textAlign:"right",fontSize:10,color:"var(--muted)"}}>{totMant>0?`${((v/totMant)*100).toFixed(0)}%`:"—"}</div>
                     </div>
                   ))}
                 </div>
@@ -7705,13 +7552,13 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
 
           {/* por mes */}
           <div className="card">
-            <div className="card-hdr"><h3>\\ud83d\\udcc5 Mantenimientos por Mes \\u2014 {filtroAnio}</h3></div>
+            <div className="card-hdr"><h3>📅 Mantenimientos por Mes — {filtroAnio}</h3></div>
             <div style={{padding:"16px 20px"}}>
               {porMesM.map((m,i)=>(
                 <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
                   <div style={{width:28,fontSize:10,color:"var(--muted)",fontWeight:700}}>{m.lbl}</div>
                   <HBar v={m.costo} max={maxMM} c="var(--orange)" h={10}/>
-                  <div style={{width:75,textAlign:"right",fontSize:10,fontWeight:700,color:"var(--orange)"}}>{m.costo>0?fmt$(m.costo):"\\u2014"}</div>
+                  <div style={{width:75,textAlign:"right",fontSize:10,fontWeight:700,color:"var(--orange)"}}>{m.costo>0?fmt$(m.costo):"—"}</div>
                   <div style={{width:26,textAlign:"right",fontSize:9,color:"var(--muted)"}}>{m.n>0?`${m.n}sv`:""}</div>
                 </div>
               ))}
@@ -7721,9 +7568,9 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
 
         {/* por unidad */}
         <div className="card">
-          <div className="card-hdr"><h3>\\ud83d\\ude9b Costo de Mantenimiento por Unidad \\u2014 {lblPeriodo()}</h3></div>
+          <div className="card-hdr"><h3>🚛 Costo de Mantenimiento por Unidad — {lblPeriodo()}</h3></div>
           <div style={{padding:"16px 20px"}}>
-            {porUnidad.length===0 ? <div className="empty"><div className="empty-icon">\\ud83d\\udd27</div><p>Sin mantenimientos en el per\\u00edodo</p></div>
+            {porUnidad.length===0 ? <div className="empty"><div className="empty-icon">🔧</div><p>Sin mantenimientos en el período</p></div>
             : porUnidad.map(u=>(
               <div key={u.id} style={{marginBottom:12}}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:12}}>
@@ -7743,9 +7590,9 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     );
   };
 
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
-  //  6. CLIENTES & FACTURACI\\u00d3N
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
+  // ══════════════════════════════════════════════════════════════
+  //  6. CLIENTES & FACTURACIÓN
+  // ══════════════════════════════════════════════════════════════
   const VistaFacturas = () => {
     const porCliente = clientes.map(c=>{
       const fCli    = fFacturas.filter(f=>f.clienteId===c.id);
@@ -7760,21 +7607,21 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     return (
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
         <div className="stats">
-          <KR icon="\\ud83e\\uddfe" lbl="Emitidas" val={fFacturas.length} sub={fmt$(totFacturado)} c="var(--yellow)"/>
-          <KR icon="\\u2705" lbl="Cobradas" val={fFactPag.length} sub={fmt$(totCobrado)} c="var(--green)"/>
-          <KR icon="\\u23f3" lbl="Pendientes" val={fFacturas.filter(f=>f.status==="PENDIENTE").length} sub={fmt$(fFacturas.filter(f=>f.status==="PENDIENTE").reduce((a,f)=>a+(Number(f.total)||0),0))} c="var(--orange)"/>
-          <KR icon="\\u274c" lbl="Vencidas" val={fFacturas.filter(f=>f.status==="VENCIDA").length} sub={fmt$(fFacturas.filter(f=>f.status==="VENCIDA").reduce((a,f)=>a+(Number(f.total)||0),0))} c="var(--red)"/>
+          <KR icon="🧾" lbl="Emitidas" val={fFacturas.length} sub={fmt$(totFacturado)} c="var(--yellow)"/>
+          <KR icon="✅" lbl="Cobradas" val={fFactPag.length} sub={fmt$(totCobrado)} c="var(--green)"/>
+          <KR icon="⏳" lbl="Pendientes" val={fFacturas.filter(f=>f.status==="PENDIENTE").length} sub={fmt$(fFacturas.filter(f=>f.status==="PENDIENTE").reduce((a,f)=>a+(Number(f.total)||0),0))} c="var(--orange)"/>
+          <KR icon="❌" lbl="Vencidas" val={fFacturas.filter(f=>f.status==="VENCIDA").length} sub={fmt$(fFacturas.filter(f=>f.status==="VENCIDA").reduce((a,f)=>a+(Number(f.total)||0),0))} c="var(--red)"/>
         </div>
 
-        {/* facturaci\\u00f3n mensual */}
+        {/* facturación mensual */}
         <div className="card">
-          <div className="card-hdr"><h3>\\ud83d\\udcc8 Facturaci\\u00f3n Mensual \\u2014 {filtroAnio}</h3></div>
+          <div className="card-hdr"><h3>📈 Facturación Mensual — {filtroAnio}</h3></div>
           <div style={{padding:"16px 20px"}}>
             {meses12.map((m,i)=>(
               <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
                 <div style={{width:28,fontSize:10,color:"var(--muted)",fontWeight:700}}>{MESES[i].slice(0,3)}</div>
                 <HBar v={m.fact} max={maxFact} c="var(--yellow)" h={12}/>
-                <div style={{width:88,textAlign:"right",fontSize:11,fontWeight:700,color:"var(--yellow)"}}>{m.fact>0?fmt$(m.fact):"\\u2014"}</div>
+                <div style={{width:88,textAlign:"right",fontSize:11,fontWeight:700,color:"var(--yellow)"}}>{m.fact>0?fmt$(m.fact):"—"}</div>
               </div>
             ))}
           </div>
@@ -7782,21 +7629,21 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
 
         {/* top clientes */}
         <div className="card">
-          <div className="card-hdr"><h3>\\ud83c\\udfc6 Top Clientes por Facturaci\\u00f3n \\u2014 {lblPeriodo()}</h3></div>
+          <div className="card-hdr"><h3>🏆 Top Clientes por Facturación — {lblPeriodo()}</h3></div>
           <div style={{padding:"16px 20px"}}>
-            {porCliente.length===0 ? <div className="empty"><div className="empty-icon">\\ud83d\\udc65</div><p>Sin facturas en el per\\u00edodo</p></div>
+            {porCliente.length===0 ? <div className="empty"><div className="empty-icon">👥</div><p>Sin facturas en el período</p></div>
             : porCliente.map((c,i)=>(
               <div key={c.id} style={{marginBottom:14}}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:12}}>
                   <span><span style={{color:"var(--muted)",marginRight:6}}>#{i+1}</span><strong>{c.nombre}</strong></span>
-                  <span style={{color:"var(--yellow)",fontWeight:700}}>{fmt$(c.total)} \\u00b7 {c.n} fact.</span>
+                  <span style={{color:"var(--yellow)",fontWeight:700}}>{fmt$(c.total)} · {c.n} fact.</span>
                 </div>
                 <SegBar items={[{v:c.cobrado,c:"var(--green)",lbl:"Cobrado"},{v:c.pend,c:"var(--orange)",lbl:"Pendiente"}]} h={10}/>
                 <div style={{display:"flex",gap:12,marginTop:3,fontSize:10,color:"var(--muted)"}}>
-                  <span style={{color:"var(--green)"}}>\\u2705 {fmt$(c.cobrado)}</span>
-                  <span style={{color:"var(--orange)"}}>\\u23f3 {fmt$(c.pend)}</span>
-                  <span>Cobrado: {c.total>0?`${((c.cobrado/c.total)*100).toFixed(0)}%`:"\\u2014"}</span>
-                  <span>Participaci\\u00f3n: {totFacturado>0?`${((c.total/totFacturado)*100).toFixed(0)}%`:"\\u2014"}</span>
+                  <span style={{color:"var(--green)"}}>✅ {fmt$(c.cobrado)}</span>
+                  <span style={{color:"var(--orange)"}}>⏳ {fmt$(c.pend)}</span>
+                  <span>Cobrado: {c.total>0?`${((c.cobrado/c.total)*100).toFixed(0)}%`:"—"}</span>
+                  <span>Participación: {totFacturado>0?`${((c.total/totFacturado)*100).toFixed(0)}%`:"—"}</span>
                 </div>
               </div>
             ))}
@@ -7806,9 +7653,9 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     );
   };
 
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
+  // ══════════════════════════════════════════════════════════════
   //  7. GASTOS GENERALES
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
+  // ══════════════════════════════════════════════════════════════
   const VistaGastos = () => {
     const porTipo = {};
     fGastos.forEach(g=>{ const t=g.tipo||"Otro"; porTipo[t]=(porTipo[t]||0)+(Number(g.monto)||0); });
@@ -7819,18 +7666,18 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     return (
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
         <div className="stats">
-          <KR icon="\\ud83d\\udcb8" lbl="Total gastos" val={fmt$(totGastos)} sub={`${fGastos.length} registros`} c="var(--purple)"/>
-          <KR icon="\\ud83d\\udcca" lbl="Categor\\u00edas activas" val={tipoArr.length} c="var(--cyan)"/>
-          <KR icon="\\ud83d\\udcc5" lbl="Prom. mensual" val={fmt$(totGastos/12)} c="var(--yellow)"/>
-          <KR icon="\\ud83c\\udfc6" lbl="Mayor categor\\u00eda" val={tipoArr[0]?tipoArr[0][0]:"\\u2014"} sub={tipoArr[0]?fmt$(tipoArr[0][1]):"\\u2014"} c="var(--orange)"/>
+          <KR icon="💸" lbl="Total gastos" val={fmt$(totGastos)} sub={`${fGastos.length} registros`} c="var(--purple)"/>
+          <KR icon="📊" lbl="Categorías activas" val={tipoArr.length} c="var(--cyan)"/>
+          <KR icon="📅" lbl="Prom. mensual" val={fmt$(totGastos/12)} c="var(--yellow)"/>
+          <KR icon="🏆" lbl="Mayor categoría" val={tipoArr[0]?tipoArr[0][0]:"—"} sub={tipoArr[0]?fmt$(tipoArr[0][1]):"—"} c="var(--orange)"/>
         </div>
 
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-          {/* por categor\\u00eda */}
+          {/* por categoría */}
           <div className="card">
-            <div className="card-hdr"><h3>\\ud83e\\udd67 Gastos por Categor\\u00eda \\u2014 {lblPeriodo()}</h3></div>
+            <div className="card-hdr"><h3>🥧 Gastos por Categoría — {lblPeriodo()}</h3></div>
             <div style={{padding:"16px 20px"}}>
-              {tipoArr.length===0 ? <div className="empty"><div className="empty-icon">\\ud83d\\udcb8</div><p>Sin gastos en el per\\u00edodo</p></div>
+              {tipoArr.length===0 ? <div className="empty"><div className="empty-icon">💸</div><p>Sin gastos en el período</p></div>
               : <>
                 <SegBar items={tipoArr.map(([,v],i)=>({v,c:PAL[i%PAL.length],lbl:""}))} h={14}/>
                 <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:8}}>
@@ -7840,7 +7687,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
                       <div style={{flex:1,fontSize:12}}>{tipo}</div>
                       <HBar v={v} max={maxG} c={PAL[i%PAL.length]} h={7}/>
                       <div style={{width:80,textAlign:"right",fontSize:11,fontWeight:700,color:PAL[i%PAL.length]}}>{fmt$(v)}</div>
-                      <div style={{width:30,textAlign:"right",fontSize:10,color:"var(--muted)"}}>{totGastos>0?`${((v/totGastos)*100).toFixed(0)}%`:"\\u2014"}</div>
+                      <div style={{width:30,textAlign:"right",fontSize:10,color:"var(--muted)"}}>{totGastos>0?`${((v/totGastos)*100).toFixed(0)}%`:"—"}</div>
                     </div>
                   ))}
                 </div>
@@ -7850,13 +7697,13 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
 
           {/* por mes */}
           <div className="card">
-            <div className="card-hdr"><h3>\\ud83d\\udcc5 Gastos por Mes \\u2014 {filtroAnio}</h3></div>
+            <div className="card-hdr"><h3>📅 Gastos por Mes — {filtroAnio}</h3></div>
             <div style={{padding:"16px 20px"}}>
               {meses12.map((m,i)=>(
                 <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
                   <div style={{width:28,fontSize:10,color:"var(--muted)",fontWeight:700}}>{MESES[i].slice(0,3)}</div>
                   <HBar v={m.gast} max={maxMG} c="var(--purple)" h={10}/>
-                  <div style={{width:80,textAlign:"right",fontSize:10,fontWeight:700,color:"var(--purple)"}}>{m.gast>0?fmt$(m.gast):"\\u2014"}</div>
+                  <div style={{width:80,textAlign:"right",fontSize:10,fontWeight:700,color:"var(--purple)"}}>{m.gast>0?fmt$(m.gast):"—"}</div>
                 </div>
               ))}
             </div>
@@ -7866,9 +7713,9 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     );
   };
 
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
-  //  8. N\\u00d3MINAS
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
+  // ══════════════════════════════════════════════════════════════
+  //  8. NÓMINAS
+  // ══════════════════════════════════════════════════════════════
   const VistaNominas = () => {
     const maxOp   = Math.max(...nomPorDriver.map(x=>x.total),1);
     const maxAdm  = Math.max(...nominasAdmin.map(n=>Number(n.sueldoBruto)||0),1);
@@ -7877,20 +7724,20 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     return (
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
         <div className="stats">
-          <KR icon="\\ud83d\\udc77" lbl="N\\u00f3mina operadores" val={fmt$(totNomina)} sub={`${nomPorDriver.length} activos`} c="var(--purple)"/>
-          <KR icon="\\ud83d\\udc54" lbl="N\\u00f3mina admin" val={fmt$(totNominaAdmin)} sub={`${nominasAdmin.length} empleados`} c="var(--cyan)"/>
-          <KR icon="\\ud83d\\udcb0" lbl="Total n\\u00f3mina" val={fmt$(totTotal)} c="var(--green)"/>
-          <KR icon="\\ud83d\\udcca" lbl="% sobre ingresos" val={totIngresos>0?`${((totTotal/totIngresos)*100).toFixed(1)}%`:"\\u2014"} c="var(--yellow)"/>
+          <KR icon="👷" lbl="Nómina operadores" val={fmt$(totNomina)} sub={`${nomPorDriver.length} activos`} c="var(--purple)"/>
+          <KR icon="👔" lbl="Nómina admin" val={fmt$(totNominaAdmin)} sub={`${nominasAdmin.length} empleados`} c="var(--cyan)"/>
+          <KR icon="💰" lbl="Total nómina" val={fmt$(totTotal)} c="var(--green)"/>
+          <KR icon="📊" lbl="% sobre ingresos" val={totIngresos>0?`${((totTotal/totIngresos)*100).toFixed(1)}%`:"—"} c="var(--yellow)"/>
         </div>
 
-        {/* barra comparativa n\\u00f3mina vs ingresos */}
+        {/* barra comparativa nómina vs ingresos */}
         <div className="card">
-          <div className="card-hdr"><h3>\\ud83d\\udcca N\\u00f3mina vs Ingresos \\u2014 {lblPeriodo()}</h3></div>
+          <div className="card-hdr"><h3>📊 Nómina vs Ingresos — {lblPeriodo()}</h3></div>
           <div style={{padding:"16px 20px"}}>
-            <SegBar items={[{v:totTotal,c:"var(--purple)",lbl:"N\\u00f3mina"},{v:Math.max(totIngresos-totTotal,0),c:"var(--green)",lbl:"Ingreso restante"}]} h={20}/>
+            <SegBar items={[{v:totTotal,c:"var(--purple)",lbl:"Nómina"},{v:Math.max(totIngresos-totTotal,0),c:"var(--green)",lbl:"Ingreso restante"}]} h={20}/>
             <div style={{marginTop:10,display:"flex",gap:14,flexWrap:"wrap",fontSize:12}}>
-              <span style={{color:"var(--purple)"}}>\\u25a0 N\\u00f3mina: {fmt$(totTotal)} ({totIngresos>0?`${((totTotal/totIngresos)*100).toFixed(0)}%`:"\\u2014"})</span>
-              <span style={{color:"var(--green)"}}>\\u25a0 Margen restante: {fmt$(Math.max(totIngresos-totTotal,0))}</span>
+              <span style={{color:"var(--purple)"}}>■ Nómina: {fmt$(totTotal)} ({totIngresos>0?`${((totTotal/totIngresos)*100).toFixed(0)}%`:"—"})</span>
+              <span style={{color:"var(--green)"}}>■ Margen restante: {fmt$(Math.max(totIngresos-totTotal,0))}</span>
             </div>
           </div>
         </div>
@@ -7898,17 +7745,17 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
           {/* operadores */}
           <div className="card">
-            <div className="card-hdr"><h3>\\ud83d\\udc77 Operadores \\u2014 Desglose</h3></div>
+            <div className="card-hdr"><h3>👷 Operadores — Desglose</h3></div>
             <div style={{padding:"16px 20px"}}>
-              {nomPorDriver.length===0 ? <div className="empty"><p>Sin operadores con n\\u00f3mina</p></div>
+              {nomPorDriver.length===0 ? <div className="empty"><p>Sin operadores con nómina</p></div>
               : nomPorDriver.map(x=>(
                 <div key={x.driver.id} style={{marginBottom:12}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:12}}>
                     <span style={{fontWeight:700}}>{x.driver.nombre}</span>
                     <span style={{color:"var(--purple)",fontWeight:700}}>{fmt$(x.total)}</span>
                   </div>
-                  <SegBar items={[{v:x.sueldo,c:"var(--cyan)",lbl:"Base"},{v:x.comision,c:"var(--purple)",lbl:"Comisi\\u00f3n"}]} h={8}/>
-                  <div style={{fontSize:9,color:"var(--muted)",marginTop:2}}>Base {fmt$(x.sueldo)} + Comisi\\u00f3n {x.driver.porcentajeViaje||0}% = {fmt$(x.comision)} \\u00b7 {x.viajesD.length}v</div>
+                  <SegBar items={[{v:x.sueldo,c:"var(--cyan)",lbl:"Base"},{v:x.comision,c:"var(--purple)",lbl:"Comisión"}]} h={8}/>
+                  <div style={{fontSize:9,color:"var(--muted)",marginTop:2}}>Base {fmt$(x.sueldo)} + Comisión {x.driver.porcentajeViaje||0}% = {fmt$(x.comision)} · {x.viajesD.length}v</div>
                 </div>
               ))}
               <div style={{borderTop:"1px solid var(--border)",paddingTop:8,display:"flex",justifyContent:"space-between",fontSize:12}}>
@@ -7919,9 +7766,9 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
 
           {/* admin */}
           <div className="card">
-            <div className="card-hdr"><h3>\\ud83d\\udc54 Personal Administrativo</h3></div>
+            <div className="card-hdr"><h3>👔 Personal Administrativo</h3></div>
             <div style={{padding:"16px 20px"}}>
-              {nominasAdmin.length===0 ? <div className="empty"><p>Sin n\\u00f3mina administrativa</p></div>
+              {nominasAdmin.length===0 ? <div className="empty"><p>Sin nómina administrativa</p></div>
               : nominasAdmin.map(n=>(
                 <div key={n.id} style={{marginBottom:12}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:12}}>
@@ -7941,9 +7788,9 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     );
   };
 
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
-  //  9. AN\\u00c1LISIS DE VIAJES
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
+  // ══════════════════════════════════════════════════════════════
+  //  9. ANÁLISIS DE VIAJES
+  // ══════════════════════════════════════════════════════════════
   const VistaViajes = () => {
     const destMap = {};
     fTrips.forEach(t=>{ const d=t.destino||"Sin destino"; if (!destMap[d]) destMap[d]={n:0,ing:0}; destMap[d].n++; destMap[d].ing+=(Number(t.costoOfrecido)||0); });
@@ -7956,17 +7803,17 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     return (
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
         <div className="stats">
-          <KR icon="\\ud83d\\ude9b" lbl="Viajes propios" val={fTripsProp.length} sub={fmt$(fTripsProp.reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0))} c="var(--cyan)"/>
-          <KR icon="\\ud83d\\udd04" lbl="Log\\u00edstica externa" val={fTripsExt.length} sub={fmt$(fTripsExt.reduce((a,t)=>a+(Number(t.costoPagar)||0),0))} c="var(--purple)"/>
-          <KR icon="\\ud83d\\udce6" lbl="Total viajes" val={fTrips.length} sub={fmt$(totIngresos)} c="var(--green)"/>
-          <KR icon="\\ud83d\\udccd" lbl="Destinos \\u00fanicos" val={[...new Set(fTrips.map(t=>t.destino).filter(Boolean))].length} c="var(--orange)"/>
-          <KR icon="\\ud83d\\udcc8" lbl="Ingreso promedio" val={fTrips.length>0?fmt$(totIngresos/fTrips.length):"\\u2014"} c="var(--yellow)"/>
+          <KR icon="🚛" lbl="Viajes propios" val={fTripsProp.length} sub={fmt$(fTripsProp.reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0))} c="var(--cyan)"/>
+          <KR icon="🔄" lbl="Logística externa" val={fTripsExt.length} sub={fmt$(fTripsExt.reduce((a,t)=>a+(Number(t.costoPagar)||0),0))} c="var(--purple)"/>
+          <KR icon="📦" lbl="Total viajes" val={fTrips.length} sub={fmt$(totIngresos)} c="var(--green)"/>
+          <KR icon="📍" lbl="Destinos únicos" val={[...new Set(fTrips.map(t=>t.destino).filter(Boolean))].length} c="var(--orange)"/>
+          <KR icon="📈" lbl="Ingreso promedio" val={fTrips.length>0?fmt$(totIngresos/fTrips.length):"—"} c="var(--yellow)"/>
         </div>
 
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
           {/* viajes y ingresos por mes */}
           <div className="card">
-            <div className="card-hdr"><h3>\\ud83d\\udcc5 Viajes e Ingresos por Mes \\u2014 {filtroAnio}</h3></div>
+            <div className="card-hdr"><h3>📅 Viajes e Ingresos por Mes — {filtroAnio}</h3></div>
             <div style={{padding:"16px 20px"}}>
               {meses12.map((m,i)=>(
                 <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
@@ -7980,32 +7827,32 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
                     </div>
                     <div style={{display:"flex",gap:4,alignItems:"center"}}>
                       <HBar v={m.ing} max={maxIngMes} c="var(--green)" h={6}/>
-                      <span style={{width:66,textAlign:"right",fontSize:9,color:"var(--green)",fontWeight:700}}>{m.ing>0?fmt$(m.ing):"\\u2014"}</span>
+                      <span style={{width:66,textAlign:"right",fontSize:9,color:"var(--green)",fontWeight:700}}>{m.ing>0?fmt$(m.ing):"—"}</span>
                     </div>
                   </div>
                 </div>
               ))}
               <div style={{display:"flex",gap:10,marginTop:4}}>
-                <span style={{fontSize:10,color:"var(--cyan)"}}>\\u25a0 Propios</span>
-                <span style={{fontSize:10,color:"var(--purple)"}}>\\u25a0 Externos</span>
-                <span style={{fontSize:10,color:"var(--green)"}}>\\u25a0 Ingresos</span>
+                <span style={{fontSize:10,color:"var(--cyan)"}}>■ Propios</span>
+                <span style={{fontSize:10,color:"var(--purple)"}}>■ Externos</span>
+                <span style={{fontSize:10,color:"var(--green)"}}>■ Ingresos</span>
               </div>
             </div>
           </div>
 
           {/* top destinos */}
           <div className="card">
-            <div className="card-hdr"><h3>\\ud83d\\uddfa\\ufe0f Top 10 Destinos por Ingreso</h3></div>
+            <div className="card-hdr"><h3>🗺️ Top 10 Destinos por Ingreso</h3></div>
             <div style={{padding:"16px 20px"}}>
-              {destArr.length===0 ? <div className="empty"><div className="empty-icon">\\ud83d\\uddfa\\ufe0f</div><p>Sin viajes en el per\\u00edodo</p></div>
+              {destArr.length===0 ? <div className="empty"><div className="empty-icon">🗺️</div><p>Sin viajes en el período</p></div>
               : destArr.map(([dest,{n,ing}],i)=>(
                 <div key={dest} style={{marginBottom:10}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:12}}>
-                    <span style={{fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:150}}>\\ud83d\\udccd {dest}</span>
+                    <span style={{fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:150}}>📍 {dest}</span>
                     <span style={{color:"var(--green)",fontWeight:700,flexShrink:0,marginLeft:8}}>{fmt$(ing)}</span>
                   </div>
                   <HBar v={ing} max={maxDest} c={PAL[i%PAL.length]} h={8}/>
-                  <div style={{fontSize:9,color:"var(--muted)",marginTop:2}}>{n} viaje{n!==1?"s":""} \\u00b7 {totIngresos>0?`${((ing/totIngresos)*100).toFixed(0)}% del ingreso`:""}</div>
+                  <div style={{fontSize:9,color:"var(--muted)",marginTop:2}}>{n} viaje{n!==1?"s":""} · {totIngresos>0?`${((ing/totIngresos)*100).toFixed(0)}% del ingreso`:""}</div>
                 </div>
               ))}
             </div>
@@ -8015,9 +7862,9 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     );
   };
 
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
+  // ══════════════════════════════════════════════════════════════
   //  10. PROVEEDORES
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
+  // ══════════════════════════════════════════════════════════════
   const VistaProveedores = () => {
     const porProv = proveedores.map(p=>{
       const gm   = maints.filter(m=>m.proveedorId===p.id).reduce((a,m)=>a+(Number(m.costoRef)||0)+(Number(m.costoMO)||0),0);
@@ -8036,17 +7883,17 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     return (
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
         <div className="stats">
-          <KR icon="\\ud83c\\udfea" lbl="Proveedores activos" val={porProv.length} c="var(--cyan)"/>
-          <KR icon="\\ud83d\\udcb5" lbl="Gasto total" val={fmt$(totGastProv)} c="var(--red)"/>
-          <KR icon="\\u23f3" lbl="Cuentas pendientes" val={fmt$(totPend)} c="var(--orange)"/>
-          <KR icon="\\ud83c\\udfc6" lbl="Mayor proveedor" val={porProv[0]?.nombre||"\\u2014"} sub={porProv[0]?fmt$(porProv[0].total):"\\u2014"} c="var(--yellow)"/>
+          <KR icon="🏪" lbl="Proveedores activos" val={porProv.length} c="var(--cyan)"/>
+          <KR icon="💵" lbl="Gasto total" val={fmt$(totGastProv)} c="var(--red)"/>
+          <KR icon="⏳" lbl="Cuentas pendientes" val={fmt$(totPend)} c="var(--orange)"/>
+          <KR icon="🏆" lbl="Mayor proveedor" val={porProv[0]?.nombre||"—"} sub={porProv[0]?fmt$(porProv[0].total):"—"} c="var(--yellow)"/>
         </div>
 
         {/* barras por proveedor */}
         <div className="card">
-          <div className="card-hdr"><h3>\\ud83c\\udfea Gasto por Proveedor \\u2014 {lblPeriodo()}</h3></div>
+          <div className="card-hdr"><h3>🏪 Gasto por Proveedor — {lblPeriodo()}</h3></div>
           <div style={{padding:"16px 20px"}}>
-            {porProv.length===0 ? <div className="empty"><div className="empty-icon">\\ud83c\\udfea</div><p>Sin datos de proveedores</p></div>
+            {porProv.length===0 ? <div className="empty"><div className="empty-icon">🏪</div><p>Sin datos de proveedores</p></div>
             : porProv.map((p,i)=>(
               <div key={p.id} style={{marginBottom:14}}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:12}}>
@@ -8055,10 +7902,10 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
                 </div>
                 <SegBar items={[{v:p.gm,c:"var(--orange)",lbl:"Mant"},{v:p.gg,c:"var(--purple)",lbl:"Gastos"},{v:p.ge,c:"var(--cyan)",lbl:"Transport"}]} h={10}/>
                 <div style={{display:"flex",gap:12,marginTop:3,fontSize:10,color:"var(--muted)"}}>
-                  {p.gm>0&&<span style={{color:"var(--orange)"}}>\\ud83d\\udd27 {fmt$(p.gm)}</span>}
-                  {p.gg>0&&<span style={{color:"var(--purple)"}}>\\ud83d\\udcb8 {fmt$(p.gg)}</span>}
-                  {p.ge>0&&<span style={{color:"var(--cyan)"}}>\\ud83d\\ude9b {fmt$(p.ge)}</span>}
-                  {p.pend>0&&<span style={{color:"var(--orange)"}}>\\u23f3 Pend: {fmt$(p.pend)}</span>}
+                  {p.gm>0&&<span style={{color:"var(--orange)"}}>🔧 {fmt$(p.gm)}</span>}
+                  {p.gg>0&&<span style={{color:"var(--purple)"}}>💸 {fmt$(p.gg)}</span>}
+                  {p.ge>0&&<span style={{color:"var(--cyan)"}}>🚛 {fmt$(p.ge)}</span>}
+                  {p.pend>0&&<span style={{color:"var(--orange)"}}>⏳ Pend: {fmt$(p.pend)}</span>}
                   <span>{totGastProv>0?`${((p.total/totGastProv)*100).toFixed(0)}% del total`:""}</span>
                 </div>
               </div>
@@ -8069,20 +7916,20 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     );
   };
 
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
+  // ══════════════════════════════════════════════════════════════
   //  RENDER PRINCIPAL
-  // \\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550\\u2550
+  // ══════════════════════════════════════════════════════════════
   const TABS = [
-    ["resumen",        "\\ud83d\\udcca Resumen"],
-    ["rendimiento",    "\\ud83d\\ude9b Unidades"],
-    ["operadores",     "\\ud83d\\udc68\\u200d\\u2708\\ufe0f Operadores"],
-    ["combustible",    "\\u26fd Combustible"],
-    ["mantenimientos", "\\ud83d\\udd27 Mantenimiento"],
-    ["facturas",       "\\ud83e\\uddfe Facturaci\\u00f3n"],
-    ["gastos",         "\\ud83d\\udcb8 Gastos"],
-    ["nominas",        "\\ud83d\\udc77 N\\u00f3minas"],
-    ["viajes",         "\\ud83d\\uddfa\\ufe0f Viajes"],
-    ["proveedores_chart","\\ud83c\\udfea Proveedores"],
+    ["resumen",        "📊 Resumen"],
+    ["rendimiento",    "🚛 Unidades"],
+    ["operadores",     "👨‍✈️ Operadores"],
+    ["combustible",    "⛽ Combustible"],
+    ["mantenimientos", "🔧 Mantenimiento"],
+    ["facturas",       "🧾 Facturación"],
+    ["gastos",         "💸 Gastos"],
+    ["nominas",        "👷 Nóminas"],
+    ["viajes",         "🗺️ Viajes"],
+    ["proveedores_chart","🏪 Proveedores"],
   ];
 
   return (
@@ -9855,7 +9702,7 @@ const AYUDA_DATA = [
       { q: "¿Cómo configuro el logo y nombre de mi empresa?",
         a: "Haz clic en el logo de la empresa en la parte superior del sidebar (aparece el ícono ✏️). Ahí puedes subir tu logo, cambiar el nombre de empresa y slogan. El logo aparece en documentos impresos y cotizaciones." },
       { q: "¿Los datos se guardan automáticamente?",
-        a: "Sí. Cada registro se guarda automáticamente en Firebase y sincroniza en tiempo real entre todos los dispositivos conectados. Las fotos se almacenan en Cloudinary y están disponibles desde cualquier dispositivo. No necesitas hacer copias manuales." },
+        a: "Sí. Cada registro se guarda automáticamente en Firebase y sincroniza en tiempo real entre todos los dispositivos conectados. No necesitas hacer copias manuales." },
       { q: "¿Puedo usar el sistema en múltiples computadoras al mismo tiempo?",
         a: "Sí. Firebase sincroniza los datos en tiempo real. Si alguien registra un viaje desde una PC, aparece de inmediato en los demás dispositivos sin recargar la página." },
       { q: "¿Cómo instalo la app en mi computadora o celular?",
@@ -9901,15 +9748,13 @@ const AYUDA_DATA = [
     color: "var(--yellow)",
     preguntas: [
       { q: "¿Cómo programo un mantenimiento?",
-        a: "Ve a Control → Mantenimientos → '➕ Nuevo'. Selecciona la unidad, tipo de servicio (preventivo/correctivo), fecha programada. Puedes vincular dos proveedores separados: 🔧 Proveedor Refacciones (costo de partes) y 🏪 Proveedor Taller/M.O. (mano de obra). Cada uno genera su cuenta por pagar independiente en Proveedores." },
+        a: "Ve a Control → Mantenimientos → '➕ Nuevo'. Selecciona la unidad, tipo de servicio (preventivo/correctivo), fecha programada. Puedes vincular dos proveedores: uno para Refacciones (costo de partes) y otro para el Taller/Mano de Obra. Ambos generan su cuenta por pagar en Proveedores." },
       { q: "¿Cómo sé qué unidades necesitan mantenimiento pronto?",
         a: "El Dashboard muestra alertas de mantenimientos próximos. En el módulo Alertas (🔔 en el sidebar) verás todas las unidades con mantenimiento vencido o por vencer." },
       { q: "¿Cómo funciona el seguimiento por KM?",
         a: "En cada unidad defines los KM actuales y el intervalo de mantenimiento (ej: 5,000 km). Al registrar combustible con los KM recorridos, el sistema calcula automáticamente cuántos KM faltan para el próximo servicio." },
       { q: "¿Puedo registrar mantenimientos correctivos (emergencias)?",
         a: "Sí. Al crear el mantenimiento, selecciona tipo 'Correctivo' y prioridad 'ALTA'. Puedes dejar la fecha programada como el mismo día del incidente." },
-      { q: "¿Cómo controlo los kilómetros para el próximo mantenimiento?",
-        a: "Cada unidad tiene configurado un 'Intervalo de Mantenimiento' en KM. El sistema calcula automáticamente los kilómetros restantes y muestra alertas cuando faltan 500 km o menos. En el Dashboard, el KPI 'Mant. por KM' muestra todas las unidades ordenadas por urgencia. En Alertas verás alertas rojas (vencido) y amarillas (próximo). La Ficha Técnica impresa también muestra los KM faltantes con código de color." },
     ]
   },
   {
@@ -9981,7 +9826,7 @@ const AYUDA_DATA = [
     color: "var(--cyan)",
     preguntas: [
       { q: "¿Cómo funciona la nómina de operadores?",
-        a: "Ve a Finanzas → Nóminas → pestaña Operadores. Usa '💵 Nómina' para generar el recibo o '✏️' para editar la nómina existente. El sistema calcula sueldo base más comisión por viajes completados según el % configurado en el perfil del conductor." },
+        a: "Ve a Finanzas → Nóminas → pestaña Operadores. Haz clic en '💵 Nómina' para generar el recibo de un operador, o en '✏️' para editarlo directamente. El sistema calcula sueldo base más comisión por viajes completados (según % configurado en el perfil). Puedes editar los montos antes de imprimir." },
       { q: "¿Qué es la nómina administrativa?",
         a: "Es para personal de oficina: secretarias, gerentes, supervisores, contadores, etc. No tiene cálculo de viajes ni comisiones, solo sueldo base, bonos y deducciones. Se gestiona en Finanzas → Nóminas → pestaña Administrativos." },
       { q: "¿Cómo agrego personal administrativo?",
@@ -10017,29 +9862,11 @@ const AYUDA_DATA = [
     color: "var(--green)",
     preguntas: [
       { q: "¿Cómo activo el módulo GPS?",
-        a: "Ve a GPS en Vivo en el sidebar. Haz clic en '⚙️ Configurar Traccar'. Necesitas un servidor Traccar (puedes adquirir uno con tu proveedor Fleet Pro). Ingresa la URL, usuario y contraseña. El mapa se actualiza en tiempo real." },
+        a: "Ve a GPS en Vivo en el sidebar. Haz clic en '⚙️ Configurar Traccar'. Necesitas una cuenta en Traccar (traccar.org) o un servidor propio. Ingresa la URL, usuario y contraseña de tu servidor Traccar." },
       { q: "¿Qué información muestra el módulo GPS?",
         a: "Muestra la posición en tiempo real de cada dispositivo GPS registrado en Traccar, velocidad actual, última actualización y el mapa con las posiciones." },
       { q: "¿Qué dispositivos GPS son compatibles?",
         a: "El módulo es compatible con cualquier dispositivo que reporte a un servidor Traccar: GPS de vehículos, trackers OBD, apps móviles con Traccar Client, y más de 200 modelos de distintas marcas. Consulta a tu proveedor Fleet Pro para recomendaciones de hardware según tu flota." },
-    ]
-  },
-  {
-    id: "almacen", icono: "📦", titulo: "Almacén",
-    color: "var(--orange)",
-    preguntas: [
-      { q: "¿Para qué sirve el módulo de Almacén?",
-        a: "El Almacén te permite controlar el inventario de refacciones, herramientas, lubricantes, filtros y cualquier artículo que uses en tu flota. Puedes ver el stock disponible, registrar entradas (compras) y salidas (uso en mantenimientos), y llevar un historial de movimientos." },
-      { q: "¿Cómo agrego un artículo al almacén?",
-        a: "Ve a Control → Almacén → '➕ Nuevo Artículo'. Ingresa nombre, categoría, marca, número de parte, unidad de medida, stock inicial y precio de referencia. Puedes subir una foto del artículo para identificarlo fácilmente." },
-      { q: "¿El precio del artículo afecta las finanzas?",
-        a: "No. El precio en el almacén es solo de referencia para saber el costo aproximado. Para registrar el gasto financiero real de una compra de refacciones, debes agregarlo también en Gastos Generales o vincularlo a un Proveedor en Cuentas por Pagar." },
-      { q: "¿Cómo registro una entrada o salida de inventario?",
-        a: "En Almacén, haz clic en '📋 Mov.' en la tarjeta del artículo, o usa el botón '📋 Registrar Movimiento'. Elige el tipo: Entrada (compra/recepción), Salida (uso en mantenimiento) o Ajuste. El stock se actualiza automáticamente." },
-      { q: "¿Qué significa el color del borde en las tarjetas?",
-        a: "Verde: stock por encima del mínimo. Amarillo: stock igual o por debajo del mínimo configurado. Rojo: sin stock (agotado). Esto te permite identificar rápidamente qué artículos necesitas reponer." },
-      { q: "¿Puedo crear categorías personalizadas?",
-        a: "Sí. Al agregar o editar un artículo, en el campo Categoría hay una opción '+ Otra categoría...' que te permite escribir cualquier categoría personalizada." },
     ]
   },
   {
@@ -10457,7 +10284,6 @@ export default function App() {
   const [branding, setBranding] = useState({ nombre: "Mi Empresa", slogan: "Sistema de Flota", logo: "" });
   const [drivers, setDrivers] = useState([]);
   const [docs, setDocs] = useState([]);
-  const [almacen, setAlmacen] = useState([]);
   const [maints, setMaints] = useState([]);
   const [fuels, setFuels] = useState([]);
   const [trips, setTrips] = useState([]);
@@ -10508,7 +10334,6 @@ export default function App() {
         [setDrivers,             "fp6:drivers",         D_DRIVERS],
         // docs se cargan individualmente abajo
         [setMaints,              "fp6:maints",          D_MAINTS],
-        [setAlmacen,             "fp6:almacen",         []],
         [setFuels,               "fp6:fuels",           D_FUELS],
         [setTrips,               "fp6:trips",           D_TRIPS],
         [setGastos,              "fp6:gastos",          D_GASTOS],
@@ -10643,9 +10468,7 @@ export default function App() {
       notify("Eliminado");
     }})
   };
-  const MC   = mkCRUD(() => mRef.current, setMaints, "fp6:maints");
-  const almRef = useRef(almacen); almRef.current = almacen;
-  const ALC  = mkCRUD(() => almRef.current, setAlmacen, "fp6:almacen");
+  const MC = mkCRUD(() => mRef.current, setMaints, "fp6:maints");
   const FC = mkCRUD(() => fRef.current, setFuels, "fp6:fuels");
   const TC = mkCRUD(() => tRef.current, setTrips, "fp6:trips");
   const GC = mkCRUD(() => gRef.current, setGastos, "fp6:gastos");
@@ -10719,12 +10542,12 @@ export default function App() {
 
   const icons = {
     dashboard: "📊", alerts: "🚨", units: "🚛", drivers: "👨‍✈️",
-    trips: "🗺️", maints: "🔧", almacen: "📦", fuels: "⛽", docs: "📄",
+    trips: "🗺️", maints: "🔧", fuels: "⛽", docs: "📄",
     charts: "📈", gastos: "💵", clientes: "👥", facturacion: "🧾", proveedores: "🏪", nominas: "💰", ayuda: "❓", gps: "📡", cotizaciones: "📋"
   };
   const titles = {
     dashboard: "Dashboard", alerts: "Alertas", units: "Unidades",
-    drivers: "Conductores", trips: "Viajes & Logística", maints: "Mantenimientos", almacen: "Almacén",
+    drivers: "Conductores", trips: "Viajes & Logística", maints: "Mantenimientos",
     fuels: "Combustible", docs: "Documentos", charts: "Gráficas & Reportes",
     gastos: "Gastos Generales", clientes: "Clientes", facturacion: "Facturación",
     proveedores: "Proveedores", nominas: "Nóminas", ayuda: "Ayuda", gps: "GPS en Vivo", cotizaciones: "Cotizaciones y Tabulador"
@@ -10734,7 +10557,7 @@ export default function App() {
     { lbl: "PRINCIPAL", items: [{ id: "dashboard" }, { id: "alerts", badge: alertCount }, { id: "gps" }, { id: "ayuda" }] },
     { lbl: "FLOTA", items: [{ id: "units" }, { id: "drivers" }, { id: "trips" }] },
     { lbl: "CONTROL", items: [
-      { id: "maints" }, { id: "almacen" },
+      { id: "maints" },
       { id: "fuels" },
       { id: "docs" },
       ...(isSupervisor ? [{ id: "gastos" }, { id: "proveedores" }] : []),
@@ -10920,10 +10743,6 @@ export default function App() {
             onAdd={(prefill) => setModal({ type: "doc", data: prefill || null, _ts: Date.now() })}
             onEdit={d => setModal({ type: "doc", data: d })}
             onDelete={DoC.del} />}
-          {tab === "almacen" && <AlmacenPage almacen={almacen} isAdmin={isAdmin}
-            onAdd={isAdmin?()=>setModal({type:"almacen",data:null,_ts:Date.now()}):null}
-            onEdit={isAdmin?item=>setModal({type:"almacen",data:item}):null}
-            onDelete={ALC.del}/>}
           {tab === "maints" && <MaintPage units={units} maints={maints} proveedores={proveedores}
             onAdd={userCan("crearMantenimientos") ? () => setModal({ type: "maint", data: null, _ts: Date.now() }) : null}
             onEdit={isSupervisor ? m => setModal({ type: "maint", data: m }) : null}
@@ -11040,7 +10859,6 @@ export default function App() {
       {modal?.type === "driver" && <DriverModal key={modal.data?.id || modal._ts || "new-driver"} driver={modal.data} units={units} onSave={d => DC.save({ ...d, id: d.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "unit" && <UnitModal key={modal.data?.id || modal._ts || "new-unit"} unit={modal.data} drivers={drivers} tiposPersonalizados={tiposPersonalizados} onAddTipo={async (t) => { const newTipos = [...tiposPersonalizados, t]; setTiposPersonalizados(newTipos); await sv("fp6:tipos", newTipos); }} onSave={u => UC.save({ ...u, id: u.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "doc" && <DocModal key={modal.data?.id || modal._ts || "new-doc"} doc={modal.data} units={units} drivers={drivers} onSave={d => DoC.save({ ...d, id: d.id || uid() })} onClose={() => setModal(null)} />}
-      {modal?.type === "almacen" && <AlmacenModal item={modal.data} onSave={d=>ALC.save({...d,id:d.id||uid()})} onClose={()=>setModal(null)}/>}
       {modal?.type === "maint" && <MaintModal key={modal.data?.id || modal._ts || "new-maint"} maint={modal.data} units={units} proveedores={proveedores} onSave={m => MC.save({ ...m, id: m.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "fuel" && <FuelModal key={modal.data?.id || modal._ts || "new-fuel"} fuel={modal.data} units={units} onSave={f => FC.save({ ...f, id: f.id || uid() })} onClose={() => setModal(null)} onUpdateUnit={UC.save} />}
       {modal?.type === "trip" && <TripModal key={modal.data?.id || modal._ts || "new-trip"} trip={modal.data} units={units} onSave={t => TC.save({ ...t, id: t.id || uid(), esExterno: false })} onClose={() => setModal(null)} />}
