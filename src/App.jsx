@@ -6787,6 +6787,249 @@ function FuelPage({ units, fuels, onAdd, onEdit, onDelete }) {
 // ════════════════════════════════════════════════════════════════════════════
 //  CHARTS PAGE v6  —  10 vistas de análisis
 // ════════════════════════════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════════
+// ALMACÉN — Control de Inventario, Refacciones y Herramientas
+// ════════════════════════════════════════════════════════════════
+
+const ALMACEN_CATS = ["Refacciones","Herramientas","Lubricantes","Filtros","Llantas","Eléctrico","Consumibles","Seguridad","Otro"];
+const ALMACEN_UNIDADES = ["pieza","litro","galón","kit","par","juego","caja","metro"];
+
+function AlmacenModal({ item, onSave, onClose }) {
+  const [f, setF] = useState(item || {
+    nombre:"", categoria:ALMACEN_CATS[0], marca:"", numParte:"",
+    unidad:"pieza", stockMin:1, stockActual:0, ubicacion:"",
+    precio:0, proveedor:"", notas:"", foto:"",
+  });
+  const [uploading, setUploading] = useState(false);
+  const ch = k => e => setF(p=>({...p,[k]:e.target.value}));
+  const ok = () => {
+    if (!f.nombre) return alert("Nombre requerido");
+    onSave({...f, id: f.id||uid()});
+  };
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal wide" onClick={e=>e.stopPropagation()}>
+        <div className="mhdr">
+          <h3>{f.id?"✏️ Editar Artículo":"📦 Nuevo Artículo"}</h3>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+        </div>
+        <div className="mbody">
+          <div className="fg">
+            <PhotoInput value={f.foto} onChange={v=>setF(p=>({...p,foto:v}))} onUploading={setUploading} label="Foto del Artículo"/>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <div className="field s2"><label>Nombre *</label><input value={f.nombre} onChange={ch("nombre")} placeholder="Ej: Filtro de aceite Wix 51334"/></div>
+              <div className="fg">
+                <div className="field"><label>Categoría</label>
+                  <select value={ALMACEN_CATS.includes(f.categoria)?f.categoria:"__otro__"}
+                    onChange={e=>setF(p=>({...p,categoria:e.target.value==="__otro__"?"":e.target.value}))}>
+                    {ALMACEN_CATS.map(cat=><option key={cat} value={cat}>{cat}</option>)}
+                    <option value="__otro__">+ Otra categoría...</option>
+                  </select>
+                  {!ALMACEN_CATS.includes(f.categoria)&&(
+                    <input value={f.categoria} onChange={ch("categoria")} placeholder="Escribe la categoría" style={{marginTop:4}}/>
+                  )}
+                </div>
+                <div className="field"><label>Marca</label><input value={f.marca} onChange={ch("marca")} placeholder="Ej: Wix, Mobil, SKF"/></div>
+              </div>
+            </div>
+            <div className="field"><label>No. Parte / SKU</label><input value={f.numParte} onChange={ch("numParte")} placeholder="Ej: WIX-51334"/></div>
+            <div className="field"><label>Unidad</label>
+              <select value={f.unidad} onChange={ch("unidad")}>
+                {ALMACEN_UNIDADES.map(u=><option key={u}>{u}</option>)}
+              </select>
+            </div>
+            <div className="field"><label>Stock Actual</label><input value={f.stockActual} onChange={ch("stockActual")} type="number" min="0"/></div>
+            <div className="field"><label>Stock Mínimo</label><input value={f.stockMin} onChange={ch("stockMin")} type="number" min="0"/></div>
+            <div className="field"><label>Precio Unitario ($) <span style={{fontSize:10,color:"var(--muted)",fontWeight:400}}>(referencia)</span></label><input value={f.precio} onChange={ch("precio")} type="number" min="0" placeholder="Solo referencia, no afecta finanzas"/></div>
+            <div className="field"><label>Ubicación / Rack</label><input value={f.ubicacion} onChange={ch("ubicacion")} placeholder="Ej: Estante A-3"/></div>
+            <div className="field"><label>Proveedor habitual</label><input value={f.proveedor} onChange={ch("proveedor")} placeholder="Ej: Autozone"/></div>
+            <div className="field s2"><label>Notas</label><textarea value={f.notas} onChange={ch("notas")} rows={2}/></div>
+          </div>
+        </div>
+        <div className="mftr">
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-cyan" onClick={ok} disabled={uploading}>{uploading?"⏳ Subiendo...":"💾 Guardar"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MovimientoModal({ item, almacen, onSave, onClose }) {
+  const [f, setF] = useState({
+    articuloId: item?.id||"", tipo:"salida", cantidad:1, motivo:"",
+    fecha: new Date().toLocaleDateString("es-MX",{day:"2-digit",month:"2-digit",year:"numeric"}).split("/").join("/"),
+    ref:"",
+  });
+  const ch = k => e => setF(p=>({...p,[k]:e.target.value}));
+  const art = almacen.find(a=>a.id===f.articuloId);
+  const ok = () => {
+    if (!f.articuloId) return alert("Selecciona un artículo");
+    if (!f.cantidad||f.cantidad<=0) return alert("Cantidad inválida");
+    onSave({...f, id:uid()});
+  };
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <div className="mhdr">
+          <h3>📋 Registrar Movimiento</h3>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+        </div>
+        <div className="mbody">
+          <div className="fg">
+            <div className="field s2"><label>Artículo *</label>
+              <select value={f.articuloId} onChange={ch("articuloId")}>
+                <option value="">— Seleccionar —</option>
+                {almacen.map(a=><option key={a.id} value={a.id}>{a.nombre} (Stock: {a.stockActual} {a.unidad})</option>)}
+              </select>
+            </div>
+            <div className="field"><label>Tipo</label>
+              <select value={f.tipo} onChange={ch("tipo")}>
+                <option value="entrada">📥 Entrada (compra/recepción)</option>
+                <option value="salida">📤 Salida (uso en mant.)</option>
+                <option value="ajuste">🔧 Ajuste de inventario</option>
+              </select>
+              {f.tipo==="entrada"&&<div style={{fontSize:10,color:"var(--cyan)",marginTop:4,padding:"4px 8px",background:"rgba(0,153,204,.1)",borderRadius:6}}>
+                💡 Para el gasto financiero, agrégalo también en <strong>Gastos Generales</strong>
+              </div>}
+            </div>
+            <div className="field"><label>Cantidad</label><input value={f.cantidad} onChange={ch("cantidad")} type="number" min="1"/></div>
+            <div className="field s2"><label>Motivo / Referencia</label><input value={f.motivo} onChange={ch("motivo")} placeholder="Ej: Mant. unidad 003, Compra factura #123"/></div>
+            <div className="field">
+              <label>Fecha</label>
+              <DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))}/>
+            </div>
+            {art&&<div className="field s2" style={{background:"var(--bg2)",borderRadius:8,padding:"10px 12px",border:"1px solid var(--border)"}}>
+              <div style={{fontSize:11,color:"var(--muted)"}}>Stock actual: <strong>{art.stockActual} {art.unidad}</strong></div>
+              <div style={{fontSize:11,color:"var(--muted)"}}>Tras movimiento: <strong style={{color:f.tipo==="entrada"?"var(--green)":"var(--orange)"}}>{f.tipo==="entrada"?Number(art.stockActual)+Number(f.cantidad||0):Number(art.stockActual)-Number(f.cantidad||0)} {art.unidad}</strong></div>
+            </div>}
+          </div>
+        </div>
+        <div className="mftr">
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-cyan" onClick={ok}>💾 Registrar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AlmacenPage({ almacen, isAdmin, onAdd, onEdit, onDelete }) {
+  const [q, setQ] = useState("");
+  const [catF, setCatF] = useState("TODOS");
+  const [movModal, setMovModal] = useState(null);
+  const [movimientos, setMovimientos] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("fp6:movimientos")||"[]"); } catch { return []; }
+  });
+
+  const saveMovimiento = (mov) => {
+    const art = almacen.find(a=>a.id===mov.articuloId);
+    if (art && onEdit) {
+      const delta = mov.tipo==="entrada" ? Number(mov.cantidad) : -Number(mov.cantidad);
+      onEdit({...art, stockActual: Math.max(0, (Number(art.stockActual)||0) + delta)});
+    }
+    const newMovs = [...movimientos, mov];
+    setMovimientos(newMovs);
+    try { localStorage.setItem("fp6:movimientos", JSON.stringify(newMovs)); } catch {}
+    setMovModal(null);
+  };
+
+  const fil = almacen.filter(a =>
+    a.nombre?.toLowerCase().includes(q.toLowerCase()) &&
+    (catF==="TODOS" || a.categoria===catF)
+  );
+
+  const stockBajo = almacen.filter(a=>(Number(a.stockActual)||0)<=(Number(a.stockMin)||1)).length;
+  const valorTotal = almacen.reduce((s,a)=>(s+(Number(a.stockActual)||0)*(Number(a.precio)||0)),0);
+
+  return (
+    <div>
+      <div className="stats" style={{marginBottom:18}}>
+        <div className="stat" style={{"--c":"var(--cyan)"}}><div className="stat-icon">📦</div><div className="stat-val">{almacen.length}</div><div className="stat-lbl">Artículos</div></div>
+        <div className="stat" style={{"--c":stockBajo>0?"var(--red)":"var(--green)"}}><div className="stat-icon">⚠️</div><div className="stat-val">{stockBajo}</div><div className="stat-lbl">Stock Bajo</div></div>
+        <div className="stat" style={{"--c":"var(--orange)"}}><div className="stat-icon">💰</div><div className="stat-val sm">{fmt$(valorTotal)}</div><div className="stat-lbl">Valor Inventario</div></div>
+        <div className="stat" style={{"--c":"var(--purple)"}}><div className="stat-icon">📋</div><div className="stat-val">{movimientos.length}</div><div className="stat-lbl">Movimientos</div></div>
+      </div>
+
+      <div className="card">
+        <div className="card-hdr">
+          <h3>📦 Almacén ({fil.length})</h3>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setMovModal({})}>📋 Registrar Movimiento</button>
+            {isAdmin&&onAdd&&<button className="btn btn-cyan btn-sm" onClick={onAdd}>➕ Nuevo Artículo</button>}
+          </div>
+        </div>
+        <div style={{padding:"12px 16px",display:"flex",gap:10,flexWrap:"wrap",borderBottom:"1px solid var(--border)"}}>
+          <input className="search" value={q} onChange={e=>setQ(e.target.value)} placeholder="🔍 Buscar..."/>
+          <select className="btn btn-ghost btn-sm" value={catF} onChange={e=>setCatF(e.target.value)} style={{padding:"6px 10px"}}>
+            <option value="TODOS">Todas las categorías</option>
+            {ALMACEN_CATS.map(cat=><option key={cat}>{cat}</option>)}
+          </select>
+        </div>
+
+        {fil.length===0
+          ? <div className="empty"><div className="empty-icon">📦</div><p>Sin artículos registrados</p></div>
+          : <div style={{padding:"12px 16px",display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:12}}>
+            {fil.map(a => {
+              const stockOk = (Number(a.stockActual)||0) > (Number(a.stockMin)||1);
+              const stockCrit = (Number(a.stockActual)||0) === 0;
+              return (
+                <div key={a.id} style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden",background:"var(--bg1)",
+                  borderLeft:`4px solid ${stockCrit?"var(--red)":stockOk?"var(--green)":"var(--yellow)"}`}}>
+                  <div style={{display:"flex",gap:10,padding:"10px 12px"}}>
+                    {a.foto
+                      ? <img src={a.foto} style={{width:60,height:60,objectFit:"cover",borderRadius:8,flexShrink:0}} alt=""/>
+                      : <div style={{width:60,height:60,background:"var(--bg3)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,flexShrink:0}}>📦</div>
+                    }
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:13,marginBottom:2}}>{a.nombre}</div>
+                      <div style={{fontSize:11,color:"var(--muted)",marginBottom:4}}>{a.categoria}{a.marca?" · "+a.marca:""}{a.numParte?" · "+a.numParte:""}</div>
+                      <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                        <span style={{fontWeight:700,fontSize:14,color:stockCrit?"var(--red)":stockOk?"var(--green)":"var(--yellow)"}}>{a.stockActual||0} {a.unidad}</span>
+                        <span style={{fontSize:10,color:"var(--muted)"}}>mín: {a.stockMin||1}</span>
+                        {a.precio>0&&<span style={{fontSize:10,color:"var(--cyan)"}}>💲{Number(a.precio).toFixed(2)}</span>}
+                      </div>
+                      {a.ubicacion&&<div style={{fontSize:10,color:"var(--muted)",marginTop:2}}>📍 {a.ubicacion}</div>}
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:6,padding:"8px 12px",borderTop:"1px solid var(--border)",background:"var(--bg2)"}}>
+                    <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>setMovModal({articuloId:a.id})}>📋 Mov.</button>
+                    {isAdmin&&<><button className="btn btn-ghost btn-xs" onClick={()=>onEdit&&onEdit(a)}>✏️</button>
+                    <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>onDelete&&onDelete(a.id)}>🗑️</button></>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        }
+
+        {movimientos.length>0&&(
+          <div style={{padding:"12px 16px",borderTop:"1px solid var(--border)"}}>
+            <div style={{fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",marginBottom:8}}>Últimos movimientos</div>
+            <div style={{maxHeight:200,overflowY:"auto"}}>
+              {[...movimientos].reverse().slice(0,20).map((m,i)=>{
+                const art=almacen.find(a=>a.id===m.articuloId);
+                return (
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"5px 0",borderBottom:"1px solid var(--border)",fontSize:12}}>
+                    <span>{m.tipo==="entrada"?"📥":"📤"}</span>
+                    <span style={{flex:1,fontWeight:600}}>{art?.nombre||"—"}</span>
+                    <span style={{color:m.tipo==="entrada"?"var(--green)":"var(--orange)",fontWeight:700}}>{m.tipo==="entrada"?"+":"-"}{m.cantidad} {art?.unidad||""}</span>
+                    <span style={{color:"var(--muted)",fontSize:10}}>{m.fecha}</span>
+                    <span style={{color:"var(--muted)",fontSize:10,maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.motivo}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {movModal&&<MovimientoModal item={movModal.articuloId?almacen.find(a=>a.id===movModal.articuloId):null} almacen={almacen} onSave={saveMovimiento} onClose={()=>setMovModal(null)}/>}
+    </div>
+  );
+}
+
 function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, drivers = [], proveedores = [], externos = [], nominasAdmin = [] }) {
 
   const hoy        = new Date();
@@ -10284,6 +10527,7 @@ export default function App() {
   const [branding, setBranding] = useState({ nombre: "Mi Empresa", slogan: "Sistema de Flota", logo: "" });
   const [drivers, setDrivers] = useState([]);
   const [docs, setDocs] = useState([]);
+  const [almacen, setAlmacen] = useState([]);
   const [maints, setMaints] = useState([]);
   const [fuels, setFuels] = useState([]);
   const [trips, setTrips] = useState([]);
@@ -10334,6 +10578,7 @@ export default function App() {
         [setDrivers,             "fp6:drivers",         D_DRIVERS],
         // docs se cargan individualmente abajo
         [setMaints,              "fp6:maints",          D_MAINTS],
+        [setAlmacen,             "fp6:almacen",         []],
         [setFuels,               "fp6:fuels",           D_FUELS],
         [setTrips,               "fp6:trips",           D_TRIPS],
         [setGastos,              "fp6:gastos",          D_GASTOS],
@@ -10468,7 +10713,9 @@ export default function App() {
       notify("Eliminado");
     }})
   };
-  const MC = mkCRUD(() => mRef.current, setMaints, "fp6:maints");
+  const MC   = mkCRUD(() => mRef.current, setMaints, "fp6:maints");
+  const almRef = useRef(almacen); almRef.current = almacen;
+  const ALC  = mkCRUD(() => almRef.current, setAlmacen, "fp6:almacen");
   const FC = mkCRUD(() => fRef.current, setFuels, "fp6:fuels");
   const TC = mkCRUD(() => tRef.current, setTrips, "fp6:trips");
   const GC = mkCRUD(() => gRef.current, setGastos, "fp6:gastos");
@@ -10542,12 +10789,12 @@ export default function App() {
 
   const icons = {
     dashboard: "📊", alerts: "🚨", units: "🚛", drivers: "👨‍✈️",
-    trips: "🗺️", maints: "🔧", fuels: "⛽", docs: "📄",
+    trips: "🗺️", maints: "🔧", almacen: "📦", fuels: "⛽", docs: "📄",
     charts: "📈", gastos: "💵", clientes: "👥", facturacion: "🧾", proveedores: "🏪", nominas: "💰", ayuda: "❓", gps: "📡", cotizaciones: "📋"
   };
   const titles = {
     dashboard: "Dashboard", alerts: "Alertas", units: "Unidades",
-    drivers: "Conductores", trips: "Viajes & Logística", maints: "Mantenimientos",
+    drivers: "Conductores", trips: "Viajes & Logística", maints: "Mantenimientos", almacen: "Almacén",
     fuels: "Combustible", docs: "Documentos", charts: "Gráficas & Reportes",
     gastos: "Gastos Generales", clientes: "Clientes", facturacion: "Facturación",
     proveedores: "Proveedores", nominas: "Nóminas", ayuda: "Ayuda", gps: "GPS en Vivo", cotizaciones: "Cotizaciones y Tabulador"
@@ -10558,6 +10805,7 @@ export default function App() {
     { lbl: "FLOTA", items: [{ id: "units" }, { id: "drivers" }, { id: "trips" }] },
     { lbl: "CONTROL", items: [
       { id: "maints" },
+      { id: "almacen" },
       { id: "fuels" },
       { id: "docs" },
       ...(isSupervisor ? [{ id: "gastos" }, { id: "proveedores" }] : []),
@@ -10743,6 +10991,10 @@ export default function App() {
             onAdd={(prefill) => setModal({ type: "doc", data: prefill || null, _ts: Date.now() })}
             onEdit={d => setModal({ type: "doc", data: d })}
             onDelete={DoC.del} />}
+          {tab === "almacen" && <AlmacenPage almacen={almacen} isAdmin={isAdmin}
+            onAdd={isAdmin?()=>setModal({type:"almacen",data:null,_ts:Date.now()}):null}
+            onEdit={isAdmin?item=>setModal({type:"almacen",data:item}):null}
+            onDelete={ALC.del}/>}
           {tab === "maints" && <MaintPage units={units} maints={maints} proveedores={proveedores}
             onAdd={userCan("crearMantenimientos") ? () => setModal({ type: "maint", data: null, _ts: Date.now() }) : null}
             onEdit={isSupervisor ? m => setModal({ type: "maint", data: m }) : null}
@@ -10859,6 +11111,7 @@ export default function App() {
       {modal?.type === "driver" && <DriverModal key={modal.data?.id || modal._ts || "new-driver"} driver={modal.data} units={units} onSave={d => DC.save({ ...d, id: d.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "unit" && <UnitModal key={modal.data?.id || modal._ts || "new-unit"} unit={modal.data} drivers={drivers} tiposPersonalizados={tiposPersonalizados} onAddTipo={async (t) => { const newTipos = [...tiposPersonalizados, t]; setTiposPersonalizados(newTipos); await sv("fp6:tipos", newTipos); }} onSave={u => UC.save({ ...u, id: u.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "doc" && <DocModal key={modal.data?.id || modal._ts || "new-doc"} doc={modal.data} units={units} drivers={drivers} onSave={d => DoC.save({ ...d, id: d.id || uid() })} onClose={() => setModal(null)} />}
+      {modal?.type === "almacen" && <AlmacenModal item={modal.data} onSave={d=>ALC.save({...d,id:d.id||uid()})} onClose={()=>setModal(null)}/>}
       {modal?.type === "maint" && <MaintModal key={modal.data?.id || modal._ts || "new-maint"} maint={modal.data} units={units} proveedores={proveedores} onSave={m => MC.save({ ...m, id: m.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "fuel" && <FuelModal key={modal.data?.id || modal._ts || "new-fuel"} fuel={modal.data} units={units} onSave={f => FC.save({ ...f, id: f.id || uid() })} onClose={() => setModal(null)} onUpdateUnit={UC.save} />}
       {modal?.type === "trip" && <TripModal key={modal.data?.id || modal._ts || "new-trip"} trip={modal.data} units={units} onSave={t => TC.save({ ...t, id: t.id || uid(), esExterno: false })} onClose={() => setModal(null)} />}
