@@ -6797,7 +6797,7 @@ function FuelPage({ units, fuels, onAdd, onEdit, onDelete }) {
 // ALMACÉN — Control de Inventario, Refacciones y Herramientas
 // ══════════════════════════════════════════════════════════════════════════════
 
-const ALMACEN_CATS = ["Refacciones","Herramientas","Lubricantes","Filtros","Llantas","Eléctrico","Otro"];
+const ALMACEN_CATS = ["Refacciones","Herramientas","Lubricantes","Filtros","Llantas","Eléctrico","Consumibles","Seguridad","Otro"];
 const ALMACEN_UNIDADES = ["pieza","litro","galón","kit","par","juego","caja","metro"];
 
 function AlmacenModal({ item, onSave, onClose }) {
@@ -6826,9 +6826,14 @@ function AlmacenModal({ item, onSave, onClose }) {
               <div className="field s2"><label>Nombre *</label><input value={f.nombre} onChange={ch("nombre")} placeholder="Ej: Filtro de aceite Wix 51334"/></div>
               <div className="fg">
                 <div className="field"><label>Categoría</label>
-                  <select value={f.categoria} onChange={ch("categoria")}>
-                    {ALMACEN_CATS.map(cat=><option key={cat}>{cat}</option>)}
+                  <select value={ALMACEN_CATS.includes(f.categoria)?f.categoria:"__otro__"}
+                    onChange={e=>setF(p=>({...p,categoria:e.target.value==="__otro__"?"":e.target.value}))}>
+                    {ALMACEN_CATS.map(cat=><option key={cat} value={cat}>{cat}</option>)}
+                    <option value="__otro__">+ Otra categoría...</option>
                   </select>
+                  {!ALMACEN_CATS.includes(f.categoria)&&(
+                    <input value={f.categoria} onChange={ch("categoria")} placeholder="Escribe la categoría" style={{marginTop:4}}/>
+                  )}
                 </div>
                 <div className="field"><label>Marca</label><input value={f.marca} onChange={ch("marca")} placeholder="Ej: Wix, Mobil, SKF"/></div>
               </div>
@@ -6841,7 +6846,7 @@ function AlmacenModal({ item, onSave, onClose }) {
             </div>
             <div className="field"><label>Stock Actual</label><input value={f.stockActual} onChange={ch("stockActual")} type="number" min="0"/></div>
             <div className="field"><label>Stock Mínimo</label><input value={f.stockMin} onChange={ch("stockMin")} type="number" min="0"/></div>
-            <div className="field"><label>Precio Unitario ($)</label><input value={f.precio} onChange={ch("precio")} type="number" min="0"/></div>
+            <div className="field"><label>Precio Unitario ($) <span style={{fontSize:10,color:"var(--muted)",fontWeight:400}}>(referencia)</span></label><input value={f.precio} onChange={ch("precio")} type="number" min="0" placeholder="Solo referencia, no afecta finanzas"/></div>
             <div className="field"><label>Ubicación / Rack</label><input value={f.ubicacion} onChange={ch("ubicacion")} placeholder="Ej: Estante A-3"/></div>
             <div className="field"><label>Proveedor habitual</label><input value={f.proveedor} onChange={ch("proveedor")} placeholder="Ej: Autozone"/></div>
             <div className="field s2"><label>Notas</label><textarea value={f.notas} onChange={ch("notas")} rows={2}/></div>
@@ -6890,6 +6895,9 @@ function MovimientoModal({ item, almacen, onSave, onClose }) {
                 <option value="salida">📤 Salida (uso en mant.)</option>
                 <option value="ajuste">🔧 Ajuste de inventario</option>
               </select>
+              {f.tipo==="entrada"&&<div style={{fontSize:10,color:"var(--cyan)",marginTop:4,padding:"4px 8px",background:"rgba(0,153,204,.1)",borderRadius:6}}>
+                💡 Para registrar el gasto financiero, agrégalo también en <strong>Gastos Generales</strong>
+              </div>}
             </div>
             <div className="field"><label>Cantidad</label><input value={f.cantidad} onChange={ch("cantidad")} type="number" min="1"/></div>
             <div className="field s2"><label>Motivo / Referencia</label><input value={f.motivo} onChange={ch("motivo")} placeholder="Ej: Mant. unidad 003, Compra factura #123"/></div>
@@ -7262,81 +7270,79 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
               <button className="btn btn-ghost btn-sm" onClick={()=>setChartQuarter(q=>Math.min(3,q+1))} disabled={chartQuarter===3}>▶</button>
             </div>
           </div>
-          <div style={{padding:"20px 24px"}}>
-            {(() => {
-              const COLS = ["#22c55e","#ef4444","#06b6d4","#eab308"];
-              const LBLS = ["Ingresos","Costos","Utilidad","Facturado"];
-              const qMonths = MESES.slice(chartQuarter*3,(chartQuarter+1)*3);
-              const qData = qMonths.map((_,qi) => {
-                const d = meses12[chartQuarter*3+qi];
-                const util = d.ing - d.costos;
-                return {ing:d.ing, cos:d.costos, util:Math.abs(util), utilSign:util>=0, fact:d.fact};
+          <div style={{padding:"16px 20px"}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16}}>
+            {MESES.slice(chartQuarter*3,(chartQuarter+1)*3).map((m,qi) => {
+              const i = chartQuarter*3+qi;
+              const d = meses12[i];
+              const util = d.ing - d.costos;
+              const total = Math.max(d.ing + d.costos + d.fact, 1);
+              // Pie slices
+              const slices = [
+                {val:d.ing,   c:"#22c55e", lbl:"Ingresos"},
+                {val:d.costos,c:"#ef4444", lbl:"Costos"},
+                {val:d.fact,  c:"#eab308", lbl:"Facturado"},
+              ];
+              let angle = -90;
+              const CX=70, CY=70, R=55, RI=28;
+              const pieSlices = slices.map(s => {
+                const deg = s.val/total*360;
+                const a1 = angle*Math.PI/180;
+                const a2 = (angle+deg)*Math.PI/180;
+                const x1=CX+R*Math.cos(a1), y1=CY+R*Math.sin(a1);
+                const x2=CX+R*Math.cos(a2), y2=CY+R*Math.sin(a2);
+                const lg = deg>180?1:0;
+                const path = deg>0?`M${CX},${CY} L${x1.toFixed(1)},${y1.toFixed(1)} A${R},${R} 0 ${lg},1 ${x2.toFixed(1)},${y2.toFixed(1)} Z`:"";
+                angle += deg;
+                return {...s, path, pct: Math.round(s.val/total*100)};
               });
-              const allVals = qData.flatMap(d=>[d.ing,d.cos,d.fact]);
-              const maxV = Math.max(...allVals, 1);
-              const H = 200;
-              const BW = 28, GAP = 5, GROUP = 4*BW+3*GAP, GPAD = 40;
-              const totalW = qMonths.length * (GROUP + GPAD*2);
               return (
-                <div style={{overflowX:"auto"}}>
-                  <svg width="100%" viewBox={`0 0 ${totalW} ${H+80}`} style={{minWidth:300}}>
-                    <defs>
-                      {COLS.map((col,i)=>(
-                        <linearGradient key={i} id={`cg${i}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={col} stopOpacity="0.95"/>
-                          <stop offset="100%" stopColor={col} stopOpacity="0.55"/>
-                        </linearGradient>
-                      ))}
-                    </defs>
-                    {/* Grid lines */}
-                    {[0,0.25,0.5,0.75,1].map(p=>(
-                      <g key={p}>
-                        <line x1="0" y1={H*(1-p)} x2={totalW} y2={H*(1-p)} stroke="var(--border)" strokeWidth="1" strokeDasharray={p===0?"0":"4,4"}/>
-                        {p>0&&<text x="2" y={H*(1-p)-3} fontSize="9" fill="var(--muted)">{fmt$(maxV*p)}</text>}
-                      </g>
-                    ))}
-                    {/* Bars per month */}
-                    {qMonths.map((m,mi)=>{
-                      const gx = mi*(GROUP+GPAD*2)+GPAD;
-                      const d = qData[mi];
-                      const vals = [d.ing, d.cos, d.util, d.fact];
-                      return (
-                        <g key={m}>
-                          {vals.map((v,bi)=>{
-                            const bh = Math.round(v/maxV*H)||0;
-                            const bx = gx+bi*(BW+GAP);
-                            const by = H-bh;
-                            const col = bi===2?(d.utilSign?COLS[2]:"#f97316"):COLS[bi];
-                            return (
-                              <g key={bi}>
-                                <rect x={bx+2} y={by+4} width={BW} height={bh} rx="3" fill={col} opacity="0.12"/>
-                                <rect x={bx} y={by} width={BW} height={bh} rx="3" fill={`url(#cg${bi===2?(d.utilSign?2:1):bi})`}/>
-                                {v>0&&<text x={bx+BW/2} y={by-3} textAnchor="middle" fontSize="8" fontWeight="700" fill={col}>{v>=10000?(v/1000).toFixed(0)+"k":v>=1000?(v/1000).toFixed(1)+"k":Math.round(v)}</text>}
-                              </g>
-                            );
-                          })}
-                          {/* Month label */}
-                          <text x={gx+GROUP/2} y={H+14} textAnchor="middle" fontSize="12" fontWeight="700" fill="var(--text)">{m}</text>
-                          {/* Utility indicator */}
-                          <text x={gx+GROUP/2} y={H+27} textAnchor="middle" fontSize="9" fill={d.utilSign?"#22c55e":"#ef4444"}>
-                            {d.utilSign?"▲":"▼"} {fmt$(d.util)}
-                          </text>
-                        </g>
-                      );
-                    })}
-                  </svg>
+                <div key={m} style={{background:"var(--bg2)",borderRadius:12,padding:"14px",border:"1px solid var(--border)",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
+                  <div style={{fontWeight:700,fontSize:13,color:"var(--text)"}}>{m}</div>
+                  {/* Pie chart SVG */}
+                  <div style={{position:"relative"}}>
+                    <svg width="140" height="140" viewBox="0 0 140 140">
+                      <defs>
+                        <filter id={`sh${i}`}>
+                          <feDropShadow dx="1" dy="3" stdDeviation="3" floodOpacity="0.25"/>
+                        </filter>
+                      </defs>
+                      {/* Shadow ring */}
+                      <ellipse cx="70" cy="80" rx="52" ry="8" fill="rgba(0,0,0,0.12)"/>
+                      {pieSlices.map((s,j) => s.path ? (
+                        <path key={j} d={s.path} fill={s.c} stroke="var(--bg1)" strokeWidth="2"
+                          filter={`url(#sh${i})`} opacity="0.9"
+                          style={{transform:"translateY(-4px)",transformOrigin:"70px 70px"}}
+                        />
+                      ) : null)}
+                      {/* Donut hole */}
+                      <circle cx="70" cy="66" r="26" fill="var(--bg2)" stroke="var(--border)" strokeWidth="1"/>
+                      {/* Center text */}
+                      <text x="70" y="62" textAnchor="middle" fontSize="9" fill="var(--muted)">Utilidad</text>
+                      <text x="70" y="75" textAnchor="middle" fontSize="11" fontWeight="700"
+                        fill={util>=0?"#22c55e":"#ef4444"}>
+                        {util>=0?"+":""}{util>=1000?(util/1000).toFixed(0)+"k":Math.round(util)}
+                      </text>
+                    </svg>
+                  </div>
                   {/* Legend */}
-                  <div style={{display:"flex",gap:16,justifyContent:"center",marginTop:8,flexWrap:"wrap"}}>
-                    {LBLS.map((l,i)=>(
-                      <span key={i} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:COLS[i],fontWeight:600}}>
-                        <span style={{width:12,height:12,borderRadius:3,background:COLS[i],display:"inline-block"}}/>
-                        {l}
-                      </span>
-                    ))}
+                  {pieSlices.map((s,j) => (
+                    <div key={j} style={{display:"flex",alignItems:"center",gap:6,width:"100%",fontSize:11}}>
+                      <div style={{width:10,height:10,borderRadius:2,background:s.c,flexShrink:0,boxShadow:`0 2px 4px ${s.c}66`}}/>
+                      <span style={{flex:1,color:"var(--muted)"}}>{s.lbl}</span>
+                      <span style={{fontWeight:700,color:s.c}}>{s.val>0?fmt$(s.val):"—"}</span>
+                    </div>
+                  ))}
+                  <div style={{width:"100%",borderTop:"1px solid var(--border)",paddingTop:6,marginTop:2,display:"flex",justifyContent:"space-between",fontSize:11}}>
+                    <span style={{color:"var(--muted)"}}>Margen</span>
+                    <span style={{fontWeight:700,color:util>=0?"#22c55e":"#ef4444"}}>
+                      {d.ing>0?Math.round(util/d.ing*100):0}%
+                    </span>
                   </div>
                 </div>
               );
-            })()}
+            })}
+            </div>
           </div>
         </div>
 
@@ -9852,7 +9858,7 @@ const AYUDA_DATA = [
       { q: "¿Cómo configuro el logo y nombre de mi empresa?",
         a: "Haz clic en el logo de la empresa en la parte superior del sidebar (aparece el ícono ✏️). Ahí puedes subir tu logo, cambiar el nombre de empresa y slogan. El logo aparece en documentos impresos y cotizaciones." },
       { q: "¿Los datos se guardan automáticamente?",
-        a: "Sí. Cada registro se guarda automáticamente en Firebase y sincroniza en tiempo real entre todos los dispositivos conectados. No necesitas hacer copias manuales." },
+        a: "Sí. Cada registro se guarda automáticamente en Firebase y sincroniza en tiempo real entre todos los dispositivos conectados. Las fotos se almacenan en Cloudinary y están disponibles desde cualquier dispositivo. No necesitas hacer copias manuales." },
       { q: "¿Puedo usar el sistema en múltiples computadoras al mismo tiempo?",
         a: "Sí. Firebase sincroniza los datos en tiempo real. Si alguien registra un viaje desde una PC, aparece de inmediato en los demás dispositivos sin recargar la página." },
       { q: "¿Cómo instalo la app en mi computadora o celular?",
@@ -9898,13 +9904,15 @@ const AYUDA_DATA = [
     color: "var(--yellow)",
     preguntas: [
       { q: "¿Cómo programo un mantenimiento?",
-        a: "Ve a Control → Mantenimientos → '➕ Nuevo'. Selecciona la unidad, tipo de servicio (preventivo/correctivo), fecha programada. Puedes vincular dos proveedores: uno para Refacciones (costo de partes) y otro para el Taller/Mano de Obra. Ambos generan su cuenta por pagar en Proveedores." },
+        a: "Ve a Control → Mantenimientos → '➕ Nuevo'. Selecciona la unidad, tipo de servicio (preventivo/correctivo), fecha programada. Puedes vincular dos proveedores separados: 🔧 Proveedor Refacciones (costo de partes) y 🏪 Proveedor Taller/M.O. (mano de obra). Cada uno genera su cuenta por pagar independiente en Proveedores." },
       { q: "¿Cómo sé qué unidades necesitan mantenimiento pronto?",
         a: "El Dashboard muestra alertas de mantenimientos próximos. En el módulo Alertas (🔔 en el sidebar) verás todas las unidades con mantenimiento vencido o por vencer." },
       { q: "¿Cómo funciona el seguimiento por KM?",
         a: "En cada unidad defines los KM actuales y el intervalo de mantenimiento (ej: 5,000 km). Al registrar combustible con los KM recorridos, el sistema calcula automáticamente cuántos KM faltan para el próximo servicio." },
       { q: "¿Puedo registrar mantenimientos correctivos (emergencias)?",
         a: "Sí. Al crear el mantenimiento, selecciona tipo 'Correctivo' y prioridad 'ALTA'. Puedes dejar la fecha programada como el mismo día del incidente." },
+      { q: "¿Cómo controlo los kilómetros para el próximo mantenimiento?",
+        a: "Cada unidad tiene configurado un 'Intervalo de Mantenimiento' en KM. El sistema calcula automáticamente los kilómetros restantes y muestra alertas cuando faltan 500 km o menos. En el Dashboard, el KPI 'Mant. por KM' muestra todas las unidades ordenadas por urgencia. En Alertas verás alertas rojas (vencido) y amarillas (próximo). La Ficha Técnica impresa también muestra los KM faltantes con código de color." },
     ]
   },
   {
@@ -9976,7 +9984,7 @@ const AYUDA_DATA = [
     color: "var(--cyan)",
     preguntas: [
       { q: "¿Cómo funciona la nómina de operadores?",
-        a: "Ve a Finanzas → Nóminas → pestaña Operadores. Haz clic en '💵 Nómina' para generar el recibo de un operador, o en '✏️' para editarlo directamente. El sistema calcula sueldo base más comisión por viajes completados (según % configurado en el perfil). Puedes editar los montos antes de imprimir." },
+        a: "Ve a Finanzas → Nóminas → pestaña Operadores. Usa '💵 Nómina' para generar el recibo o '✏️' para editar la nómina existente. El sistema calcula sueldo base más comisión por viajes completados según el % configurado en el perfil del conductor." },
       { q: "¿Qué es la nómina administrativa?",
         a: "Es para personal de oficina: secretarias, gerentes, supervisores, contadores, etc. No tiene cálculo de viajes ni comisiones, solo sueldo base, bonos y deducciones. Se gestiona en Finanzas → Nóminas → pestaña Administrativos." },
       { q: "¿Cómo agrego personal administrativo?",
@@ -10012,11 +10020,29 @@ const AYUDA_DATA = [
     color: "var(--green)",
     preguntas: [
       { q: "¿Cómo activo el módulo GPS?",
-        a: "Ve a GPS en Vivo en el sidebar. Haz clic en '⚙️ Configurar Traccar'. Necesitas una cuenta en Traccar (traccar.org) o un servidor propio. Ingresa la URL, usuario y contraseña de tu servidor Traccar." },
+        a: "Ve a GPS en Vivo en el sidebar. Haz clic en '⚙️ Configurar Traccar'. Necesitas un servidor Traccar (puedes adquirir uno con tu proveedor Fleet Pro). Ingresa la URL, usuario y contraseña. El mapa se actualiza en tiempo real." },
       { q: "¿Qué información muestra el módulo GPS?",
         a: "Muestra la posición en tiempo real de cada dispositivo GPS registrado en Traccar, velocidad actual, última actualización y el mapa con las posiciones." },
       { q: "¿Qué dispositivos GPS son compatibles?",
         a: "El módulo es compatible con cualquier dispositivo que reporte a un servidor Traccar: GPS de vehículos, trackers OBD, apps móviles con Traccar Client, y más de 200 modelos de distintas marcas. Consulta a tu proveedor Fleet Pro para recomendaciones de hardware según tu flota." },
+    ]
+  },
+  {
+    id: "almacen", icono: "📦", titulo: "Almacén",
+    color: "var(--orange)",
+    preguntas: [
+      { q: "¿Para qué sirve el módulo de Almacén?",
+        a: "El Almacén te permite controlar el inventario de refacciones, herramientas, lubricantes, filtros y cualquier artículo que uses en tu flota. Puedes ver el stock disponible, registrar entradas (compras) y salidas (uso en mantenimientos), y llevar un historial de movimientos." },
+      { q: "¿Cómo agrego un artículo al almacén?",
+        a: "Ve a Control → Almacén → '➕ Nuevo Artículo'. Ingresa nombre, categoría, marca, número de parte, unidad de medida, stock inicial y precio de referencia. Puedes subir una foto del artículo para identificarlo fácilmente." },
+      { q: "¿El precio del artículo afecta las finanzas?",
+        a: "No. El precio en el almacén es solo de referencia para saber el costo aproximado. Para registrar el gasto financiero real de una compra de refacciones, debes agregarlo también en Gastos Generales o vincularlo a un Proveedor en Cuentas por Pagar." },
+      { q: "¿Cómo registro una entrada o salida de inventario?",
+        a: "En Almacén, haz clic en '📋 Mov.' en la tarjeta del artículo, o usa el botón '📋 Registrar Movimiento'. Elige el tipo: Entrada (compra/recepción), Salida (uso en mantenimiento) o Ajuste. El stock se actualiza automáticamente." },
+      { q: "¿Qué significa el color del borde en las tarjetas?",
+        a: "Verde: stock por encima del mínimo. Amarillo: stock igual o por debajo del mínimo configurado. Rojo: sin stock (agotado). Esto te permite identificar rápidamente qué artículos necesitas reponer." },
+      { q: "¿Puedo crear categorías personalizadas?",
+        a: "Sí. Al agregar o editar un artículo, en el campo Categoría hay una opción '+ Otra categoría...' que te permite escribir cualquier categoría personalizada." },
     ]
   },
   {
