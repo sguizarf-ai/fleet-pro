@@ -3856,8 +3856,13 @@ function printUnitSheet({ unit, driver, docs, maints, fuels, trips, showFinancia
     <div class="grid">
       <div class="field"><label>KM Actual</label>${fmtN(unit.kmActual)} km</div>
       <div class="field"><label>KM Último Mant.</label>${fmtN(unit.kmUltMant)} km</div>
-      <div class="field"><label>KM desde último mant.</label>${fmtN((Number(unit.kmActual) || 0) - (Number(unit.kmUltMant) || 0))} km</div>
-      <div class="field"><label>Próx. Mantenimiento</label>${unit.proxMant || "—"}</div>
+      <div class="field"><label>KM desde último mant.</label>${fmtN((Number(unit.kmActual)||0)-(Number(unit.kmUltMant)||0))} km</div>
+      <div class="field"><label>Intervalo Mant.</label>${fmtN(unit.intervaloMant||5000)} km</div>
+      <div class="field" style="background:${(()=>{const r=(Number(unit.kmUltMant)||0)+(Number(unit.intervaloMant)||5000)-(Number(unit.kmActual)||0);return r<=0?'#FFE5E5':r<=500?'#FFF3E0':'#E8F5EA';})()}">
+        <label>KM Faltantes para Próx. Mant.</label>
+        ${(()=>{const r=(Number(unit.kmUltMant)||0)+(Number(unit.intervaloMant)||5000)-(Number(unit.kmActual)||0);return r<=0?'<span style="color:#C62828;font-weight:700">⚠️ VENCIDO — excedido por '+fmtN(Math.abs(r))+' km</span>':'<span style="color:'+(r<=500?'#E65100':'#2E7D32')+';font-weight:700">'+fmtN(r)+' km restantes</span>';})()}
+      </div>
+      <div class="field"><label>Próx. Mant. a KM Total</label>${fmtN((Number(unit.kmUltMant)||0)+(Number(unit.intervaloMant)||5000))} km</div>
     </div>
     <h2>📄 Documentos</h2>
     <table><thead><tr><th>Documento</th><th>Número</th><th>Empresa</th><th>Vence</th><th>Estado</th></tr></thead><tbody>
