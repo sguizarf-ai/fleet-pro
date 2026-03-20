@@ -7998,39 +7998,40 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
               <button className="btn btn-ghost btn-sm" onClick={()=>setChartQuarter(q=>Math.min(3,q+1))} disabled={chartQuarter===3}>▶</button>
             </div>
           </div>
-          <div style={{padding:"16px 20px",display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:16}}>
+          <div style={{padding:"16px 20px"}}>
             {MESES.slice(chartQuarter*3,(chartQuarter+1)*3).map((m,qi) => {
               const d = meses12[chartQuarter*3+qi];
               const util = d.ing - d.costos;
-              const tot = Math.max(d.ing + d.costos + d.fact, 1);
-              const items = [
-                {v:d.ing,   c:"#22c55e", lbl:"Ingresos"},
-                {v:d.costos,c:"#ef4444", lbl:"Costos"},
-                {v:d.fact,  c:"#eab308", lbl:"Facturado"},
-              ];
-              const margen = d.ing>0 ? Math.round(util/d.ing*100) : 0;
               const maxV = Math.max(d.ing, d.costos, d.fact, 1);
+              const rows = [
+                {v:d.ing,    c:"#22c55e", lbl:"Ingresos"},
+                {v:d.costos, c:"#ef4444", lbl:"Costos"},
+                {v:d.fact,   c:"#eab308", lbl:"Facturado"},
+              ];
               return (
-                <div key={m} style={{background:"var(--bg2)",borderRadius:12,padding:14,border:"1px solid var(--border)"}}>
-                  <div style={{fontWeight:700,fontSize:13,marginBottom:10,textAlign:"center"}}>{m}</div>
-                  {items.map((it,j) => {
-                    const pct = Math.round(it.v/maxV*100);
+                <div key={m} style={{marginBottom:20,background:"var(--bg2)",borderRadius:10,padding:"14px 16px",border:"1px solid var(--border)"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}>
+                    <span style={{fontWeight:700,fontSize:14}}>{m}</span>
+                    <span style={{fontSize:11,padding:"2px 10px",borderRadius:99,
+                      background:util>=0?"rgba(34,197,94,.15)":"rgba(239,68,68,.15)",
+                      color:util>=0?"#22c55e":"#ef4444",fontWeight:700}}>
+                      {util>=0?"Utilidad":"Pérdida"}: {fmt$(Math.abs(util))}
+                    </span>
+                  </div>
+                  {rows.map((row,j) => {
+                    const pct = Math.round(row.v/maxV*100);
                     return (
-                      <div key={j} style={{marginBottom:8}}>
-                        <div style={{display:"flex",justifyContent:"space-between",fontSize:10,marginBottom:2}}>
-                          <span style={{color:it.c,fontWeight:600}}>{it.lbl}</span>
-                          <span style={{fontWeight:700,color:it.c}}>{it.v>0?fmt$(it.v):"—"}</span>
+                      <div key={j} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                        <span style={{width:72,fontSize:11,color:row.c,fontWeight:600}}>{row.lbl}</span>
+                        <div style={{flex:1,background:"var(--bg3)",borderRadius:99,height:18,overflow:"hidden"}}>
+                          <div style={{width:pct+"%",height:"100%",background:row.c,borderRadius:99}}/>
                         </div>
-                        <div style={{background:"var(--bg3)",borderRadius:99,height:14,overflow:"hidden"}}>
-                          <div style={{width:pct+"%",height:"100%",background:it.c,borderRadius:99,transition:"width .4s"}}/>
-                        </div>
+                        <span style={{width:90,textAlign:"right",fontWeight:700,fontSize:12,color:row.c}}>
+                          {row.v>0?fmt$(row.v):"—"}
+                        </span>
                       </div>
                     );
                   })}
-                  <div style={{borderTop:"1px solid var(--border)",paddingTop:6,marginTop:4,display:"flex",justifyContent:"space-between",fontSize:11}}>
-                    <span style={{color:"var(--muted)"}}>Utilidad {margen}%</span>
-                    <span style={{fontWeight:700,color:util>=0?"#22c55e":"#ef4444"}}>{util>=0?"+":""}{fmt$(util)}</span>
-                  </div>
                 </div>
               );
             })}
