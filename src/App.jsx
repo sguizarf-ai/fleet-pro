@@ -7258,70 +7258,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
           <KR icon="🔧" lbl="Mantenimiento" val={fmt$(totMant)} c="var(--orange)"/>
         </div>
 
-        {/* Gráfica ingresos vs costos 12 meses */}
-        <div className="card">
-          <div className="card-hdr">
-            <h3>📊 Ingresos vs Costos — {filtroAnio}</h3>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <button className="btn btn-ghost btn-sm" onClick={()=>setChartQuarter(q=>Math.max(0,q-1))} disabled={chartQuarter===0}>◀</button>
-              <span style={{fontSize:12,fontWeight:700,color:"var(--cyan)",minWidth:110,textAlign:"center"}}>
-                {MESES.slice(chartQuarter*3,(chartQuarter+1)*3).map(m=>m.slice(0,3)).join(" · ")}
-              </span>
-              <button className="btn btn-ghost btn-sm" onClick={()=>setChartQuarter(q=>Math.min(3,q+1))} disabled={chartQuarter===3}>▶</button>
-            </div>
-          </div>
-          <div style={{padding:"16px 20px",display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16}}>
-            {MESES.slice(chartQuarter*3,(chartQuarter+1)*3).map((m,qi) => {
-              const d = meses12[chartQuarter*3+qi];
-              const util = d.ing - d.costos;
-              const tot = Math.max(d.ing + d.costos + d.fact, 1);
-              // Build pie path data
-              const items = [
-                {v:d.ing,   c:"#22c55e", lbl:"Ingresos"},
-                {v:d.costos,c:"#ef4444", lbl:"Costos"},
-                {v:d.fact,  c:"#eab308", lbl:"Facturado"},
-              ];
-              let a = -90;
-              const paths = items.map(it => {
-                const deg = it.v/tot*360;
-                const r=52, cx=65, cy=65;
-                const ra1 = a*Math.PI/180, ra2 = (a+deg)*Math.PI/180;
-                const x1=cx+r*Math.cos(ra1), y1=cy+r*Math.sin(ra1);
-                const x2=cx+r*Math.cos(ra2), y2=cy+r*Math.sin(ra2);
-                const lg = deg>180?1:0;
-                const path = deg>1 ? "M"+cx+","+cy+" L"+x1.toFixed(1)+","+y1.toFixed(1)+" A"+r+","+r+" 0 "+lg+",1 "+x2.toFixed(1)+","+y2.toFixed(1)+" Z" : "";
-                a += deg;
-                return {...it, path};
-              });
-              const margen = d.ing>0 ? Math.round(util/d.ing*100) : 0;
-              return (
-                <div key={m} style={{background:"var(--bg2)",borderRadius:12,padding:14,border:"1px solid var(--border)",display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
-                  <div style={{fontWeight:700,fontSize:13}}>{m}</div>
-                  <svg width="130" height="130" viewBox="0 0 130 130">
-                    <circle cx="65" cy="70" r="50" fill="none" stroke="var(--bg3)" strokeWidth="1" opacity="0.5"/>
-                    {paths.map((p,j) => p.path ? <path key={j} d={p.path} fill={p.c} stroke="var(--bg1)" strokeWidth="1.5" opacity="0.88"/> : null)}
-                    <circle cx="65" cy="65" r="24" fill="var(--bg2)" stroke="var(--border)" strokeWidth="1"/>
-                    <text x="65" y="61" textAnchor="middle" fontSize="9" fill="var(--muted)">Margen</text>
-                    <text x="65" y="73" textAnchor="middle" fontSize="12" fontWeight="700" fill={util>=0?"#22c55e":"#ef4444"}>{margen}%</text>
-                  </svg>
-                  {items.map((it,j) => (
-                    <div key={j} style={{display:"flex",alignItems:"center",gap:6,width:"100%",fontSize:11}}>
-                      <div style={{width:9,height:9,borderRadius:2,background:it.c,flexShrink:0}}/>
-                      <span style={{flex:1,color:"var(--muted)"}}>{it.lbl}</span>
-                      <span style={{fontWeight:700,color:it.c}}>{it.v>0?fmt$(it.v):"—"}</span>
-                    </div>
-                  ))}
-                  <div style={{width:"100%",borderTop:"1px solid var(--border)",paddingTop:5,display:"flex",justifyContent:"space-between",fontSize:11}}>
-                    <span style={{color:"var(--muted)"}}>Utilidad</span>
-                    <span style={{fontWeight:700,color:util>=0?"#22c55e":"#ef4444"}}>{util>=0?"+":""}{fmt$(util)}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-
+        
         {/* barras comparativas por unidad */}
         <div className="card">
           <div className="card-hdr"><h3>📊 Ingresos Comparativos por Unidad — {lblPeriodo()}</h3></div>
@@ -8048,7 +7985,58 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
           ))}
         </div>
       </div>
-      {vistaTab==="resumen"            && <VistaResumen/>}
+      {vistaTab==="resumen" && <VistaResumen/>}
+      {vistaTab==="resumen" && (
+        <div className="card" style={{marginTop:16}}>
+          <div className="card-hdr">
+            <h3>📊 Ingresos vs Costos — {filtroAnio}</h3>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setChartQuarter(q=>Math.max(0,q-1))} disabled={chartQuarter===0}>◀</button>
+              <span style={{fontSize:12,fontWeight:700,color:"var(--cyan)",minWidth:110,textAlign:"center"}}>
+                {MESES.slice(chartQuarter*3,(chartQuarter+1)*3).map(m=>m.slice(0,3)).join(" · ")}
+              </span>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setChartQuarter(q=>Math.min(3,q+1))} disabled={chartQuarter===3}>▶</button>
+            </div>
+          </div>
+          <div style={{padding:"16px 20px",display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:16}}>
+            {MESES.slice(chartQuarter*3,(chartQuarter+1)*3).map((m,qi) => {
+              const d = meses12[chartQuarter*3+qi];
+              const util = d.ing - d.costos;
+              const tot = Math.max(d.ing + d.costos + d.fact, 1);
+              const items = [
+                {v:d.ing,   c:"#22c55e", lbl:"Ingresos"},
+                {v:d.costos,c:"#ef4444", lbl:"Costos"},
+                {v:d.fact,  c:"#eab308", lbl:"Facturado"},
+              ];
+              const margen = d.ing>0 ? Math.round(util/d.ing*100) : 0;
+              const maxV = Math.max(d.ing, d.costos, d.fact, 1);
+              return (
+                <div key={m} style={{background:"var(--bg2)",borderRadius:12,padding:14,border:"1px solid var(--border)"}}>
+                  <div style={{fontWeight:700,fontSize:13,marginBottom:10,textAlign:"center"}}>{m}</div>
+                  {items.map((it,j) => {
+                    const pct = Math.round(it.v/maxV*100);
+                    return (
+                      <div key={j} style={{marginBottom:8}}>
+                        <div style={{display:"flex",justifyContent:"space-between",fontSize:10,marginBottom:2}}>
+                          <span style={{color:it.c,fontWeight:600}}>{it.lbl}</span>
+                          <span style={{fontWeight:700,color:it.c}}>{it.v>0?fmt$(it.v):"—"}</span>
+                        </div>
+                        <div style={{background:"var(--bg3)",borderRadius:99,height:14,overflow:"hidden"}}>
+                          <div style={{width:pct+"%",height:"100%",background:it.c,borderRadius:99,transition:"width .4s"}}/>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div style={{borderTop:"1px solid var(--border)",paddingTop:6,marginTop:4,display:"flex",justifyContent:"space-between",fontSize:11}}>
+                    <span style={{color:"var(--muted)"}}>Utilidad {margen}%</span>
+                    <span style={{fontWeight:700,color:util>=0?"#22c55e":"#ef4444"}}>{util>=0?"+":""}{fmt$(util)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {vistaTab==="rendimiento"        && <VistaRendimiento/>}
       {vistaTab==="operadores"         && <VistaOperadores/>}
       {vistaTab==="combustible"        && <VistaCombustible/>}
