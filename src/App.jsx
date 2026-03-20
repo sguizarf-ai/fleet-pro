@@ -7270,79 +7270,54 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
               <button className="btn btn-ghost btn-sm" onClick={()=>setChartQuarter(q=>Math.min(3,q+1))} disabled={chartQuarter===3}>▶</button>
             </div>
           </div>
-          <div style={{padding:"16px 20px"}}>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16}}>
+          <div style={{padding:"16px 20px",display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16}}>
             {MESES.slice(chartQuarter*3,(chartQuarter+1)*3).map((m,qi) => {
-              const i = chartQuarter*3+qi;
-              const d = meses12[i];
+              const d = meses12[chartQuarter*3+qi];
               const util = d.ing - d.costos;
-              const total = Math.max(d.ing + d.costos + d.fact, 1);
-              // Pie slices
-              const slices = [
-                {val:d.ing,   c:"#22c55e", lbl:"Ingresos"},
-                {val:d.costos,c:"#ef4444", lbl:"Costos"},
-                {val:d.fact,  c:"#eab308", lbl:"Facturado"},
+              const tot = Math.max(d.ing + d.costos + d.fact, 1);
+              // Build pie path data
+              const items = [
+                {v:d.ing,   c:"#22c55e", lbl:"Ingresos"},
+                {v:d.costos,c:"#ef4444", lbl:"Costos"},
+                {v:d.fact,  c:"#eab308", lbl:"Facturado"},
               ];
-              let angle = -90;
-              const CX=70, CY=70, R=55, RI=28;
-              const pieSlices = slices.map(s => {
-                const deg = s.val/total*360;
-                const a1 = angle*Math.PI/180;
-                const a2 = (angle+deg)*Math.PI/180;
-                const x1=CX+R*Math.cos(a1), y1=CY+R*Math.sin(a1);
-                const x2=CX+R*Math.cos(a2), y2=CY+R*Math.sin(a2);
+              let a = -90;
+              const paths = items.map(it => {
+                const deg = it.v/tot*360;
+                const r=52, cx=65, cy=65;
+                const ra1 = a*Math.PI/180, ra2 = (a+deg)*Math.PI/180;
+                const x1=cx+r*Math.cos(ra1), y1=cy+r*Math.sin(ra1);
+                const x2=cx+r*Math.cos(ra2), y2=cy+r*Math.sin(ra2);
                 const lg = deg>180?1:0;
-                const path = deg>0?`M${CX},${CY} L${x1.toFixed(1)},${y1.toFixed(1)} A${R},${R} 0 ${lg},1 ${x2.toFixed(1)},${y2.toFixed(1)} Z`:"";
-                angle += deg;
-                return {...s, path, pct: Math.round(s.val/total*100)};
+                const path = deg>1 ? "M"+cx+","+cy+" L"+x1.toFixed(1)+","+y1.toFixed(1)+" A"+r+","+r+" 0 "+lg+",1 "+x2.toFixed(1)+","+y2.toFixed(1)+" Z" : "";
+                a += deg;
+                return {...it, path};
               });
+              const margen = d.ing>0 ? Math.round(util/d.ing*100) : 0;
               return (
-                <div key={m} style={{background:"var(--bg2)",borderRadius:12,padding:"14px",border:"1px solid var(--border)",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
-                  <div style={{fontWeight:700,fontSize:13,color:"var(--text)"}}>{m}</div>
-                  {/* Pie chart SVG */}
-                  <div style={{position:"relative"}}>
-                    <svg width="140" height="140" viewBox="0 0 140 140">
-                      <defs>
-                        <filter id={`sh${i}`}>
-                          <feDropShadow dx="1" dy="3" stdDeviation="3" floodOpacity="0.25"/>
-                        </filter>
-                      </defs>
-                      {/* Shadow ring */}
-                      <ellipse cx="70" cy="80" rx="52" ry="8" fill="rgba(0,0,0,0.12)"/>
-                      {pieSlices.map((s,j) => s.path ? (
-                        <path key={j} d={s.path} fill={s.c} stroke="var(--bg1)" strokeWidth="2"
-                          filter={`url(#sh${i})`} opacity="0.9"
-                          style={{transform:"translateY(-4px)",transformOrigin:"70px 70px"}}
-                        />
-                      ) : null)}
-                      {/* Donut hole */}
-                      <circle cx="70" cy="66" r="26" fill="var(--bg2)" stroke="var(--border)" strokeWidth="1"/>
-                      {/* Center text */}
-                      <text x="70" y="62" textAnchor="middle" fontSize="9" fill="var(--muted)">Utilidad</text>
-                      <text x="70" y="75" textAnchor="middle" fontSize="11" fontWeight="700"
-                        fill={util>=0?"#22c55e":"#ef4444"}>
-                        {util>=0?"+":""}{util>=1000?(util/1000).toFixed(0)+"k":Math.round(util)}
-                      </text>
-                    </svg>
-                  </div>
-                  {/* Legend */}
-                  {pieSlices.map((s,j) => (
+                <div key={m} style={{background:"var(--bg2)",borderRadius:12,padding:14,border:"1px solid var(--border)",display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
+                  <div style={{fontWeight:700,fontSize:13}}>{m}</div>
+                  <svg width="130" height="130" viewBox="0 0 130 130">
+                    <circle cx="65" cy="70" r="50" fill="none" stroke="var(--bg3)" strokeWidth="1" opacity="0.5"/>
+                    {paths.map((p,j) => p.path ? <path key={j} d={p.path} fill={p.c} stroke="var(--bg1)" strokeWidth="1.5" opacity="0.88"/> : null)}
+                    <circle cx="65" cy="65" r="24" fill="var(--bg2)" stroke="var(--border)" strokeWidth="1"/>
+                    <text x="65" y="61" textAnchor="middle" fontSize="9" fill="var(--muted)">Margen</text>
+                    <text x="65" y="73" textAnchor="middle" fontSize="12" fontWeight="700" fill={util>=0?"#22c55e":"#ef4444"}>{margen}%</text>
+                  </svg>
+                  {items.map((it,j) => (
                     <div key={j} style={{display:"flex",alignItems:"center",gap:6,width:"100%",fontSize:11}}>
-                      <div style={{width:10,height:10,borderRadius:2,background:s.c,flexShrink:0,boxShadow:`0 2px 4px ${s.c}66`}}/>
-                      <span style={{flex:1,color:"var(--muted)"}}>{s.lbl}</span>
-                      <span style={{fontWeight:700,color:s.c}}>{s.val>0?fmt$(s.val):"—"}</span>
+                      <div style={{width:9,height:9,borderRadius:2,background:it.c,flexShrink:0}}/>
+                      <span style={{flex:1,color:"var(--muted)"}}>{it.lbl}</span>
+                      <span style={{fontWeight:700,color:it.c}}>{it.v>0?fmt$(it.v):"—"}</span>
                     </div>
                   ))}
-                  <div style={{width:"100%",borderTop:"1px solid var(--border)",paddingTop:6,marginTop:2,display:"flex",justifyContent:"space-between",fontSize:11}}>
-                    <span style={{color:"var(--muted)"}}>Margen</span>
-                    <span style={{fontWeight:700,color:util>=0?"#22c55e":"#ef4444"}}>
-                      {d.ing>0?Math.round(util/d.ing*100):0}%
-                    </span>
+                  <div style={{width:"100%",borderTop:"1px solid var(--border)",paddingTop:5,display:"flex",justifyContent:"space-between",fontSize:11}}>
+                    <span style={{color:"var(--muted)"}}>Utilidad</span>
+                    <span style={{fontWeight:700,color:util>=0?"#22c55e":"#ef4444"}}>{util>=0?"+":""}{fmt$(util)}</span>
                   </div>
                 </div>
               );
             })}
-            </div>
           </div>
         </div>
 
