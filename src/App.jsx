@@ -6717,11 +6717,14 @@ function MaintPage({ units, maints, proveedores, onAdd, onEdit, onDelete }) {
       <div className="card-body">
         {fil.length === 0 ? <div className="empty"><div className="empty-icon">🔧</div><p>Sin resultados</p></div> :
           <table>
-            <thead><tr><th>Unidad</th><th>Tipo</th><th>Descripción</th><th>Prioridad</th><th>F.Prog</th><th>F.Ejec</th><th>Realizado</th><th>Proveedor</th><th>Costo Total</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>Unidad</th><th>Tipo</th><th>Descripción</th><th>Prioridad</th><th>F.Prog</th><th>F.Ejec</th><th>Realizado</th><th>Taller / M.O.</th><th>Refacciones</th><th>M.O.</th><th>Total</th><th>Acciones</th></tr></thead>
             <tbody>{fil.map(m => { 
               const u = units.find(u => u.id === m.unidadId); 
-              const prov = (proveedores||[]).find(p => p.id === m.proveedorId);
-              const ct = (Number(m.costoRef) || 0) + (Number(m.costoMO) || 0); return (
+              const prov    = (proveedores||[]).find(p => p.id === m.proveedorId);
+              const provRef = (proveedores||[]).find(p => p.id === m.proveedorRefId);
+              const costoRef = Number(m.costoRef) || 0;
+              const costoMO  = Number(m.costoMO)  || 0;
+              const ct = costoRef + costoMO; return (
               <tr key={m.id}>
                 <td><strong>{u?.num || "?"}</strong> <span style={{ fontSize: 11, color: "var(--muted)" }}>{u?.placas}</span></td>
                 <td><Bdg c="bb" t={m.tipo} /></td>
@@ -6730,8 +6733,15 @@ function MaintPage({ units, maints, proveedores, onAdd, onEdit, onDelete }) {
                 <td style={{ fontSize: 12 }}>{m.fechaProg || "—"}</td>
                 <td style={{ fontSize: 12, color: m.fechaEjec ? "var(--green)" : "var(--muted)", fontWeight: 600 }}>{m.fechaEjec || "Pendiente"}</td>
                 <td>{realBdg(m.realizado)}</td>
-                <td style={{ fontSize: 11 }}>{prov ? <Bdg c="bo" t={prov.nombre} /> : (m.taller ? <span style={{ color: "var(--muted)" }}>{m.taller}</span> : "—")}</td>
-                <td style={{ color: ct > 0 ? "var(--orange)" : "var(--muted)", fontWeight: 700 }}>{ct > 0 ? fmt$(ct) : "—"}</td>
+                <td style={{ fontSize: 11 }}>
+                  {prov ? <Bdg c="bo" t={prov.nombre} /> : (m.taller ? <span style={{ color: "var(--muted)" }}>{m.taller}</span> : "—")}
+                </td>
+                <td style={{ fontSize: 11 }}>
+                  {provRef ? <Bdg c="bp" t={provRef.nombre} /> : (costoRef > 0 ? <span style={{ color: "var(--muted)", fontSize: 10 }}>Sin prov.</span> : <span style={{ color: "var(--muted)" }}>—</span>)}
+                  {costoRef > 0 && <div style={{ fontSize: 11, color: "var(--cyan)", fontWeight: 700, marginTop: 2 }}>{fmt$(costoRef)}</div>}
+                </td>
+                <td style={{ color: costoMO > 0 ? "var(--orange)" : "var(--muted)", fontWeight: 700, fontSize: 13 }}>{costoMO > 0 ? fmt$(costoMO) : "—"}</td>
+                <td style={{ color: ct > 0 ? "var(--red)" : "var(--muted)", fontWeight: 700, fontSize: 13 }}>{ct > 0 ? fmt$(ct) : "—"}</td>
                 <td><div className="acts"><button className="btn btn-ghost btn-sm" onClick={() => onEdit(m)}>✏️</button><button className="btn btn-red btn-sm" onClick={() => onDelete(m.id)}>🗑</button></div></td>
               </tr>
             )})}</tbody>
