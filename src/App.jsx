@@ -7330,6 +7330,65 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
   };
 
   // ══════════════════════════════════════════════════════════════
+  //  2. RENDIMIENTO POR UNIDAD
+  // ══════════════════════════════════════════════════════════════
+  const VistaRendimiento = () => {
+    const stats = units.map(u => {
+      const viajesU = trips.filter(t => t.unidadId === u.id && t.status === "COMPLETADO");
+      const ingresos = viajesU.reduce((a,t) => a+(Number(t.costoOfrecido)||0), 0);
+      const kmTotal = viajesU.reduce((a,t) => a+Math.max(0,(Number(t.kmLlegada)||0)-(Number(t.kmSalida)||0)), 0);
+      const combustU = fuels.filter(f => f.unidadId === u.id).reduce((a,f) => a+(Number(f.litros)||0)*(Number(f.precio)||0), 0);
+      const mantU = maints.filter(m => m.unidadId === u.id).reduce((a,m) => a+(Number(m.costoRef)||0)+(Number(m.costoMO)||0), 0);
+      const costos = combustU + mantU;
+      const utilidad = ingresos - costos;
+      const margen = ingresos > 0 ? Math.round(utilidad/ingresos*100) : 0;
+      return { u, ingresos, costos, utilidad, margen, viajes: viajesU.length, km: kmTotal };
+    }).sort((a,b) => b.ingresos - a.ingresos);
+
+    const maxIng = Math.max(...stats.map(s=>s.ingresos), 1);
+
+    return (
+      <div className="card">
+        <div className="card-hdr"><h3>🚛 Rendimiento por Unidad — {filtroAnio}</h3></div>
+        <div style={{padding:"16px 20px"}}>
+          {stats.length === 0
+            ? <div className="empty"><div className="empty-icon">🚛</div><p>Sin datos de viajes</p></div>
+            : stats.map(({u, ingresos, costos, utilidad, margen, viajes, km}) => (
+              <div key={u.id} style={{marginBottom:16,background:"var(--bg2)",borderRadius:10,padding:"12px 16px",border:"1px solid var(--border)",borderLeft:`4px solid ${margen>=0?"var(--green)":"var(--red)"}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <div>
+                    <span style={{fontWeight:700,fontSize:14}}>{u.num} — {u.placas}</span>
+                    <span style={{fontSize:11,color:"var(--muted)",marginLeft:8}}>{u.marca} {u.modelo}</span>
+                  </div>
+                  <div style={{display:"flex",gap:12,fontSize:11}}>
+                    <span style={{color:"var(--muted)"}}>{viajes} viajes</span>
+                    {km>0 && <span style={{color:"var(--muted)"}}>{(km/1000).toFixed(1)}k km</span>}
+                    <span style={{fontWeight:700,color:margen>=0?"var(--green)":"var(--red)",padding:"2px 8px",background:margen>=0?"rgba(34,197,94,.12)":"rgba(239,68,68,.12)",borderRadius:99}}>
+                      {margen}% margen
+                    </span>
+                  </div>
+                </div>
+                {[
+                  {v:ingresos, c:"#22c55e", lbl:"Ingresos"},
+                  {v:costos,   c:"#ef4444", lbl:"Costos"},
+                ].map((row,j) => (
+                  <div key={j} style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                    <span style={{width:60,fontSize:11,color:row.c,fontWeight:600}}>{row.lbl}</span>
+                    <div style={{flex:1,background:"var(--bg3)",borderRadius:99,height:14,overflow:"hidden"}}>
+                      <div style={{width:Math.round(row.v/maxIng*100)+"%",height:"100%",background:row.c,borderRadius:99,boxShadow:"0 1px 4px "+row.c+"44"}}/>
+                    </div>
+                    <span style={{width:80,textAlign:"right",fontWeight:700,fontSize:11,color:row.c}}>{row.v>0?fmt$(row.v):"—"}</span>
+                  </div>
+                ))}
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    );
+  };
+
+    // ══════════════════════════════════════════════════════════════
   //  3. OPERADORES / CONDUCTORES
   // ══════════════════════════════════════════════════════════════
   const VistaOperadores = () => {
@@ -7998,40 +8057,43 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
               <button className="btn btn-ghost btn-sm" onClick={()=>setChartQuarter(q=>Math.min(3,q+1))} disabled={chartQuarter===3}>▶</button>
             </div>
           </div>
-          <div style={{padding:"16px 20px"}}>
+          <div style={{padding:"16px 20px",display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:16}}>
             {MESES.slice(chartQuarter*3,(chartQuarter+1)*3).map((m,qi) => {
               const d = meses12[chartQuarter*3+qi];
               const util = d.ing - d.costos;
-              const maxV = Math.max(d.ing, d.costos, d.fact, 1);
+              const tot = Math.max(d.ing + d.costos + d.fact, 1);
+              const margen = d.ing>0 ? Math.round(util/d.ing*100) : 0;
+              const colMargen = util>=0 ? "#22c55e" : "#ef4444";
               const rows = [
-                {v:d.ing,    c:"#22c55e", lbl:"Ingresos"},
-                {v:d.costos, c:"#ef4444", lbl:"Costos"},
-                {v:d.fact,   c:"#eab308", lbl:"Facturado"},
+                {v:d.ing,    c:"#22c55e", lbl:"Ingresos",   pct: Math.round(d.ing/tot*100)},
+                {v:d.costos, c:"#ef4444", lbl:"Costos",     pct: Math.round(d.costos/tot*100)},
+                {v:d.fact,   c:"#eab308", lbl:"Facturado",  pct: Math.round(d.fact/tot*100)},
               ];
               return (
-                <div key={m} style={{marginBottom:20,background:"var(--bg2)",borderRadius:10,padding:"14px 16px",border:"1px solid var(--border)"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}>
-                    <span style={{fontWeight:700,fontSize:14}}>{m}</span>
-                    <span style={{fontSize:11,padding:"2px 10px",borderRadius:99,
-                      background:util>=0?"rgba(34,197,94,.15)":"rgba(239,68,68,.15)",
-                      color:util>=0?"#22c55e":"#ef4444",fontWeight:700}}>
-                      {util>=0?"Utilidad":"Pérdida"}: {fmt$(Math.abs(util))}
-                    </span>
+                <div key={m} style={{background:"var(--bg2)",borderRadius:12,padding:14,border:"1px solid var(--border)"}}>
+                  <div style={{fontWeight:700,fontSize:13,marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span>{m}</span>
+                    <span style={{fontSize:10,padding:"2px 8px",borderRadius:99,background:util>=0?"rgba(34,197,94,.15)":"rgba(239,68,68,.15)",color:colMargen,fontWeight:700}}>{margen}%</span>
                   </div>
-                  {rows.map((row,j) => {
-                    const pct = Math.round(row.v/maxV*100);
-                    return (
-                      <div key={j} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
-                        <span style={{width:72,fontSize:11,color:row.c,fontWeight:600}}>{row.lbl}</span>
-                        <div style={{flex:1,background:"var(--bg3)",borderRadius:99,height:18,overflow:"hidden"}}>
-                          <div style={{width:pct+"%",height:"100%",background:row.c,borderRadius:99}}/>
-                        </div>
-                        <span style={{width:90,textAlign:"right",fontWeight:700,fontSize:12,color:row.c}}>
-                          {row.v>0?fmt$(row.v):"—"}
-                        </span>
-                      </div>
-                    );
-                  })}
+                  {/* Stacked bar */}
+                  <div style={{height:20,borderRadius:99,overflow:"hidden",display:"flex",marginBottom:10,gap:1}}>
+                    {rows.map((r,j) => r.pct>0 && (
+                      <div key={j} style={{width:r.pct+"%",height:"100%",background:r.c,transition:"width .5s ease"}}
+                        title={r.lbl+": "+fmt$(r.v)}/>
+                    ))}
+                  </div>
+                  {/* Legend rows */}
+                  {rows.map((r,j) => (
+                    <div key={j} style={{display:"flex",alignItems:"center",gap:6,marginBottom:5,fontSize:11}}>
+                      <div style={{width:8,height:8,borderRadius:2,background:r.c,flexShrink:0}}/>
+                      <span style={{flex:1,color:"var(--muted)"}}>{r.lbl}</span>
+                      <span style={{fontWeight:700,color:r.c}}>{r.v>0?fmt$(r.v):"—"}</span>
+                    </div>
+                  ))}
+                  <div style={{borderTop:"1px solid var(--border)",paddingTop:6,marginTop:4,display:"flex",justifyContent:"space-between",fontSize:11}}>
+                    <span style={{color:"var(--muted)"}}>Utilidad</span>
+                    <span style={{fontWeight:700,color:colMargen}}>{util>=0?"+":""}{fmt$(util)}</span>
+                  </div>
                 </div>
               );
             })}
