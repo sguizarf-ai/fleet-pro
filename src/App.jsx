@@ -3856,8 +3856,13 @@ function printUnitSheet({ unit, driver, docs, maints, fuels, trips, showFinancia
     <div class="grid">
       <div class="field"><label>KM Actual</label>${fmtN(unit.kmActual)} km</div>
       <div class="field"><label>KM Último Mant.</label>${fmtN(unit.kmUltMant)} km</div>
-      <div class="field"><label>KM desde último mant.</label>${fmtN((Number(unit.kmActual) || 0) - (Number(unit.kmUltMant) || 0))} km</div>
-      <div class="field"><label>Próx. Mantenimiento</label>${unit.proxMant || "—"}</div>
+      <div class="field"><label>KM desde último mant.</label>${fmtN((Number(unit.kmActual)||0)-(Number(unit.kmUltMant)||0))} km</div>
+      <div class="field"><label>Intervalo Mant.</label>${fmtN(unit.intervaloMant||5000)} km</div>
+      <div class="field" style="background:${(()=>{const r=(Number(unit.kmUltMant)||0)+(Number(unit.intervaloMant)||5000)-(Number(unit.kmActual)||0);return r<=0?'#FFE5E5':r<=500?'#FFF3E0':'#E8F5EA';})()}">
+        <label>KM Faltantes para Próx. Mant.</label>
+        ${(()=>{const r=(Number(unit.kmUltMant)||0)+(Number(unit.intervaloMant)||5000)-(Number(unit.kmActual)||0);return r<=0?'<span style="color:#C62828;font-weight:700">⚠️ VENCIDO — excedido por '+fmtN(Math.abs(r))+' km</span>':'<span style="color:'+(r<=500?'#E65100':'#2E7D32')+';font-weight:700">'+fmtN(r)+' km restantes</span>';})()}
+      </div>
+      <div class="field"><label>Próx. Mant. a KM Total</label>${fmtN((Number(unit.kmUltMant)||0)+(Number(unit.intervaloMant)||5000))} km</div>
     </div>
     <h2>📄 Documentos</h2>
     <table><thead><tr><th>Documento</th><th>Número</th><th>Empresa</th><th>Vence</th><th>Estado</th></tr></thead><tbody>
@@ -6787,6 +6792,249 @@ function FuelPage({ units, fuels, onAdd, onEdit, onDelete }) {
 // ════════════════════════════════════════════════════════════════════════════
 //  CHARTS PAGE v6  —  10 vistas de análisis
 // ════════════════════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ALMACÉN — Control de Inventario, Refacciones y Herramientas
+// ══════════════════════════════════════════════════════════════════════════════
+
+const ALMACEN_CATS = ["Refacciones","Herramientas","Lubricantes","Filtros","Llantas","Eléctrico","Otro"];
+const ALMACEN_UNIDADES = ["pieza","litro","galón","kit","par","juego","caja","metro"];
+
+function AlmacenModal({ item, onSave, onClose }) {
+  const [f, setF] = useState(item || {
+    nombre:"", categoria:ALMACEN_CATS[0], marca:"", numParte:"",
+    unidad:"pieza", stockMin:1, stockActual:0, ubicacion:"",
+    precio:0, proveedor:"", notas:"", foto:"",
+  });
+  const [uploading, setUploading] = useState(false);
+  const ch = k => e => setF(p=>({...p,[k]:e.target.value}));
+  const ok = () => {
+    if (!f.nombre) return alert("Nombre requerido");
+    onSave({...f, id: f.id||uid()});
+  };
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal wide" onClick={e=>e.stopPropagation()}>
+        <div className="mhdr">
+          <h3>{f.id?"✏️ Editar Artículo":"📦 Nuevo Artículo"}</h3>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+        </div>
+        <div className="mbody">
+          <div className="fg">
+            <PhotoInput value={f.foto} onChange={v=>setF(p=>({...p,foto:v}))} onUploading={setUploading} label="Foto del Artículo"/>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <div className="field s2"><label>Nombre *</label><input value={f.nombre} onChange={ch("nombre")} placeholder="Ej: Filtro de aceite Wix 51334"/></div>
+              <div className="fg">
+                <div className="field"><label>Categoría</label>
+                  <select value={f.categoria} onChange={ch("categoria")}>
+                    {ALMACEN_CATS.map(cat=><option key={cat}>{cat}</option>)}
+                  </select>
+                </div>
+                <div className="field"><label>Marca</label><input value={f.marca} onChange={ch("marca")} placeholder="Ej: Wix, Mobil, SKF"/></div>
+              </div>
+            </div>
+            <div className="field"><label>No. Parte / SKU</label><input value={f.numParte} onChange={ch("numParte")} placeholder="Ej: WIX-51334"/></div>
+            <div className="field"><label>Unidad</label>
+              <select value={f.unidad} onChange={ch("unidad")}>
+                {ALMACEN_UNIDADES.map(u=><option key={u}>{u}</option>)}
+              </select>
+            </div>
+            <div className="field"><label>Stock Actual</label><input value={f.stockActual} onChange={ch("stockActual")} type="number" min="0"/></div>
+            <div className="field"><label>Stock Mínimo</label><input value={f.stockMin} onChange={ch("stockMin")} type="number" min="0"/></div>
+            <div className="field"><label>Precio Unitario ($)</label><input value={f.precio} onChange={ch("precio")} type="number" min="0"/></div>
+            <div className="field"><label>Ubicación / Rack</label><input value={f.ubicacion} onChange={ch("ubicacion")} placeholder="Ej: Estante A-3"/></div>
+            <div className="field"><label>Proveedor habitual</label><input value={f.proveedor} onChange={ch("proveedor")} placeholder="Ej: Autozone"/></div>
+            <div className="field s2"><label>Notas</label><textarea value={f.notas} onChange={ch("notas")} rows={2}/></div>
+          </div>
+        </div>
+        <div className="mftr">
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-cyan" onClick={ok} disabled={uploading}>{uploading?"⏳ Subiendo...":"💾 Guardar"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MovimientoModal({ item, almacen, onSave, onClose }) {
+  const [f, setF] = useState({
+    articuloId: item?.id||"", tipo:"salida", cantidad:1, motivo:"",
+    fecha: new Date().toLocaleDateString("es-MX",{day:"2-digit",month:"2-digit",year:"numeric"}).split("/").join("/"),
+    ref:"",
+  });
+  const ch = k => e => setF(p=>({...p,[k]:e.target.value}));
+  const art = almacen.find(a=>a.id===f.articuloId);
+  const ok = () => {
+    if (!f.articuloId) return alert("Selecciona un artículo");
+    if (!f.cantidad||f.cantidad<=0) return alert("Cantidad inválida");
+    onSave({...f, id:uid()});
+  };
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <div className="mhdr">
+          <h3>📋 Registrar Movimiento</h3>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+        </div>
+        <div className="mbody">
+          <div className="fg">
+            <div className="field s2"><label>Artículo *</label>
+              <select value={f.articuloId} onChange={ch("articuloId")}>
+                <option value="">— Seleccionar —</option>
+                {almacen.map(a=><option key={a.id} value={a.id}>{a.nombre} (Stock: {a.stockActual} {a.unidad})</option>)}
+              </select>
+            </div>
+            <div className="field"><label>Tipo</label>
+              <select value={f.tipo} onChange={ch("tipo")}>
+                <option value="entrada">📥 Entrada (compra/recepción)</option>
+                <option value="salida">📤 Salida (uso en mant.)</option>
+                <option value="ajuste">🔧 Ajuste de inventario</option>
+              </select>
+            </div>
+            <div className="field"><label>Cantidad</label><input value={f.cantidad} onChange={ch("cantidad")} type="number" min="1"/></div>
+            <div className="field s2"><label>Motivo / Referencia</label><input value={f.motivo} onChange={ch("motivo")} placeholder="Ej: Mant. unidad 003, Compra factura #123"/></div>
+            <div className="field">
+              <label>Fecha</label>
+              <DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))}/>
+            </div>
+            {art&&<div className="field s2" style={{background:"var(--bg2)",borderRadius:8,padding:"10px 12px",border:"1px solid var(--border)"}}>
+              <div style={{fontSize:11,color:"var(--muted)"}}>Stock actual: <strong>{art.stockActual} {art.unidad}</strong></div>
+              <div style={{fontSize:11,color:"var(--muted)"}}>Tras movimiento: <strong style={{color:f.tipo==="entrada"?"var(--green)":"var(--orange)"}}>{f.tipo==="entrada"?Number(art.stockActual)+Number(f.cantidad||0):Number(art.stockActual)-Number(f.cantidad||0)} {art.unidad}</strong></div>
+            </div>}
+          </div>
+        </div>
+        <div className="mftr">
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-cyan" onClick={ok}>💾 Registrar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AlmacenPage({ almacen, isAdmin, onAdd, onEdit, onDelete }) {
+  const [q, setQ] = useState("");
+  const [catF, setCatF] = useState("TODOS");
+  const [movModal, setMovModal] = useState(null);
+  const [movimientos, setMovimientos] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("fp6:movimientos")||"[]"); } catch { return []; }
+  });
+
+  const saveMovimiento = (mov) => {
+    // Update stock
+    const updated = almacen.map(a => {
+      if (a.id !== mov.articuloId) return a;
+      const delta = mov.tipo==="entrada" ? Number(mov.cantidad) : -Number(mov.cantidad);
+      return {...a, stockActual: Math.max(0, (Number(a.stockActual)||0) + delta)};
+    });
+    // Save updated item
+    const art = updated.find(a=>a.id===mov.articuloId);
+    if (art && onEdit) onEdit(art);
+    // Save movimiento locally
+    const newMovs = [...movimientos, mov];
+    setMovimientos(newMovs);
+    try { localStorage.setItem("fp6:movimientos", JSON.stringify(newMovs)); } catch {}
+    setMovModal(null);
+  };
+
+  const fil = almacen.filter(a =>
+    a.nombre?.toLowerCase().includes(q.toLowerCase()) &&
+    (catF==="TODOS" || a.categoria===catF)
+  );
+
+  const stockBajo = almacen.filter(a=>(Number(a.stockActual)||0)<=(Number(a.stockMin)||1)).length;
+  const totalItems = almacen.length;
+  const valorTotal = almacen.reduce((s,a)=>(s+(Number(a.stockActual)||0)*(Number(a.precio)||0)),0);
+
+  return (
+    <div>
+      {/* KPIs */}
+      <div className="stats" style={{marginBottom:18}}>
+        <div className="stat" style={{"--c":"var(--cyan)"}}><div className="stat-icon">📦</div><div className="stat-val">{totalItems}</div><div className="stat-lbl">Artículos</div></div>
+        <div className="stat" style={{"--c":stockBajo>0?"var(--red)":"var(--green)"}}><div className="stat-icon">⚠️</div><div className="stat-val">{stockBajo}</div><div className="stat-lbl">Stock Bajo</div></div>
+        <div className="stat" style={{"--c":"var(--orange)"}}><div className="stat-icon">💰</div><div className="stat-val sm">{fmt$(valorTotal)}</div><div className="stat-lbl">Valor Inventario</div></div>
+        <div className="stat" style={{"--c":"var(--purple)"}}><div className="stat-icon">📋</div><div className="stat-val">{movimientos.length}</div><div className="stat-lbl">Movimientos</div></div>
+      </div>
+
+      <div className="card">
+        <div className="card-hdr">
+          <h3>📦 Almacén ({fil.length})</h3>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setMovModal({})}>📋 Registrar Movimiento</button>
+            {isAdmin&&onAdd&&<button className="btn btn-cyan btn-sm" onClick={onAdd}>➕ Nuevo Artículo</button>}
+          </div>
+        </div>
+        <div style={{padding:"12px 16px",display:"flex",gap:10,flexWrap:"wrap",borderBottom:"1px solid var(--border)"}}>
+          <input className="search" value={q} onChange={e=>setQ(e.target.value)} placeholder="🔍 Buscar..."/>
+          <select className="btn btn-ghost btn-sm" value={catF} onChange={e=>setCatF(e.target.value)} style={{padding:"6px 10px"}}>
+            <option value="TODOS">Todas las categorías</option>
+            {ALMACEN_CATS.map(cat=><option key={cat}>{cat}</option>)}
+          </select>
+        </div>
+
+        {fil.length===0
+          ? <div className="empty"><div className="empty-icon">📦</div><p>Sin artículos registrados</p></div>
+          : <div style={{padding:"12px 16px",display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:12}}>
+            {fil.map(a => {
+              const stockOk = (Number(a.stockActual)||0) > (Number(a.stockMin)||1);
+              const stockCrit = (Number(a.stockActual)||0) === 0;
+              return (
+                <div key={a.id} style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden",background:"var(--bg1)",
+                  borderLeft:`4px solid ${stockCrit?"var(--red)":stockOk?"var(--green)":"var(--yellow)"}`}}>
+                  <div style={{display:"flex",gap:10,padding:"10px 12px"}}>
+                    {a.foto
+                      ? <img src={a.foto} style={{width:60,height:60,objectFit:"cover",borderRadius:8,flexShrink:0}} alt=""/>
+                      : <div style={{width:60,height:60,background:"var(--bg3)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,flexShrink:0}}>📦</div>
+                    }
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:13,marginBottom:2}}>{a.nombre}</div>
+                      <div style={{fontSize:11,color:"var(--muted)",marginBottom:4}}>{a.categoria}{a.marca?" · "+a.marca:""}{a.numParte?" · "+a.numParte:""}</div>
+                      <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                        <span style={{fontWeight:700,fontSize:14,color:stockCrit?"var(--red)":stockOk?"var(--green)":"var(--yellow)"}}>{a.stockActual||0} {a.unidad}</span>
+                        <span style={{fontSize:10,color:"var(--muted)"}}>mín: {a.stockMin||1}</span>
+                        {a.precio>0&&<span style={{fontSize:10,color:"var(--cyan)"}}>💲{Number(a.precio).toFixed(2)}</span>}
+                      </div>
+                      {a.ubicacion&&<div style={{fontSize:10,color:"var(--muted)",marginTop:2}}>📍 {a.ubicacion}</div>}
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:6,padding:"8px 12px",borderTop:"1px solid var(--border)",background:"var(--bg2)"}}>
+                    <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>setMovModal({articuloId:a.id})}>📋 Mov.</button>
+                    {isAdmin&&<><button className="btn btn-ghost btn-xs" onClick={()=>onEdit&&onEdit(a)}>✏️</button>
+                    <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>onDelete&&onDelete(a.id)}>🗑️</button></>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        }
+
+        {/* Movimientos recientes */}
+        {movimientos.length>0&&(
+          <div style={{padding:"12px 16px",borderTop:"1px solid var(--border)"}}>
+            <div style={{fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",marginBottom:8}}>Últimos movimientos</div>
+            <div style={{maxHeight:200,overflowY:"auto"}}>
+              {[...movimientos].reverse().slice(0,20).map((m,i)=>{
+                const art=almacen.find(a=>a.id===m.articuloId);
+                return (
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"5px 0",borderBottom:"1px solid var(--border)",fontSize:12}}>
+                    <span>{m.tipo==="entrada"?"📥":"📤"}</span>
+                    <span style={{flex:1,fontWeight:600}}>{art?.nombre||"—"}</span>
+                    <span style={{color:m.tipo==="entrada"?"var(--green)":"var(--orange)",fontWeight:700}}>{m.tipo==="entrada"?"+":"-"}{m.cantidad} {art?.unidad||""}</span>
+                    <span style={{color:"var(--muted)",fontSize:10}}>{m.fecha}</span>
+                    <span style={{color:"var(--muted)",fontSize:10,maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.motivo}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {movModal&&<MovimientoModal item={movModal.articuloId?almacen.find(a=>a.id===movModal.articuloId):null} almacen={almacen} onSave={saveMovimiento} onClose={()=>setMovModal(null)}/>}
+    </div>
+  );
+}
+
 function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, drivers = [], proveedores = [], externos = [], nominasAdmin = [] }) {
 
   const hoy        = new Date();
@@ -7005,162 +7253,93 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
         {/* Gráfica ingresos vs costos 12 meses */}
         <div className="card">
           <div className="card-hdr">
-            <h3>📊 Ingresos vs Costos vs Facturación — {filtroAnio}</h3>
+            <h3>📊 Ingresos vs Costos — {filtroAnio}</h3>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <button className="btn btn-ghost btn-sm" onClick={()=>setChartQuarter(q=>Math.max(0,q-1))} disabled={chartQuarter===0}>◀</button>
-              <span style={{fontSize:12,fontWeight:700,color:"var(--cyan)",minWidth:100,textAlign:"center"}}>
+              <span style={{fontSize:12,fontWeight:700,color:"var(--cyan)",minWidth:110,textAlign:"center"}}>
                 {MESES.slice(chartQuarter*3,(chartQuarter+1)*3).map(m=>m.slice(0,3)).join(" · ")}
               </span>
               <button className="btn btn-ghost btn-sm" onClick={()=>setChartQuarter(q=>Math.min(3,q+1))} disabled={chartQuarter===3}>▶</button>
             </div>
           </div>
           <div style={{padding:"20px 24px"}}>
-            {/* 3D-style bar chart for 3 months */}
-            {MESES.slice(chartQuarter*3,(chartQuarter+1)*3).map((m,qi)=>{
-              const i = chartQuarter*3+qi;
-              const d = meses12[i];
-              const util = d.ing - d.costos;
-              const maxV = Math.max(d.ing, d.costos, d.fact, 1);
-              const bars = [
-                {val:d.ing,  c:"#22c55e", label:"Ingresos",   icon:"📈"},
-                {val:d.costos,c:"#ef4444",label:"Costos",     icon:"📉"},
-                {val:Math.abs(util), c:util>=0?"#06b6d4":"#f97316", label:(util>=0?"":"−")+"Utilidad", icon:"💰"},
-                {val:d.fact, c:"#eab308", label:"Facturado",  icon:"🧾"},
-              ];
+            {(() => {
+              const COLS = ["#22c55e","#ef4444","#06b6d4","#eab308"];
+              const LBLS = ["Ingresos","Costos","Utilidad","Facturado"];
+              const qMonths = MESES.slice(chartQuarter*3,(chartQuarter+1)*3);
+              const qData = qMonths.map((_,qi) => {
+                const d = meses12[chartQuarter*3+qi];
+                const util = d.ing - d.costos;
+                return {ing:d.ing, cos:d.costos, util:Math.abs(util), utilSign:util>=0, fact:d.fact};
+              });
+              const allVals = qData.flatMap(d=>[d.ing,d.cos,d.fact]);
+              const maxV = Math.max(...allVals, 1);
+              const H = 200;
+              const BW = 28, GAP = 5, GROUP = 4*BW+3*GAP, GPAD = 40;
+              const totalW = qMonths.length * (GROUP + GPAD*2);
               return (
-                <div key={m} style={{marginBottom:28}}>
-                  <div style={{fontSize:13,fontWeight:700,color:"var(--text)",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
-                    <span style={{background:"var(--cyan)",color:"#fff",borderRadius:6,padding:"2px 10px",fontSize:11}}>{m}</span>
-                    <span style={{fontSize:11,color:"var(--muted)"}}>
-                      Utilidad: <span style={{color:util>=0?"var(--green)":"var(--red)",fontWeight:700}}>{util>=0?"":"-"}{fmt$(Math.abs(util))}</span>
-                    </span>
-                  </div>
-                  <div style={{display:"flex",gap:16,alignItems:"flex-end",height:120,padding:"0 8px"}}>
-                    {bars.map((b,j)=>{
-                      const h = Math.round(b.val/maxV*100);
+                <div style={{overflowX:"auto"}}>
+                  <svg width="100%" viewBox={`0 0 ${totalW} ${H+80}`} style={{minWidth:300}}>
+                    <defs>
+                      {COLS.map((col,i)=>(
+                        <linearGradient key={i} id={`cg${i}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={col} stopOpacity="0.95"/>
+                          <stop offset="100%" stopColor={col} stopOpacity="0.55"/>
+                        </linearGradient>
+                      ))}
+                    </defs>
+                    {/* Grid lines */}
+                    {[0,0.25,0.5,0.75,1].map(p=>(
+                      <g key={p}>
+                        <line x1="0" y1={H*(1-p)} x2={totalW} y2={H*(1-p)} stroke="var(--border)" strokeWidth="1" strokeDasharray={p===0?"0":"4,4"}/>
+                        {p>0&&<text x="2" y={H*(1-p)-3} fontSize="9" fill="var(--muted)">{fmt$(maxV*p)}</text>}
+                      </g>
+                    ))}
+                    {/* Bars per month */}
+                    {qMonths.map((m,mi)=>{
+                      const gx = mi*(GROUP+GPAD*2)+GPAD;
+                      const d = qData[mi];
+                      const vals = [d.ing, d.cos, d.util, d.fact];
                       return (
-                        <div key={j} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-                          <div style={{fontSize:10,fontWeight:700,color:b.c}}>{b.val>0?fmt$(b.val):"—"}</div>
-                          <div style={{width:"100%",position:"relative",height:100,display:"flex",alignItems:"flex-end"}}>
-                            {/* 3D effect */}
-                            <div style={{
-                              width:"100%",height:h+"%",background:`linear-gradient(180deg,${b.c}dd,${b.c}88)`,
-                              borderRadius:"6px 6px 0 0",position:"relative",
-                              boxShadow:`0 -4px 12px ${b.c}44, inset 0 1px 0 rgba(255,255,255,0.3)`,
-                              transition:"height .5s ease",
-                            }}>
-                              {/* 3D top face */}
-                              <div style={{
-                                position:"absolute",top:-6,left:"8%",right:"-8%",height:12,
-                                background:`linear-gradient(180deg,${b.c},${b.c}bb)`,
-                                borderRadius:"4px 8px 4px 0",transform:"skewX(40deg)",
-                                boxShadow:`2px -2px 4px ${b.c}66`
-                              }}/>
-                              {/* 3D right face */}
-                              <div style={{
-                                position:"absolute",top:-6,right:"-8%",width:"8%",bottom:0,
-                                background:`linear-gradient(90deg,${b.c}88,${b.c}44)`,
-                                transform:"skewY(-50deg)",transformOrigin:"top right"
-                              }}/>
-                            </div>
-                          </div>
-                          <div style={{fontSize:9,color:"var(--muted)",textAlign:"center"}}>{b.icon} {b.label}</div>
-                        </div>
+                        <g key={m}>
+                          {vals.map((v,bi)=>{
+                            const bh = Math.round(v/maxV*H)||0;
+                            const bx = gx+bi*(BW+GAP);
+                            const by = H-bh;
+                            const col = bi===2?(d.utilSign?COLS[2]:"#f97316"):COLS[bi];
+                            return (
+                              <g key={bi}>
+                                <rect x={bx+2} y={by+4} width={BW} height={bh} rx="3" fill={col} opacity="0.12"/>
+                                <rect x={bx} y={by} width={BW} height={bh} rx="3" fill={`url(#cg${bi===2?(d.utilSign?2:1):bi})`}/>
+                                {v>0&&<text x={bx+BW/2} y={by-3} textAnchor="middle" fontSize="8" fontWeight="700" fill={col}>{v>=10000?(v/1000).toFixed(0)+"k":v>=1000?(v/1000).toFixed(1)+"k":Math.round(v)}</text>}
+                              </g>
+                            );
+                          })}
+                          {/* Month label */}
+                          <text x={gx+GROUP/2} y={H+14} textAnchor="middle" fontSize="12" fontWeight="700" fill="var(--text)">{m}</text>
+                          {/* Utility indicator */}
+                          <text x={gx+GROUP/2} y={H+27} textAnchor="middle" fontSize="9" fill={d.utilSign?"#22c55e":"#ef4444"}>
+                            {d.utilSign?"▲":"▼"} {fmt$(d.util)}
+                          </text>
+                        </g>
                       );
                     })}
+                  </svg>
+                  {/* Legend */}
+                  <div style={{display:"flex",gap:16,justifyContent:"center",marginTop:8,flexWrap:"wrap"}}>
+                    {LBLS.map((l,i)=>(
+                      <span key={i} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:COLS[i],fontWeight:600}}>
+                        <span style={{width:12,height:12,borderRadius:3,background:COLS[i],display:"inline-block"}}/>
+                        {l}
+                      </span>
+                    ))}
                   </div>
                 </div>
               );
-            })}
-            {/* Leyenda */}
-            <div style={{display:"flex",gap:16,marginTop:8,flexWrap:"wrap",justifyContent:"center"}}>
-              {[["📈 Ingresos","#22c55e"],["📉 Costos","#ef4444"],["💰 Utilidad","#06b6d4"],["🧾 Facturado","#eab308"]].map(([l,c])=>(
-                <span key={l} style={{fontSize:11,color:c,fontWeight:600,display:"flex",alignItems:"center",gap:4}}>
-                  <span style={{width:10,height:10,background:c,borderRadius:2,display:"inline-block",boxShadow:`0 2px 4px ${c}88`}}/>
-                  {l}
-                </span>
-              ))}
-            </div>
+            })()}
           </div>
         </div>
 
-        {/* 2 cards lado a lado */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-          {/* Distribución costos */}
-          <div className="card">
-            <div className="card-hdr"><h3>🥧 Distribución de Costos</h3></div>
-            <div style={{padding:"16px 20px"}}>
-              <SegBar items={segCostos} h={18}/>
-              <Legend items={segCostos}/>
-              <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:8}}>
-                {segCostos.map(x=>(
-                  <div key={x.lbl} style={{display:"flex",alignItems:"center",gap:8}}>
-                    <div style={{width:8,height:8,borderRadius:"50%",background:x.c,flexShrink:0}}/>
-                    <div style={{flex:1,fontSize:12}}>{x.lbl}</div>
-                    <HBar v={x.v} max={totCostoOper} c={x.c} h={7}/>
-                    <div style={{width:85,textAlign:"right",fontSize:11,fontWeight:700,color:x.c}}>{fmt$(x.v)}</div>
-                    <div style={{width:34,textAlign:"right",fontSize:10,color:"var(--muted)"}}>{totCostoOper>0?`${((x.v/totCostoOper)*100).toFixed(0)}%`:"—"}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-          {/* Cartera */}
-          <div className="card">
-            <div className="card-hdr"><h3>💳 Estado de Cartera</h3></div>
-            <div style={{padding:"16px 20px"}}>
-              <SegBar items={segCartera} h={18}/>
-              <Legend items={segCartera}/>
-              <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:8}}>
-                {segCartera.map(x=>(
-                  <div key={x.lbl} style={{display:"flex",alignItems:"center",gap:8}}>
-                    <div style={{width:8,height:8,borderRadius:"50%",background:x.c,flexShrink:0}}/>
-                    <div style={{flex:1,fontSize:12}}>{x.lbl}</div>
-                    <HBar v={x.v} max={totFacturado} c={x.c} h={7}/>
-                    <div style={{width:85,textAlign:"right",fontSize:11,fontWeight:700,color:x.c}}>{fmt$(x.v)}</div>
-                  </div>
-                ))}
-              </div>
-              <div style={{borderTop:"1px solid var(--border)",paddingTop:8,marginTop:8,display:"flex",justifyContent:"space-between",fontSize:12}}>
-                <span style={{color:"var(--muted)"}}>Eficiencia cobranza</span>
-                <strong style={{color:"var(--green)"}}>{totFacturado>0?`${((totCobrado/totFacturado)*100).toFixed(0)}%`:"—"}</strong>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // ══════════════════════════════════════════════════════════════
-  //  2. RENDIMIENTO DE FLOTA (por unidad)
-  // ══════════════════════════════════════════════════════════════
-  const VistaRendimiento = () => {
-    const stats = units.map(u=>{
-      const vUs     = fTripsProp.filter(t=>t.unidadId===u.id);
-      const ingresos= vUs.reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0);
-      const km      = vUs.reduce((a,t)=>a+(Number(t.km)||0),0);
-      const combU   = fFuels.filter(f=>f.unidadId===u.id);
-      const litros  = combU.reduce((a,f)=>a+(Number(f.litros)||0),0);
-      const costComb= combU.reduce((a,f)=>a+(Number(f.litros)||0)*(Number(f.precio)||0),0);
-      const maintU  = fMaints.filter(m=>m.unidadId===u.id).reduce((a,m)=>a+(Number(m.costoRef)||0)+(Number(m.costoMO)||0),0);
-      const costos  = costComb+maintU;
-      const utilidad= ingresos-costos;
-      const rendL   = km>0?(litros/km*100).toFixed(2):null;
-      const ingKm   = km>0?(ingresos/km).toFixed(2):null;
-      return { ...u, viajes:vUs.length, ingresos, km, litros, costComb, maintU, costos, utilidad, rendL, ingKm };
-    }).sort((a,b)=>b.ingresos-a.ingresos);
-
-    const maxIng = Math.max(...stats.map(s=>s.ingresos),1);
-
-    return (
-      <div style={{display:"flex",flexDirection:"column",gap:16}}>
-        <div className="stats">
-          <KR icon="🚛" lbl="Unidades activas" val={stats.filter(s=>s.viajes>0).length} sub={`de ${units.length} total`} c="var(--cyan)"/>
-          <KR icon="🗺️" lbl="Viajes propios" val={fTripsProp.length} c="var(--green)"/>
-          <KR icon="⛽" lbl="Combustible total" val={`${totLitros.toFixed(0)}L`} sub={fmt$(totComb)} c="var(--yellow)"/>
-          <KR icon="🔧" lbl="Mantenimientos" val={fMaints.length} sub={fmt$(totMant)} c="var(--orange)"/>
-        </div>
 
         {/* barras comparativas por unidad */}
         <div className="card">
@@ -10255,6 +10434,7 @@ export default function App() {
   const [branding, setBranding] = useState({ nombre: "Mi Empresa", slogan: "Sistema de Flota", logo: "" });
   const [drivers, setDrivers] = useState([]);
   const [docs, setDocs] = useState([]);
+  const [almacen, setAlmacen] = useState([]);
   const [maints, setMaints] = useState([]);
   const [fuels, setFuels] = useState([]);
   const [trips, setTrips] = useState([]);
@@ -10305,6 +10485,7 @@ export default function App() {
         [setDrivers,             "fp6:drivers",         D_DRIVERS],
         // docs se cargan individualmente abajo
         [setMaints,              "fp6:maints",          D_MAINTS],
+        [setAlmacen,             "fp6:almacen",         []],
         [setFuels,               "fp6:fuels",           D_FUELS],
         [setTrips,               "fp6:trips",           D_TRIPS],
         [setGastos,              "fp6:gastos",          D_GASTOS],
@@ -10439,7 +10620,9 @@ export default function App() {
       notify("Eliminado");
     }})
   };
-  const MC = mkCRUD(() => mRef.current, setMaints, "fp6:maints");
+  const MC   = mkCRUD(() => mRef.current, setMaints, "fp6:maints");
+  const almRef = useRef(almacen); almRef.current = almacen;
+  const ALC  = mkCRUD(() => almRef.current, setAlmacen, "fp6:almacen");
   const FC = mkCRUD(() => fRef.current, setFuels, "fp6:fuels");
   const TC = mkCRUD(() => tRef.current, setTrips, "fp6:trips");
   const GC = mkCRUD(() => gRef.current, setGastos, "fp6:gastos");
@@ -10513,12 +10696,12 @@ export default function App() {
 
   const icons = {
     dashboard: "📊", alerts: "🚨", units: "🚛", drivers: "👨‍✈️",
-    trips: "🗺️", maints: "🔧", fuels: "⛽", docs: "📄",
+    trips: "🗺️", maints: "🔧", almacen: "📦", fuels: "⛽", docs: "📄",
     charts: "📈", gastos: "💵", clientes: "👥", facturacion: "🧾", proveedores: "🏪", nominas: "💰", ayuda: "❓", gps: "📡", cotizaciones: "📋"
   };
   const titles = {
     dashboard: "Dashboard", alerts: "Alertas", units: "Unidades",
-    drivers: "Conductores", trips: "Viajes & Logística", maints: "Mantenimientos",
+    drivers: "Conductores", trips: "Viajes & Logística", maints: "Mantenimientos", almacen: "Almacén",
     fuels: "Combustible", docs: "Documentos", charts: "Gráficas & Reportes",
     gastos: "Gastos Generales", clientes: "Clientes", facturacion: "Facturación",
     proveedores: "Proveedores", nominas: "Nóminas", ayuda: "Ayuda", gps: "GPS en Vivo", cotizaciones: "Cotizaciones y Tabulador"
@@ -10528,7 +10711,7 @@ export default function App() {
     { lbl: "PRINCIPAL", items: [{ id: "dashboard" }, { id: "alerts", badge: alertCount }, { id: "gps" }, { id: "ayuda" }] },
     { lbl: "FLOTA", items: [{ id: "units" }, { id: "drivers" }, { id: "trips" }] },
     { lbl: "CONTROL", items: [
-      { id: "maints" },
+      { id: "maints" }, { id: "almacen" },
       { id: "fuels" },
       { id: "docs" },
       ...(isSupervisor ? [{ id: "gastos" }, { id: "proveedores" }] : []),
@@ -10714,6 +10897,10 @@ export default function App() {
             onAdd={(prefill) => setModal({ type: "doc", data: prefill || null, _ts: Date.now() })}
             onEdit={d => setModal({ type: "doc", data: d })}
             onDelete={DoC.del} />}
+          {tab === "almacen" && <AlmacenPage almacen={almacen} isAdmin={isAdmin}
+            onAdd={isAdmin?()=>setModal({type:"almacen",data:null,_ts:Date.now()}):null}
+            onEdit={isAdmin?item=>setModal({type:"almacen",data:item}):null}
+            onDelete={ALC.del}/>}
           {tab === "maints" && <MaintPage units={units} maints={maints} proveedores={proveedores}
             onAdd={userCan("crearMantenimientos") ? () => setModal({ type: "maint", data: null, _ts: Date.now() }) : null}
             onEdit={isSupervisor ? m => setModal({ type: "maint", data: m }) : null}
@@ -10830,6 +11017,7 @@ export default function App() {
       {modal?.type === "driver" && <DriverModal key={modal.data?.id || modal._ts || "new-driver"} driver={modal.data} units={units} onSave={d => DC.save({ ...d, id: d.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "unit" && <UnitModal key={modal.data?.id || modal._ts || "new-unit"} unit={modal.data} drivers={drivers} tiposPersonalizados={tiposPersonalizados} onAddTipo={async (t) => { const newTipos = [...tiposPersonalizados, t]; setTiposPersonalizados(newTipos); await sv("fp6:tipos", newTipos); }} onSave={u => UC.save({ ...u, id: u.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "doc" && <DocModal key={modal.data?.id || modal._ts || "new-doc"} doc={modal.data} units={units} drivers={drivers} onSave={d => DoC.save({ ...d, id: d.id || uid() })} onClose={() => setModal(null)} />}
+      {modal?.type === "almacen" && <AlmacenModal item={modal.data} onSave={d=>ALC.save({...d,id:d.id||uid()})} onClose={()=>setModal(null)}/>}
       {modal?.type === "maint" && <MaintModal key={modal.data?.id || modal._ts || "new-maint"} maint={modal.data} units={units} proveedores={proveedores} onSave={m => MC.save({ ...m, id: m.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "fuel" && <FuelModal key={modal.data?.id || modal._ts || "new-fuel"} fuel={modal.data} units={units} onSave={f => FC.save({ ...f, id: f.id || uid() })} onClose={() => setModal(null)} onUpdateUnit={UC.save} />}
       {modal?.type === "trip" && <TripModal key={modal.data?.id || modal._ts || "new-trip"} trip={modal.data} units={units} onSave={t => TC.save({ ...t, id: t.id || uid(), esExterno: false })} onClose={() => setModal(null)} />}
