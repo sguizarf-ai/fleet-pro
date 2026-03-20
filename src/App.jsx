@@ -6180,14 +6180,24 @@ function NominaPage({ drivers, units, trips, onOpenNomina, nominasAdmin = [], on
 // ── MODAL DE PAGO GENÉRICO (mantenimientos, gastos, etc.) ────────────────────
 function PagoProveedorGenericoModal({ item, proveedor, branding, trips, maints, onSave, onClose }) {
   const data = item.data;
+  // Pick correct status fields depending on whether this is ref or mo payment
+  const isRef = item.tipo === "mantenimiento_ref";
+  const isMO  = item.tipo === "mantenimiento_mo";
+  const initStatus = isRef ? (data.pagoRefStatus||"pendiente") : isMO ? (data.pagoMOStatus||"pendiente") : (data.pagoStatus||"pendiente");
+  const initFecha  = isRef ? (data.pagoRefFecha||"")  : isMO ? (data.pagoMOFecha||"")  : (data.pagoFecha||"");
+  const initForma  = isRef ? (data.pagoRefForma||"Transferencia SPEI") : isMO ? (data.pagoMOForma||"Transferencia SPEI") : (data.pagoForma||"Transferencia SPEI");
+  const initRef    = isRef ? (data.pagoRefReferencia||"") : isMO ? (data.pagoMOReferencia||"") : (data.pagoReferencia||"");
+  const initFact   = isRef ? (data.pagoRefFactura||"") : isMO ? (data.pagoMOFactura||"") : (data.pagoFactura||"");
+  const initNotas  = isRef ? (data.pagoRefNotas||"")  : isMO ? (data.pagoMONotas||"")  : (data.pagoNotas||"");
+  const initEvidencias = isRef ? (data.pagoRefEvidencias||[]) : isMO ? (data.pagoMOEvidencias||[]) : (data.pagoEvidencias||[]);
   const [f, setF] = useState({
-    pagoStatus:      data.pagoStatus      || "pendiente",
-    pagoFecha:       data.pagoFecha       || "",
-    pagoForma:       data.pagoForma       || "Transferencia SPEI",
-    pagoReferencia:  data.pagoReferencia  || "",
-    pagoFactura:     data.pagoFactura     || "",
-    pagoNotas:       data.pagoNotas       || "",
-    pagoEvidencias:  data.pagoEvidencias  || [],
+    pagoStatus:      initStatus,
+    pagoFecha:       initFecha,
+    pagoForma:       initForma,
+    pagoReferencia:  initRef,
+    pagoFactura:     initFact,
+    pagoNotas:       initNotas,
+    pagoEvidencias:  initEvidencias,
     pagoMontoParcial:data.pagoMontoParcial|| "",
   });
   const ch = k => e => setF(p=>({...p,[k]:e.target.value}));
@@ -6196,8 +6206,8 @@ function PagoProveedorGenericoModal({ item, proveedor, branding, trips, maints, 
   const inp = {padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",fontSize:13,width:"100%",boxSizing:"border-box"};
   const lbl = {fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",display:"block",marginBottom:4};
 
-  const tipoIcon = item.tipo==="mantenimiento"?"🔧":item.tipo==="gasto"?"💵":"📋";
-  const tipoLbl  = item.tipo==="mantenimiento"?"Mantenimiento":item.tipo==="gasto"?"Gasto General":"Servicio";
+  const tipoIcon = (item.tipo==="mantenimiento_ref"||item.tipo==="mantenimiento_mo")?"🔧":item.tipo==="gasto"?"💵":"📋";
+  const tipoLbl  = item.tipo==="mantenimiento_ref"?"Refacciones":item.tipo==="mantenimiento_mo"?"Taller / M.O.":item.tipo==="gasto"?"Gasto General":"Servicio";
 
   const handleImg = e => {
     Array.from(e.target.files).forEach(file => {
@@ -6365,14 +6375,14 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
       proveedorId: e.proveedorId, data: e,
     })),
     // From maints - refacciones (separate proveedor)
-    ...maints.filter(m => m.pagoStatus !== "pagado" && (Number(m.costoRef)||0) > 0 && m.proveedorRefId).map(m => ({
-      tipo: "mantenimiento", id: m.id+"_ref", label: `Refac: ${m.descripcion||m.tipo||"—"}`,
+    ...maints.filter(m => (m.pagoRefStatus||"pendiente") !== "pagado" && (Number(m.costoRef)||0) > 0 && m.proveedorRefId).map(m => ({
+      tipo: "mantenimiento_ref", id: m.id+"_ref", label: `Refac: ${m.descripcion||m.tipo||"—"}`,
       fecha: m.fecha, monto: Number(m.costoRef)||0, status: m.pagoRefStatus||"pendiente",
       proveedorId: m.proveedorRefId, data: m,
     })),
     // From maints - mano de obra / taller
-    ...maints.filter(m => m.pagoStatus !== "pagado" && (Number(m.costoMO)||0) > 0 && m.proveedorId).map(m => ({
-      tipo: "mantenimiento", id: m.id+"_mo", label: `Taller: ${m.descripcion||m.tipo||"—"}`,
+    ...maints.filter(m => (m.pagoMOStatus||"pendiente") !== "pagado" && (Number(m.costoMO)||0) > 0 && m.proveedorId).map(m => ({
+      tipo: "mantenimiento_mo", id: m.id+"_mo", label: `Taller: ${m.descripcion||m.tipo||"—"}`,
       fecha: m.fecha, monto: Number(m.costoMO)||0, status: m.pagoMOStatus||"pendiente",
       proveedorId: m.proveedorId, data: m,
     })),
@@ -11085,8 +11095,32 @@ export default function App() {
             onDelete={PVC.del}
             onSaveExterno={async e => { EC.save(e); }}
             onSavePagoProveedor={async (updated, tipo) => {
-              if (tipo === "mantenimiento") MC.save(updated);
-              else if (tipo === "gasto") GC.save(updated);
+              if (tipo === "mantenimiento_ref") {
+                // Only update pagoRefStatus fields, not the whole pagoStatus
+                const orig = maints.find(m => m.id === updated.id);
+                if (orig) MC.save({ ...orig,
+                  pagoRefStatus:      updated.pagoStatus,
+                  pagoRefFecha:       updated.pagoFecha,
+                  pagoRefForma:       updated.pagoForma,
+                  pagoRefReferencia:  updated.pagoReferencia,
+                  pagoRefFactura:     updated.pagoFactura,
+                  pagoRefNotas:       updated.pagoNotas,
+                  pagoRefEvidencias:  updated.pagoEvidencias,
+                });
+              } else if (tipo === "mantenimiento_mo") {
+                const orig = maints.find(m => m.id === updated.id);
+                if (orig) MC.save({ ...orig,
+                  pagoMOStatus:      updated.pagoStatus,
+                  pagoMOFecha:       updated.pagoFecha,
+                  pagoMOForma:       updated.pagoForma,
+                  pagoMOReferencia:  updated.pagoReferencia,
+                  pagoMOFactura:     updated.pagoFactura,
+                  pagoMONotas:       updated.pagoNotas,
+                  pagoMOEvidencias:  updated.pagoEvidencias,
+                });
+              } else if (tipo === "gasto") {
+                GC.save(updated);
+              }
             }}
           />}
           {tab === "charts" && (isAdmin || userCan("verReportes")) && <ChartsPage units={units} maints={maints} fuels={fuels} gastos={gastos} trips={trips} facturas={facturas} clientes={clientes} drivers={drivers} proveedores={proveedores} externos={externos} nominasAdmin={nominasAdmin} />}
