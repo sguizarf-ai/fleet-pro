@@ -10012,6 +10012,24 @@ const AYUDA_DATA = [
     ]
   },
   {
+    id: "viajes", icono: "🗺️", titulo: "Viajes & Logística",
+    color: "var(--blue)",
+    preguntas: [
+      { q: "¿Cómo registro un viaje propio?",
+        a: "Ve a Flota → Viajes & Logística → '➕ Nuevo Viaje'. Selecciona la unidad, operador, origen, destino, fecha, cliente, tipo de carga y el ingreso ofrecido. Puedes agregar gastos del viaje (extras, estadías, peajes). El viaje aparecerá en el Dashboard y en Gráficas una vez marcado como COMPLETADO." },
+      { q: "¿Qué es la Logística Externa y cómo funciona?",
+        a: "Son viajes que subcontratas a un transportista externo (no tu propia flota). Activa el switch 'Es logística externa', selecciona el transportista proveedor y captura el costo a pagar. Genera automáticamente una cuenta por pagar en Proveedores → CxP, independiente de cada transportista." },
+      { q: "¿Cómo marco un viaje como completado?",
+        a: "En la tabla de viajes, usa el selector de estado o el botón de edición. Cambia el estado a 'COMPLETADO'. Solo los viajes completados se contabilizan en ingresos, estadísticas del Dashboard y Gráficas & Reportes." },
+      { q: "¿Puedo agregar fotos de evidencia a un viaje?",
+        a: "Sí. Al editar un viaje puedes subir fotos de evidencia (carga, entrega, remisiones). La columna 📸 en la tabla muestra cuántas fotos tiene ese viaje. Las fotos se almacenan en Cloudinary." },
+      { q: "¿Cómo se calculan las comisiones de los operadores?",
+        a: "Automáticamente. Cada conductor tiene configurado un % de comisión por viaje en su perfil. El sistema multiplica ese porcentaje por el ingreso del viaje completado. Puedes ver el desglose en Gráficas → Nóminas o en el módulo de Nóminas." },
+      { q: "¿Qué diferencia hay entre viaje propio y logística externa en las finanzas?",
+        a: "Viaje propio: genera ingreso para tu empresa, se asigna a una unidad de tu flota y afecta la nómina del operador. Logística externa: genera un costo (cuenta por pagar al transportista), no afecta tu flota ni nóminas. Ambos se pueden facturar al cliente desde el módulo de Facturación." },
+    ]
+  },
+  {
     id: "mantenimiento", icono: "🔧", titulo: "Mantenimientos",
     color: "var(--yellow)",
     preguntas: [
@@ -10023,6 +10041,24 @@ const AYUDA_DATA = [
         a: "En cada unidad defines los KM actuales y el intervalo de mantenimiento (ej: 5,000 km). Al registrar combustible con los KM recorridos, el sistema calcula automáticamente cuántos KM faltan para el próximo servicio." },
       { q: "¿Puedo registrar mantenimientos correctivos (emergencias)?",
         a: "Sí. Al crear el mantenimiento, selecciona tipo 'Correctivo' y prioridad 'ALTA'. Puedes dejar la fecha programada como el mismo día del incidente." },
+    ]
+  },
+  {
+    id: "almacen", icono: "📦", titulo: "Almacén",
+    color: "var(--cyan)",
+    preguntas: [
+      { q: "¿Para qué sirve el módulo de Almacén?",
+        a: "Permite llevar el control de inventario de refacciones, herramientas, lubricantes y cualquier artículo que uses en el taller. Puedes registrar stock actual, stock mínimo de alerta, foto, número de parte, proveedor habitual y ubicación física en el almacén." },
+      { q: "¿Cómo agrego un artículo al almacén?",
+        a: "Ve a Control → Almacén → '➕ Nuevo Artículo'. Llena el nombre, categoría (Refacciones, Herramientas, Lubricantes, Filtros, Llantas, Eléctrico, Consumibles, Seguridad u Otro personalizado), marca, número de parte, unidad de medida, stock actual y stock mínimo. Puedes agregar foto desde Cloudinary." },
+      { q: "¿Cómo registro una entrada o salida de inventario?",
+        a: "Haz clic en '📋 Mov.' en la tarjeta del artículo, o en el botón '📋 Registrar Movimiento' del encabezado. Selecciona el artículo, el tipo (Entrada = compra/recepción, Salida = uso en mantenimiento, Ajuste = corrección de inventario), la cantidad y el motivo. El stock se actualiza automáticamente." },
+      { q: "¿Qué significan los colores en las tarjetas de artículos?",
+        a: "La franja izquierda de cada tarjeta indica el estado del stock: 🟢 Verde = stock por encima del mínimo (todo bien), 🟡 Amarillo = stock igual o por debajo del mínimo (reabastecer pronto), 🔴 Rojo = sin stock (crítico). El KPI 'Stock Bajo' en la parte superior muestra cuántos artículos están en alerta." },
+      { q: "¿El precio del artículo afecta las finanzas?",
+        a: "No directamente. El precio unitario en el almacén es solo de referencia para calcular el valor total del inventario. Para registrar un gasto financiero real (como una compra de refacciones), debes registrarlo también en Gastos Generales o vincularlo a un mantenimiento con su proveedor de refacciones." },
+      { q: "¿Cómo busco un artículo específico?",
+        a: "Usa la barra de búsqueda para filtrar por nombre. También puedes filtrar por categoría con el selector desplegable que está junto a la búsqueda. El historial de los últimos movimientos aparece al final de la pantalla." },
     ]
   },
   {
