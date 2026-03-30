@@ -6672,7 +6672,7 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
 }
 
 
-function GastosPage({ gastos, proveedores, externos = [], onAdd, onEdit, onDelete }) {
+function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [], onAdd, onEdit, onDelete }) {
   const [q, setQ] = useState(""); const [tf, setTf] = useState("TODOS");
   const fil = gastos.filter(g => (g.descripcion + g.responsable).toLowerCase().includes(q.toLowerCase()) && (tf === "TODOS" || g.tipo === tf));
   const tot = fil.reduce((a, g) => a + (Number(g.monto) || 0), 0);
@@ -6689,7 +6689,91 @@ function GastosPage({ gastos, proveedores, externos = [], onAdd, onEdit, onDelet
       </div>
       <div className="sbar"><span>Registros: <strong>{fil.length}</strong></span><span>Total: <strong style={{ color: "var(--red)" }}>{fmt$(tot)}</strong></span></div>
       <div className="card-body">
-        {fil.length === 0 ? <div className="empty"><div className="empty-icon">💵</div><p>Sin gastos registrados</p></div> :
+        {showUnificado ? (
+          /* Vista unificada: todos los gastos ligados a proveedores */
+          <div>
+            {/* 1. Gastos generales con proveedor */}
+            {gastosConProv.length > 0 && (
+              <div style={{marginBottom:16}}>
+                <div style={{fontWeight:700,fontSize:12,color:"var(--muted)",textTransform:"uppercase",padding:"8px 12px",background:"var(--bg2)",borderRadius:6,marginBottom:6}}>
+                  💵 Gastos Generales con Proveedor ({gastosConProv.length})
+                </div>
+                <table>
+                  <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Proveedor</th><th>Monto</th><th>Estado</th><th>Acciones</th></tr></thead>
+                  <tbody>{gastosConProv.map(g => {
+                    const prov = (proveedores||[]).find(p => p.id === g.proveedorId);
+                    const st = g.pagoStatus==="pagado" ? {lbl:"Pagado",c:"var(--green)"} : {lbl:"Pendiente",c:"var(--orange)"};
+                    return <tr key={g.id}>
+                      <td style={{fontSize:11}}>{g.fecha||"—"}</td>
+                      <td><Bdg c="bo" t={g.tipo}/></td>
+                      <td style={{fontSize:11}}>{g.descripcion||"—"}</td>
+                      <td style={{fontSize:11}}>{prov?<Bdg c="bp" t={prov.nombre}/>:"—"}</td>
+                      <td style={{color:"var(--red)",fontWeight:700}}>{fmt$(g.monto)}</td>
+                      <td><span style={{fontSize:11,fontWeight:700,color:st.c}}>{st.lbl}</span></td>
+                      <td><div className="acts"><button className="btn btn-ghost btn-sm" onClick={()=>onEdit(g)}>✏️</button><button className="btn btn-red btn-sm" onClick={()=>onDelete(g.id)}>🗑</button></div></td>
+                    </tr>;
+                  })}</tbody>
+                </table>
+              </div>
+            )}
+            {/* 2. Mantenimientos por proveedor */}
+            {maintsConProv.length > 0 && (
+              <div style={{marginBottom:16}}>
+                <div style={{fontWeight:700,fontSize:12,color:"var(--muted)",textTransform:"uppercase",padding:"8px 12px",background:"var(--bg2)",borderRadius:6,marginBottom:6}}>
+                  🔧 Mantenimientos con Proveedor ({maintsConProv.length})
+                </div>
+                <table>
+                  <thead><tr><th>Fecha</th><th>Unidad</th><th>Descripción</th><th>Taller / M.O.</th><th>M.O. $</th><th>Refacciones</th><th>Ref. $</th><th>Total</th></tr></thead>
+                  <tbody>{maintsConProv.map(m => {
+                    const provMO  = (proveedores||[]).find(p => p.id === m.proveedorId);
+                    const provRef = (proveedores||[]).find(p => p.id === m.proveedorRefId);
+                    const cMO  = Number(m.costoMO)||0;
+                    const cRef = Number(m.costoRef)||0;
+                    const stMO  = m.pagoMOStatus==="pagado"  ? {lbl:"✅",c:"var(--green)"} : {lbl:"⏳",c:"var(--orange)"};
+                    const stRef = m.pagoRefStatus==="pagado" ? {lbl:"✅",c:"var(--green)"} : {lbl:"⏳",c:"var(--orange)"};
+                    return <tr key={m.id}>
+                      <td style={{fontSize:11}}>{m.fechaEjec||m.fechaProg||"—"}</td>
+                      <td style={{fontSize:11,fontWeight:700}}>{(units.find(u=>u.id===m.unidadId)||{}).num||m.unidadId||"—"}</td>
+                      <td style={{fontSize:11}}>{m.desc||m.tipo||"—"}</td>
+                      <td style={{fontSize:11}}>{provMO?<Bdg c="bo" t={provMO.nombre}/>:"—"}</td>
+                      <td style={{color:"var(--orange)",fontWeight:700,fontSize:11}}>{cMO>0?<>{fmt$(cMO)} <span style={{color:stMO.c}}>{stMO.lbl}</span></>:"—"}</td>
+                      <td style={{fontSize:11}}>{provRef?<Bdg c="bp" t={provRef.nombre}/>:"—"}</td>
+                      <td style={{color:"var(--cyan)",fontWeight:700,fontSize:11}}>{cRef>0?<>{fmt$(cRef)} <span style={{color:stRef.c}}>{stRef.lbl}</span></>:"—"}</td>
+                      <td style={{color:"var(--red)",fontWeight:700}}>{fmt$(cMO+cRef)}</td>
+                    </tr>;
+                  })}</tbody>
+                </table>
+              </div>
+            )}
+            {/* 3. Logística externa */}
+            {extConProv.length > 0 && (
+              <div>
+                <div style={{fontWeight:700,fontSize:12,color:"var(--muted)",textTransform:"uppercase",padding:"8px 12px",background:"var(--bg2)",borderRadius:6,marginBottom:6}}>
+                  🚛 Logística Externa / Transportistas ({extConProv.length})
+                </div>
+                <table>
+                  <thead><tr><th>Fecha</th><th>Empresa</th><th>Ruta</th><th>Proveedor</th><th>Costo</th><th>Estado Pago</th></tr></thead>
+                  <tbody>{extConProv.map(e => {
+                    const prov = (proveedores||[]).find(p => p.id === e.proveedorId);
+                    const st = e.pagoStatus==="pagado" ? {lbl:"Pagado",c:"var(--green)"} : e.pagoStatus==="parcial" ? {lbl:"Parcial",c:"var(--cyan)"} : {lbl:"Pendiente",c:"var(--orange)"};
+                    return <tr key={e.id}>
+                      <td style={{fontSize:11}}>{e.fecha||"—"}</td>
+                      <td style={{fontWeight:600,fontSize:11}}>{e.empresa||"—"}</td>
+                      <td style={{fontSize:11,color:"var(--muted)"}}>{e.origen||""}{e.destino?" → "+e.destino:""}</td>
+                      <td style={{fontSize:11}}>{prov?<Bdg c="bp" t={prov.nombre}/>:<span style={{color:"var(--orange)",fontSize:10}}>⚠️ Sin proveedor</span>}</td>
+                      <td style={{color:"var(--purple)",fontWeight:700}}>{fmt$(e.costoPagar)}</td>
+                      <td><span style={{fontSize:11,fontWeight:700,color:st.c}}>{st.lbl}</span></td>
+                    </tr>;
+                  })}</tbody>
+                </table>
+              </div>
+            )}
+            {gastosConProv.length===0 && maintsConProv.length===0 && extConProv.length===0 && (
+              <div className="empty"><div className="empty-icon">🏪</div><p>No hay gastos vinculados a proveedores</p></div>
+            )}
+          </div>
+        ) : (
+          fil.length === 0 ? <div className="empty"><div className="empty-icon">💵</div><p>Sin gastos registrados</p></div> :
           <table>
             <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Monto</th><th>Proveedor</th><th>Responsable</th><th>Acciones</th></tr></thead>
             <tbody>{fil.map(g => {
@@ -6705,37 +6789,10 @@ function GastosPage({ gastos, proveedores, externos = [], onAdd, onEdit, onDelet
                 <td><div className="acts"><button className="btn btn-ghost btn-sm" onClick={() => onEdit(g)}>✏️</button><button className="btn btn-red btn-sm" onClick={() => onDelete(g.id)}>🗑</button></div></td>
               </tr>
             )})}</tbody>
-          </table>}
-      </div>
-      {/* ── Logística Externa (Transportistas) ── */}
-      {externos.length > 0 && (
-        <div style={{borderTop:"1px solid var(--border)",padding:"12px 16px"}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:8,color:"var(--purple)"}}>🚛 Logística Externa — Transportistas ({externos.length})</div>
-          <table>
-            <thead><tr><th>Fecha</th><th>Empresa</th><th>Ruta</th><th>Costo</th><th>Estado Pago</th></tr></thead>
-            <tbody>{externos.map(e=>{
-              const st = e.pagoStatus==="pagado"
-                ? {lbl:"Pagado",c:"var(--green)"}
-                : e.pagoStatus==="parcial"
-                ? {lbl:"Parcial",c:"var(--cyan)"}
-                : {lbl:"Pendiente",c:"var(--orange)"};
-              return (
-                <tr key={e.id}>
-                  <td style={{fontSize:12}}>{e.fecha||"—"}</td>
-                  <td style={{fontWeight:600,fontSize:12}}>{e.empresa||"—"}</td>
-                  <td style={{fontSize:11,color:"var(--muted)"}}>{e.origen||""}{e.destino?" → "+e.destino:""}</td>
-                  <td style={{color:"var(--purple)",fontWeight:700}}>{fmt$(e.costoPagar)}</td>
-                  <td><span style={{fontSize:11,fontWeight:700,color:st.c}}>{st.lbl}</span></td>
-                </tr>
-              );
-            })}</tbody>
           </table>
-          <div style={{textAlign:"right",fontSize:12,color:"var(--muted)",marginTop:6}}>
-            Total logística externa: <strong style={{color:"var(--purple)"}}>{fmt$(externos.reduce((a,e)=>a+(Number(e.costoPagar)||0),0))}</strong>
-            {" | "}Pendiente: <strong style={{color:"var(--orange)"}}>{fmt$(externos.filter(e=>e.pagoStatus!=="pagado").reduce((a,e)=>a+(Number(e.costoPagar)||0),0))}</strong>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
+
     </div>
   );
 }
@@ -11143,7 +11200,7 @@ export default function App() {
             onDelete={FacC.del}
             onMarcarPagada={marcarPagada}
           />}
-          {tab === "gastos" && isSupervisor && <GastosPage gastos={gastos} proveedores={proveedores} externos={externos}
+          {tab === "gastos" && isSupervisor && <GastosPage gastos={gastos} proveedores={proveedores} externos={externos} maints={maints} units={units}
             onAdd={() => setModal({ type: "gasto", data: null, _ts: Date.now() })}
             onEdit={g => setModal({ type: "gasto", data: g })}
             onDelete={GC.del} />}
