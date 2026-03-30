@@ -5613,14 +5613,29 @@ function DocsPage({ units, drivers, docs, clientes, remitentes, onAdd, onEdit, o
 function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes, onAdd, onEdit, onDelete, onAddExt, onEditExt, onDeleteExt, isAdmin, branding = {} }) {
   const [q, setQ] = useState(""); const [sf, setSf] = useState("TODOS"); const [tf, setTf] = useState("TODOS");
   const [evidModal, setEvidModal] = useState(null); // { trip, unit, ext }
-  const allTrips = [...trips.filter(t => !t.esExterno).map(t => ({ ...t, tipo: "PROPIO" })), ...trips.filter(t => t.esExterno).map(t => ({ ...t, tipo: "EXTERNO" }))];
+  const allTrips = [
+    ...trips.filter(t => !t.esExterno).map(t => ({ ...t, tipo: "PROPIO" })),
+    ...trips.filter(t => t.esExterno).map(t => ({ ...t, tipo: "EXTERNO" })),
+    // Registros de logística externa (externos[]) — conciliación completa
+    ...(externos||[]).map(e => ({
+      ...e,
+      tipo: "EXT",
+      _esExternoRec: true,
+      status: e.status || "COMPLETADO",
+      costoOfrecido: e.precioCliente || 0,
+      fecha: e.fecha,
+      fechaReg: e.fecha,
+    })),
+  ];
   const fil = allTrips.filter(t => {
-    const u = t.tipo === "PROPIO" ? units.find(u => u.id === t.unidadId) : null;
-    const ext = t.tipo === "EXTERNO" ? externos.find(e => e.id === t.unidadId) : null;
-    return (t.origen + t.destino + t.carga + t.cliente + (u?.placas || "") + (ext?.empresa || "")).toLowerCase().includes(q.toLowerCase()) && (sf === "TODOS" || t.status === sf) && (tf === "TODOS" || t.tipo === tf)
+    const u   = t.tipo === "PROPIO" ? units.find(u => u.id === t.unidadId) : null;
+    const searchStr = [t.origen||"", t.destino||"", t.carga||"", t.cliente||"",
+                       t.empresa||"", u?.placas||"", u?.num||""].join(" ").toLowerCase();
+    const tipoMatch = tf === "TODOS" || t.tipo === tf || (tf === "EXTERNO" && t._esExternoRec);
+    return searchStr.includes(q.toLowerCase()) && (sf === "TODOS" || t.status === sf) && tipoMatch;
   });
   const totKm = fil.reduce((a, t) => a + ((Number(t.kmLlegada) || 0) - (Number(t.kmSalida) || 0)), 0);
-  const totIng = fil.filter(t => t.status === "COMPLETADO").reduce((a, t) => a + (Number(t.costoOfrecido) || 0), 0);
+  const totIng = fil.filter(t => t.status === "COMPLETADO" && !t._esExternoRec).reduce((a, t) => a + (Number(t.costoOfrecido) || 0), 0);
   
   return (
     <>
@@ -5649,13 +5664,16 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
             <thead><tr><th>Tipo</th><th>Unidad/Empresa</th><th>Origen → Destino</th><th>Salida</th><th>Regreso</th><th>KM</th><th>Cliente</th><th>Status</th><th>Evid.</th>{isAdmin && <th>💰</th>}<th>Acciones</th></tr></thead>
             <tbody>{fil.map(t => {
               const u = t.tipo === "PROPIO" ? units.find(u => u.id === t.unidadId) : null;
-              const ext = t.tipo === "EXTERNO" ? externos.find(e => e.id === t.unidadId) : null;
+              const ext = t._esExternoRec ? t : (t.tipo === "EXTERNO" ? externos.find(e => e.id === t.unidadId) : null);
               const dist = t.kmLlegada && t.kmSalida ? Number(t.kmLlegada) - Number(t.kmSalida) : null;
               const hasEvid = (t.evidencias || []).length > 0;
               return (
-                <tr key={t.id}>
+                <tr key={t.id} style={{background: t._esExternoRec ? "rgba(130,80,255,.04)" : ""}}>
                   <td><Bdg c={t.tipo === "PROPIO" ? "bb" : "bp"} t={t.tipo === "PROPIO" ? "INT" : "EXT"} /></td>
-                  <td style={{ fontSize: 12 }}><strong>{t.tipo === "PROPIO" ? u?.num : ext?.empresa}</strong> <span style={{ color: "var(--muted)", fontSize: 11 }}>{t.tipo === "PROPIO" ? u?.placas : ext?.contacto}</span></td>
+                  <td style={{ fontSize: 12 }}>
+                    <strong>{t.tipo === "PROPIO" ? u?.num : (t._esExternoRec ? t.empresa : ext?.empresa)}</strong>
+                    <span style={{ color: "var(--muted)", fontSize: 11 }}>{t.tipo === "PROPIO" ? u?.placas : (t._esExternoRec ? t.placas : ext?.contacto)}</span>
+                  </td>
                   <td style={{ fontSize: 12 }}><span style={{ color: "var(--cyan)" }}>📍{t.origen}</span><span style={{ color: "var(--muted)", margin: "0 5px" }}>→</span><span>{t.destino || "—"}</span></td>
                   <td style={{ fontSize: 12 }}>{t.fecha || "—"}</td>
                   <td style={{ fontSize: 12, color: t.fechaReg ? "var(--text)" : "var(--muted)" }}>{t.fechaReg || "Pendiente"}</td>
@@ -5668,7 +5686,7 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
                   {isAdmin && <td>{t.status === "COMPLETADO" ? <button className="btn btn-purple btn-xs" onClick={() => printTripProfit({ trip: t, unit: u, fuels, maints, externos })} title="Ver utilidad">💰</button> : <span style={{ color: "var(--muted)" }}>—</span>}</td>}
                   <td><div className="acts">
                     <button className="btn btn-ghost btn-sm" onClick={() => t.tipo === "PROPIO" ? onEdit(t) : onEditExt(t)}>✏️</button>
-                    <button className="btn btn-red btn-sm" onClick={() => t.tipo === "PROPIO" ? onDelete(t.id) : onDeleteExt(t.id)}>🗑</button>
+                    {(t.tipo === "PROPIO" || t._esExternoRec) && <button className="btn btn-red btn-sm" onClick={() => t.tipo === "PROPIO" ? onDelete(t.id) : onDeleteExt(t.id)}>🗑</button>}
                   </div></td>
                 </tr>
               );
@@ -6673,12 +6691,26 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
 
 
 function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [], onAdd, onEdit, onDelete }) {
-  const [q, setQ] = useState(""); const [tf, setTf] = useState("TODOS");
-  const fil = gastos.filter(g => (g.descripcion + g.responsable).toLowerCase().includes(q.toLowerCase()) && (tf === "TODOS" || g.tipo === tf));
+  const [q, setQ] = useState("");
+  const [tf, setTf] = useState("TODOS");
+
+  // Computed vars — fuera del return para evitar crashes
+  const fil = gastos.filter(g =>
+    ((g.descripcion||"") + (g.responsable||"")).toLowerCase().includes(q.toLowerCase()) &&
+    (tf === "TODOS" || g.tipo === tf)
+  );
   const tot = fil.reduce((a, g) => a + (Number(g.monto) || 0), 0);
+
+  // Vista unificada "Gastos a Proveedores": agrupa todos los orígenes
+  const showUnificado = tf === "Gastos a Proveedores";
+  const gastosConProv = gastos.filter(g => g.proveedorId);
+  const maintsConProv = maints.filter(m => m.proveedorId || m.proveedorRefId);
+  const extConProv    = externos;
+
   return (
     <div className="card">
-      <div className="card-hdr"><h3>💵 Gastos Generales ({gastos.length}) 🔒</h3>
+      <div className="card-hdr">
+        <h3>💵 Gastos Generales ({gastos.length}) 🔒</h3>
         <div className="row-gap">
           <div className="sw"><span style={{ color: "var(--muted)" }}>🔍</span><input placeholder="Buscar..." value={q} onChange={e => setQ(e.target.value)} /></div>
           <button className="btn btn-cyan" onClick={onAdd}>+ Nuevo Gasto</button>
@@ -6687,115 +6719,142 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
       <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--border)" }}>
         <div className="ftabs">{["TODOS", ...GASTO_TIPOS].map(t => <button key={t} className={`ftab${tf === t ? " on" : ""}`} onClick={() => setTf(t)}>{t}</button>)}</div>
       </div>
-      <div className="sbar"><span>Registros: <strong>{fil.length}</strong></span><span>Total: <strong style={{ color: "var(--red)" }}>{fmt$(tot)}</strong></span></div>
-      <div className="card-body">
-        {showUnificado ? (
-          /* Vista unificada: todos los gastos ligados a proveedores */
-          <div>
-            {/* 1. Gastos generales con proveedor */}
-            {gastosConProv.length > 0 && (
-              <div style={{marginBottom:16}}>
-                <div style={{fontWeight:700,fontSize:12,color:"var(--muted)",textTransform:"uppercase",padding:"8px 12px",background:"var(--bg2)",borderRadius:6,marginBottom:6}}>
-                  💵 Gastos Generales con Proveedor ({gastosConProv.length})
-                </div>
-                <table>
-                  <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Proveedor</th><th>Monto</th><th>Estado</th><th>Acciones</th></tr></thead>
-                  <tbody>{gastosConProv.map(g => {
-                    const prov = (proveedores||[]).find(p => p.id === g.proveedorId);
-                    const st = g.pagoStatus==="pagado" ? {lbl:"Pagado",c:"var(--green)"} : {lbl:"Pendiente",c:"var(--orange)"};
-                    return <tr key={g.id}>
+
+      {showUnificado ? (
+        /* ── Vista unificada: todos los gastos ligados a proveedores ── */
+        <div className="card-body">
+          {gastosConProv.length === 0 && maintsConProv.length === 0 && extConProv.length === 0 && (
+            <div className="empty"><div className="empty-icon">🏪</div><p>No hay gastos vinculados a proveedores</p></div>
+          )}
+
+          {gastosConProv.length > 0 && (
+            <div style={{marginBottom:16}}>
+              <div style={{fontWeight:700,fontSize:12,color:"var(--muted)",textTransform:"uppercase",padding:"8px 12px",background:"var(--bg2)",borderRadius:6,marginBottom:6}}>
+                💵 Gastos Generales con Proveedor ({gastosConProv.length})
+              </div>
+              <table>
+                <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Proveedor</th><th>Monto</th><th>Estado</th><th>Acciones</th></tr></thead>
+                <tbody>{gastosConProv.map(g => {
+                  const prov = (proveedores||[]).find(p => p.id === g.proveedorId);
+                  const st = g.pagoStatus === "pagado"
+                    ? { lbl: "Pagado", c: "var(--green)" }
+                    : { lbl: "Pendiente", c: "var(--orange)" };
+                  return (
+                    <tr key={g.id}>
                       <td style={{fontSize:11}}>{g.fecha||"—"}</td>
                       <td><Bdg c="bo" t={g.tipo}/></td>
                       <td style={{fontSize:11}}>{g.descripcion||"—"}</td>
-                      <td style={{fontSize:11}}>{prov?<Bdg c="bp" t={prov.nombre}/>:"—"}</td>
+                      <td style={{fontSize:11}}>{prov ? <Bdg c="bp" t={prov.nombre}/> : "—"}</td>
                       <td style={{color:"var(--red)",fontWeight:700}}>{fmt$(g.monto)}</td>
                       <td><span style={{fontSize:11,fontWeight:700,color:st.c}}>{st.lbl}</span></td>
                       <td><div className="acts"><button className="btn btn-ghost btn-sm" onClick={()=>onEdit(g)}>✏️</button><button className="btn btn-red btn-sm" onClick={()=>onDelete(g.id)}>🗑</button></div></td>
-                    </tr>;
-                  })}</tbody>
-                </table>
+                    </tr>
+                  );
+                })}</tbody>
+              </table>
+            </div>
+          )}
+
+          {maintsConProv.length > 0 && (
+            <div style={{marginBottom:16}}>
+              <div style={{fontWeight:700,fontSize:12,color:"var(--muted)",textTransform:"uppercase",padding:"8px 12px",background:"var(--bg2)",borderRadius:6,marginBottom:6}}>
+                🔧 Mantenimientos con Proveedor ({maintsConProv.length})
               </div>
-            )}
-            {/* 2. Mantenimientos por proveedor */}
-            {maintsConProv.length > 0 && (
-              <div style={{marginBottom:16}}>
-                <div style={{fontWeight:700,fontSize:12,color:"var(--muted)",textTransform:"uppercase",padding:"8px 12px",background:"var(--bg2)",borderRadius:6,marginBottom:6}}>
-                  🔧 Mantenimientos con Proveedor ({maintsConProv.length})
-                </div>
-                <table>
-                  <thead><tr><th>Fecha</th><th>Unidad</th><th>Descripción</th><th>Taller / M.O.</th><th>M.O. $</th><th>Refacciones</th><th>Ref. $</th><th>Total</th></tr></thead>
-                  <tbody>{maintsConProv.map(m => {
-                    const provMO  = (proveedores||[]).find(p => p.id === m.proveedorId);
-                    const provRef = (proveedores||[]).find(p => p.id === m.proveedorRefId);
-                    const cMO  = Number(m.costoMO)||0;
-                    const cRef = Number(m.costoRef)||0;
-                    const stMO  = m.pagoMOStatus==="pagado"  ? {lbl:"✅",c:"var(--green)"} : {lbl:"⏳",c:"var(--orange)"};
-                    const stRef = m.pagoRefStatus==="pagado" ? {lbl:"✅",c:"var(--green)"} : {lbl:"⏳",c:"var(--orange)"};
-                    return <tr key={m.id}>
+              <table>
+                <thead><tr><th>Fecha</th><th>Unidad</th><th>Descripción</th><th>Taller / M.O.</th><th>M.O. $</th><th>Refacciones</th><th>Ref. $</th><th>Total</th></tr></thead>
+                <tbody>{maintsConProv.map(m => {
+                  const provMO  = (proveedores||[]).find(p => p.id === m.proveedorId);
+                  const provRef = (proveedores||[]).find(p => p.id === m.proveedorRefId);
+                  const cMO  = Number(m.costoMO)  || 0;
+                  const cRef = Number(m.costoRef) || 0;
+                  const stMO  = (m.pagoMOStatus  || "pendiente") === "pagado" ? "✅" : "⏳";
+                  const stRef = (m.pagoRefStatus || "pendiente") === "pagado" ? "✅" : "⏳";
+                  const unit  = units.find(u => u.id === m.unidadId);
+                  return (
+                    <tr key={m.id}>
                       <td style={{fontSize:11}}>{m.fechaEjec||m.fechaProg||"—"}</td>
-                      <td style={{fontSize:11,fontWeight:700}}>{(units.find(u=>u.id===m.unidadId)||{}).num||m.unidadId||"—"}</td>
+                      <td style={{fontSize:11,fontWeight:700}}>{unit ? unit.num : (m.unidadId||"—")}</td>
                       <td style={{fontSize:11}}>{m.desc||m.tipo||"—"}</td>
-                      <td style={{fontSize:11}}>{provMO?<Bdg c="bo" t={provMO.nombre}/>:"—"}</td>
-                      <td style={{color:"var(--orange)",fontWeight:700,fontSize:11}}>{cMO>0?<>{fmt$(cMO)} <span style={{color:stMO.c}}>{stMO.lbl}</span></>:"—"}</td>
-                      <td style={{fontSize:11}}>{provRef?<Bdg c="bp" t={provRef.nombre}/>:"—"}</td>
-                      <td style={{color:"var(--cyan)",fontWeight:700,fontSize:11}}>{cRef>0?<>{fmt$(cRef)} <span style={{color:stRef.c}}>{stRef.lbl}</span></>:"—"}</td>
-                      <td style={{color:"var(--red)",fontWeight:700}}>{fmt$(cMO+cRef)}</td>
-                    </tr>;
-                  })}</tbody>
-                </table>
+                      <td style={{fontSize:11}}>{provMO ? <Bdg c="bo" t={provMO.nombre}/> : "—"}</td>
+                      <td style={{color:"var(--orange)",fontWeight:700,fontSize:11}}>{cMO > 0 ? <>{fmt$(cMO)} {stMO}</> : "—"}</td>
+                      <td style={{fontSize:11}}>{provRef ? <Bdg c="bp" t={provRef.nombre}/> : "—"}</td>
+                      <td style={{color:"var(--cyan)",fontWeight:700,fontSize:11}}>{cRef > 0 ? <>{fmt$(cRef)} {stRef}</> : "—"}</td>
+                      <td style={{color:"var(--red)",fontWeight:700}}>{fmt$(cMO + cRef)}</td>
+                    </tr>
+                  );
+                })}</tbody>
+              </table>
+            </div>
+          )}
+
+          {extConProv.length > 0 && (
+            <div>
+              <div style={{fontWeight:700,fontSize:12,color:"var(--muted)",textTransform:"uppercase",padding:"8px 12px",background:"var(--bg2)",borderRadius:6,marginBottom:6}}>
+                🚛 Logística Externa / Transportistas ({extConProv.length})
               </div>
-            )}
-            {/* 3. Logística externa */}
-            {extConProv.length > 0 && (
-              <div>
-                <div style={{fontWeight:700,fontSize:12,color:"var(--muted)",textTransform:"uppercase",padding:"8px 12px",background:"var(--bg2)",borderRadius:6,marginBottom:6}}>
-                  🚛 Logística Externa / Transportistas ({extConProv.length})
-                </div>
-                <table>
-                  <thead><tr><th>Fecha</th><th>Empresa</th><th>Ruta</th><th>Proveedor</th><th>Costo</th><th>Estado Pago</th></tr></thead>
-                  <tbody>{extConProv.map(e => {
-                    const prov = (proveedores||[]).find(p => p.id === e.proveedorId);
-                    const st = e.pagoStatus==="pagado" ? {lbl:"Pagado",c:"var(--green)"} : e.pagoStatus==="parcial" ? {lbl:"Parcial",c:"var(--cyan)"} : {lbl:"Pendiente",c:"var(--orange)"};
-                    return <tr key={e.id}>
+              <table>
+                <thead><tr><th>Fecha</th><th>Empresa</th><th>Ruta</th><th>Proveedor</th><th>Costo</th><th>Estado Pago</th></tr></thead>
+                <tbody>{extConProv.map(e => {
+                  const prov = (proveedores||[]).find(p => p.id === e.proveedorId);
+                  const st = e.pagoStatus === "pagado"
+                    ? { lbl: "Pagado",   c: "var(--green)"  }
+                    : e.pagoStatus === "parcial"
+                    ? { lbl: "Parcial",  c: "var(--cyan)"   }
+                    : { lbl: "Pendiente",c: "var(--orange)" };
+                  return (
+                    <tr key={e.id}>
                       <td style={{fontSize:11}}>{e.fecha||"—"}</td>
                       <td style={{fontWeight:600,fontSize:11}}>{e.empresa||"—"}</td>
                       <td style={{fontSize:11,color:"var(--muted)"}}>{e.origen||""}{e.destino?" → "+e.destino:""}</td>
-                      <td style={{fontSize:11}}>{prov?<Bdg c="bp" t={prov.nombre}/>:<span style={{color:"var(--orange)",fontSize:10}}>⚠️ Sin proveedor</span>}</td>
+                      <td style={{fontSize:11}}>
+                        {prov
+                          ? <Bdg c="bp" t={prov.nombre}/>
+                          : <span style={{color:"var(--orange)",fontSize:10}}>⚠️ Sin proveedor registrado</span>}
+                      </td>
                       <td style={{color:"var(--purple)",fontWeight:700}}>{fmt$(e.costoPagar)}</td>
                       <td><span style={{fontSize:11,fontWeight:700,color:st.c}}>{st.lbl}</span></td>
-                    </tr>;
+                    </tr>
+                  );
+                })}</tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* ── Vista normal por tipo ── */
+        <>
+          <div className="sbar">
+            <span>Registros: <strong>{fil.length}</strong></span>
+            <span>Total: <strong style={{ color: "var(--red)" }}>{fmt$(tot)}</strong></span>
+          </div>
+          <div className="card-body">
+            {fil.length === 0
+              ? <div className="empty"><div className="empty-icon">💵</div><p>Sin gastos registrados</p></div>
+              : <table>
+                  <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Monto</th><th>Proveedor</th><th>Responsable</th><th>Acciones</th></tr></thead>
+                  <tbody>{fil.map(g => {
+                    const prov = (proveedores||[]).find(p => p.id === g.proveedorId);
+                    return (
+                      <tr key={g.id}>
+                        <td style={{ fontSize: 12 }}>{g.fecha || "—"}</td>
+                        <td><Bdg c="bo" t={g.tipo} /></td>
+                        <td style={{ fontSize: 12 }}>{g.descripcion || "—"}</td>
+                        <td style={{ color: "var(--red)", fontWeight: 700 }}>{fmt$(g.monto)}</td>
+                        <td style={{ fontSize: 11 }}>{prov ? <Bdg c="bp" t={prov.nombre} /> : <span style={{ color: "var(--muted)" }}>—</span>}</td>
+                        <td style={{ fontSize: 12 }}>{g.responsable || "—"}</td>
+                        <td><div className="acts"><button className="btn btn-ghost btn-sm" onClick={() => onEdit(g)}>✏️</button><button className="btn btn-red btn-sm" onClick={() => onDelete(g.id)}>🗑</button></div></td>
+                      </tr>
+                    );
                   })}</tbody>
                 </table>
-              </div>
-            )}
-            {gastosConProv.length===0 && maintsConProv.length===0 && extConProv.length===0 && (
-              <div className="empty"><div className="empty-icon">🏪</div><p>No hay gastos vinculados a proveedores</p></div>
-            )}
+            }
           </div>
-        ) : (
-          fil.length === 0 ? <div className="empty"><div className="empty-icon">💵</div><p>Sin gastos registrados</p></div> :
-          <table>
-            <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Monto</th><th>Proveedor</th><th>Responsable</th><th>Acciones</th></tr></thead>
-            <tbody>{fil.map(g => {
-              const prov = (proveedores||[]).find(p => p.id === g.proveedorId);
-              return (
-              <tr key={g.id}>
-                <td style={{ fontSize: 12 }}>{g.fecha || "—"}</td>
-                <td><Bdg c="bo" t={g.tipo} /></td>
-                <td style={{ fontSize: 12 }}>{g.descripcion || "—"}</td>
-                <td style={{ color: "var(--red)", fontWeight: 700 }}>{fmt$(g.monto)}</td>
-                <td style={{ fontSize: 11 }}>{prov ? <Bdg c="bp" t={prov.nombre} /> : <span style={{ color: "var(--muted)" }}>—</span>}</td>
-                <td style={{ fontSize: 12 }}>{g.responsable || "—"}</td>
-                <td><div className="acts"><button className="btn btn-ghost btn-sm" onClick={() => onEdit(g)}>✏️</button><button className="btn btn-red btn-sm" onClick={() => onDelete(g.id)}>🗑</button></div></td>
-              </tr>
-            )})}</tbody>
-          </table>
-        )}
-      </div>
-
+        </>
+      )}
     </div>
   );
 }
+
 
 function MaintPage({ units, maints, proveedores, onAdd, onEdit, onDelete }) {
   const [q, setQ] = useState(""); const [pf, setPf] = useState("TODOS"); const [rf, setRf] = useState("TODOS");
