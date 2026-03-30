@@ -192,7 +192,7 @@ const DOCS_LIST_UNIDAD = ["Seguro", "Verificación", "Permiso SCT", "Tarjeta Cir
 const DOCS_LIST_OPERADOR = ["Licencia Operador", "INE / Identificación", "IMSS Operador", "Examen Médico", "Comprobante Domicilio", "Acta de Nacimiento", "Otro"];
 const DOCS_LIST = [...DOCS_LIST_UNIDAD, ...DOCS_LIST_OPERADOR];
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-const PROVEEDOR_CATS = ["Refacciones", "Mano de Obra", "Talleres", "Herramientas", "Combustible", "Llantas", "Seguros", "Servicios", "Otro"];
+const PROVEEDOR_CATS = ["Refacciones", "Mano de Obra", "Talleres", "Herramientas", "Combustible", "Llantas", "Seguros", "Servicios", "Viajes", "Otro"];
 
 const D_PROVEEDORES = [
   { id: "pv1", nombre: "Refaccionaria Norma", categoria: "Refacciones", tipoProv: "Llantera", contacto: "Norma López", tel: "8181234500", email: "norma@refacs.com", rfc: "RNL990101XXX", direccion: "Av. Colón 200, MTY", banco: "BBVA", cuenta: "1234567890", diasCredito: 30, limiteCredito: 50000, saldoPendiente: 8500, ultimoPago: "2026-02-15", notas: "" },
@@ -2739,7 +2739,7 @@ function ProveedorModal({ proveedor, onSave, onClose }) {
   const ok = (_e) => { if (!f.nombre) return alert("Nombre requerido"); onSave({ ...f, id: f.id || uid() }) };
   // Días vencidos de crédito
   const diasUsados = f.ultimoPago ? Math.floor((Date.now() - new Date(f.ultimoPago)) / 86400000) : null;
-  const creditoVencido = diasUsados != null && diasUsados > (f.diasCredito || 0);
+  const creditoVencido = diasUsados != null && (f.diasCredito||0) > 0 && diasUsados > (f.diasCredito || 0);
   return (
     <div className="modal-ov" onClick={onClose}>
       <div className="modal wide" onClick={e => e.stopPropagation()}>
@@ -2765,7 +2765,7 @@ function ProveedorModal({ proveedor, onSave, onClose }) {
             <div className="field"><label>Saldo Pendiente ($)</label><input type="number" value={f.saldoPendiente||0} onChange={chN("saldoPendiente")} min="0" placeholder="0"/></div>
             <div className="field"><label>Fecha Último Pago</label><input type="date" value={f.ultimoPago||""} onChange={ch("ultimoPago")}/></div>
           </div>
-          {diasUsados != null && (
+          {diasUsados != null && (f.diasCredito||0) > 0 && (
             <div style={{padding:"10px 14px",borderRadius:8,background:creditoVencido?"rgba(220,50,50,.1)":"rgba(0,200,100,.08)",border:`1px solid ${creditoVencido?"var(--red)":"var(--green)"}`,fontSize:12,marginBottom:8}}>
               {creditoVencido ? `🚨 Crédito vencido hace ${diasUsados - (f.diasCredito||0)} días (${diasUsados} días desde último pago, límite: ${f.diasCredito} días)` : `✅ Crédito vigente — ${diasUsados} de ${f.diasCredito} días usados`}
             </div>
@@ -6351,7 +6351,13 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
     const gm = gmMO + gmRef;
     const gg = gastos.filter(g => g.proveedorId === pvId).reduce((a, g) => a + (Number(g.monto)||0), 0);
     const ge = externos.filter(e => e.proveedorId === pvId).reduce((a, e) => a + (Number(e.costoPagar)||0), 0);
-    return { total: gm + gg + ge, mantenimientos: maints.filter(m => m.proveedorId === pvId || m.proveedorRefId === pvId).length, gastos: gastos.filter(g => g.proveedorId === pvId).length, externos: externos.filter(e => e.proveedorId === pvId).length };
+    // Pendiente = todo lo NO pagado de este proveedor
+    const pendMO  = maints.filter(m => m.proveedorId === pvId && (m.pagoMOStatus||"pendiente") !== "pagado").reduce((a,m)=>a+(Number(m.costoMO)||0),0);
+    const pendRef = maints.filter(m => m.proveedorRefId === pvId && (m.pagoRefStatus||"pendiente") !== "pagado").reduce((a,m)=>a+(Number(m.costoRef)||0),0);
+    const pendGg  = gastos.filter(g => g.proveedorId === pvId && (g.pagoStatus||"pendiente") !== "pagado").reduce((a,g)=>a+(Number(g.monto)||0),0);
+    const pendExt = externos.filter(e => e.proveedorId === pvId && e.pagoStatus !== "pagado").reduce((a,e)=>a+(Number(e.costoPagar)||0),0);
+    const pendiente = pendMO + pendRef + pendGg + pendExt;
+    return { total: gm + gg + ge, pendiente, mantenimientos: maints.filter(m => m.proveedorId === pvId || m.proveedorRefId === pvId).length, gastos: gastos.filter(g => g.proveedorId === pvId).length, externos: externos.filter(e => e.proveedorId === pvId).length };
   };
 
   // Credit status helpers
@@ -6432,14 +6438,7 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
       {/* Tab selector */}
       <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
         <button className={`btn btn-sm ${tab==="lista"?"btn-cyan":"btn-ghost"}`} onClick={()=>setTab("lista")}>🏪 Proveedores ({proveedores.length})</button>
-        <button className={`btn btn-sm ${tab==="transportistas"?"btn-cyan":"btn-ghost"}`} onClick={()=>setTab("transportistas")}>
-          🚛 Transportistas
-          {externos.filter(e=>e.pagoStatus!=="pagado"&&e.costoPagar>0).length>0 && (
-            <span style={{background:"var(--red)",color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:10,marginLeft:4}}>
-              {externos.filter(e=>e.pagoStatus!=="pagado"&&e.costoPagar>0).length}
-            </span>
-          )}
-        </button>
+
         <button className={`btn btn-sm ${tab==="cxp"?"btn-cyan":"btn-ghost"}`} onClick={()=>setTab("cxp")}>
           💳 Cuentas por Pagar
           {allPendingPayments.length>0 && (
@@ -6484,8 +6483,8 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
                             ? <div><div style={{fontWeight:700}}>{p.diasCredito} días</div><div style={{fontSize:10,color:"var(--muted)"}}>Límite: {fmt$(p.limiteCredito||0)}</div></div>
                             : <span style={{color:"var(--muted)",fontSize:11}}>Sin crédito</span>}
                         </td>
-                        <td style={{fontWeight:700,color:(p.saldoPendiente||0)>0?"var(--orange)":"var(--muted)"}}>
-                          {(p.saldoPendiente||0)>0?fmt$(p.saldoPendiente):"—"}
+                        <td style={{fontWeight:700,color:s.pendiente>0?"var(--orange)":"var(--muted)"}}>
+                          {s.pendiente>0?fmt$(s.pendiente):"—"}
                         </td>
                         <td>
                           {cs?<span style={{fontSize:11,fontWeight:700,color:cs.color}}>{cs.icon} {cs.lbl}</span>:<span style={{color:"var(--muted)",fontSize:11}}>—</span>}
@@ -6673,7 +6672,7 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
 }
 
 
-function GastosPage({ gastos, proveedores, onAdd, onEdit, onDelete }) {
+function GastosPage({ gastos, proveedores, externos = [], onAdd, onEdit, onDelete }) {
   const [q, setQ] = useState(""); const [tf, setTf] = useState("TODOS");
   const fil = gastos.filter(g => (g.descripcion + g.responsable).toLowerCase().includes(q.toLowerCase()) && (tf === "TODOS" || g.tipo === tf));
   const tot = fil.reduce((a, g) => a + (Number(g.monto) || 0), 0);
@@ -6708,6 +6707,35 @@ function GastosPage({ gastos, proveedores, onAdd, onEdit, onDelete }) {
             )})}</tbody>
           </table>}
       </div>
+      {/* ── Logística Externa (Transportistas) ── */}
+      {externos.length > 0 && (
+        <div style={{borderTop:"1px solid var(--border)",padding:"12px 16px"}}>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:8,color:"var(--purple)"}}>🚛 Logística Externa — Transportistas ({externos.length})</div>
+          <table>
+            <thead><tr><th>Fecha</th><th>Empresa</th><th>Ruta</th><th>Costo</th><th>Estado Pago</th></tr></thead>
+            <tbody>{externos.map(e=>{
+              const st = e.pagoStatus==="pagado"
+                ? {lbl:"Pagado",c:"var(--green)"}
+                : e.pagoStatus==="parcial"
+                ? {lbl:"Parcial",c:"var(--cyan)"}
+                : {lbl:"Pendiente",c:"var(--orange)"};
+              return (
+                <tr key={e.id}>
+                  <td style={{fontSize:12}}>{e.fecha||"—"}</td>
+                  <td style={{fontWeight:600,fontSize:12}}>{e.empresa||"—"}</td>
+                  <td style={{fontSize:11,color:"var(--muted)"}}>{e.origen||""}{e.destino?" → "+e.destino:""}</td>
+                  <td style={{color:"var(--purple)",fontWeight:700}}>{fmt$(e.costoPagar)}</td>
+                  <td><span style={{fontSize:11,fontWeight:700,color:st.c}}>{st.lbl}</span></td>
+                </tr>
+              );
+            })}</tbody>
+          </table>
+          <div style={{textAlign:"right",fontSize:12,color:"var(--muted)",marginTop:6}}>
+            Total logística externa: <strong style={{color:"var(--purple)"}}>{fmt$(externos.reduce((a,e)=>a+(Number(e.costoPagar)||0),0))}</strong>
+            {" | "}Pendiente: <strong style={{color:"var(--orange)"}}>{fmt$(externos.filter(e=>e.pagoStatus!=="pagado").reduce((a,e)=>a+(Number(e.costoPagar)||0),0))}</strong>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -7111,6 +7139,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
   const fTrips     = trips.filter(t=>t.status==="COMPLETADO"&&enRango(t.fechaReg||t.fecha));
   const fTripsProp = fTrips.filter(t=>!t.esExterno);
   const fTripsExt  = fTrips.filter(t=>t.esExterno);
+  const fExternos  = externos.filter(e=>{ const d=toISO(e.fecha); return !d||(d>=rango.de&&d<=rango.a); });
 
   // totales
   const totFacturado = fFacturas.reduce((a,f)=>a+(Number(f.total)||0),0);
@@ -7122,7 +7151,8 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
   const totMant      = fMaints.reduce((a,m)=>a+(Number(m.costoRef)||0)+(Number(m.costoMO)||0),0);
   const totIngresos  = fTrips.reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0);
   const totCostoViaj = fTrips.reduce((a,t)=>a+(Number(t.gastosExtras)||0)+(Number(t.costoEstadias)||0)+(Number(t.costoPagar)||0),0);
-  const totCostoOper = totComb+totMant+totGastos+totCostoViaj;
+  const totExternos  = fExternos.reduce((a,e)=>a+(Number(e.costoPagar)||0),0);
+  const totCostoOper = totComb+totMant+totGastos+totCostoViaj+totExternos;
   const utilidadBruta= totIngresos-totCostoOper;
   const margen       = totIngresos>0?((utilidadBruta/totIngresos)*100).toFixed(1):0;
 
@@ -7144,13 +7174,14 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     const mFuel  = byMes(fuels, f=>f.fecha).reduce((a,f)=>a+(Number(f.litros)||0)*(Number(f.precio)||0),0);
     const mMaint = byMes(maints,m=>m.fechaEjec).reduce((a,m)=>a+(Number(m.costoRef)||0)+(Number(m.costoMO)||0),0);
     const mGast  = byMes(gastos,g=>g.fecha).reduce((a,g)=>a+(Number(g.monto)||0),0);
+    const mExtCosto = byMes(externos,e=>e.fecha).reduce((a,e)=>a+(Number(e.costoPagar)||0),0);
     const mIng   = byMes(trips.filter(t=>t.status==="COMPLETADO"),t=>t.fechaReg||t.fecha).reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0);
     const mFact  = byMes(facturas,f=>f.fechaEmision).reduce((a,f)=>a+(Number(f.total)||0),0);
     const mViaj  = byMes(trips.filter(t=>t.status==="COMPLETADO"&&!t.esExterno),t=>t.fechaReg||t.fecha).length;
     const mExt   = byMes(trips.filter(t=>t.status==="COMPLETADO"&&t.esExterno),t=>t.fechaReg||t.fecha).length;
     const mLit   = byMes(fuels,f=>f.fecha).reduce((a,f)=>a+(Number(f.litros)||0),0);
     const mMantN = byMes(maints,m=>m.fechaEjec).length;
-    return { fuel:mFuel, maint:mMaint, gast:mGast, ing:mIng, fact:mFact, costos:mFuel+mMaint+mGast, viajes:mViaj, ext:mExt, litros:mLit, mantN:mMantN };
+    return { fuel:mFuel, maint:mMaint, gast:mGast, extCosto:mExtCosto, ext:mExt, ing:mIng, fact:mFact, costos:mFuel+mMaint+mGast+mExtCosto, viajes:mViaj, litros:mLit, mantN:mMantN };
   });
 
   // colores palette
@@ -7249,6 +7280,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
       {v:totMant,     c:"var(--orange)",lbl:"🔧 Mantenimiento"},
       {v:totGastos,   c:"var(--purple)",lbl:"💸 Gastos grales"},
       {v:totCostoViaj,c:"var(--yellow)",lbl:"🚛 Gastos viajes"},
+      {v:totExternos,  c:"var(--purple)",lbl:"🔄 Logística externa"},
     ];
     const segCartera = [
       {v:totCobrado,  c:"var(--green)", lbl:"✅ Cobrado"},
@@ -10018,7 +10050,7 @@ const AYUDA_DATA = [
       { q: "¿Cómo registro un viaje propio?",
         a: "Ve a Flota → Viajes & Logística → '➕ Nuevo Viaje'. Selecciona la unidad, operador, origen, destino, fecha, cliente, tipo de carga y el ingreso ofrecido. Puedes agregar gastos del viaje (extras, estadías, peajes). El viaje aparecerá en el Dashboard y en Gráficas una vez marcado como COMPLETADO." },
       { q: "¿Qué es la Logística Externa y cómo funciona?",
-        a: "Son viajes que subcontratas a un transportista externo (no tu propia flota). Activa el switch 'Es logística externa', selecciona el transportista proveedor y captura el costo a pagar. Genera automáticamente una cuenta por pagar en Proveedores → CxP, independiente de cada transportista." },
+        a: "Son viajes que subcontratas a un transportista externo (no tu propia flota). Activa el switch 'Es logística externa', selecciona el transportista proveedor (registrado en Proveedores con categoría 'Viajes') y captura el costo a pagar. Genera automáticamente una cuenta por pagar en Proveedores → CxP. El costo también se refleja en Gastos Generales y en Gráficas & Reportes dentro del costo operacional total." },
       { q: "¿Cómo marco un viaje como completado?",
         a: "En la tabla de viajes, usa el selector de estado o el botón de edición. Cambia el estado a 'COMPLETADO'. Solo los viajes completados se contabilizan en ingresos, estadísticas del Dashboard y Gráficas & Reportes." },
       { q: "¿Puedo agregar fotos de evidencia a un viaje?",
@@ -10143,12 +10175,20 @@ const AYUDA_DATA = [
     id: "gastos", icono: "💵", titulo: "Gastos y Proveedores",
     color: "var(--orange)",
     preguntas: [
+      { q: "¿Qué aparece en Gastos Generales?",
+        a: "Gastos Generales muestra dos secciones: 1) Los gastos administrativos del negocio (renta, telefonía, seguros, etc.) que registras manualmente con '+ Nuevo Gasto'. 2) La Logística Externa — todos los viajes subcontratados a transportistas, con su costo, ruta y estado de pago." },
       { q: "¿Cuál es la diferencia entre Gastos Generales y Costos de Viaje?",
-        a: "Los Gastos Generales (renta, telefonía, servicios) se registran en Control → Gastos. Los costos de viaje (casetas, estadías, combustible específico de un viaje) se registran directamente en el viaje al editarlo." },
+        a: "Los Gastos Generales (renta, telefonía, servicios) se registran en Control → Gastos. Los costos de viaje (casetas, estadías, combustible específico de un viaje) se registran directamente en el viaje al editarlo. Ambos se consolidan en Gráficas & Reportes como costo operacional total." },
       { q: "¿Cómo registro un proveedor?",
-        a: "Ve a Control → Proveedores → '➕ Nuevo Proveedor'. Ingresa nombre, RFC, tipo de servicio que ofrece y datos de contacto. Luego puedes asignarlo a mantenimientos, gastos y logística externa." },
-      { q: "¿Cómo registro un pago a proveedor?",
-        a: "En Control → Proveedores, abre el perfil del proveedor y usa el botón '💳 Registrar Pago'. Puedes adjuntar referencia, forma de pago y notas." },
+        a: "Ve a Control → Proveedores → '➕ Nuevo Proveedor'. Ingresa nombre, RFC, categoría (Refacciones, Talleres, Viajes, Servicios, etc.) y tipo de proveedor. Puedes asignarle días de crédito y límite de crédito. Los proveedores de contado (0 días de crédito) no generan alertas de vencimiento." },
+      { q: "¿Cómo funciona el Saldo Pendiente del proveedor?",
+        a: "El Saldo Pendiente se calcula automáticamente sumando todos los gastos, mantenimientos y viajes externos asociados a ese proveedor que aún no han sido liquidados. No necesitas llenarlo manualmente — se actualiza en tiempo real conforme registras y pagas cuentas." },
+      { q: "¿Cómo funcionan las Cuentas por Pagar (CxP)?",
+        a: "En Proveedores → Cuentas por Pagar aparecen todos los montos pendientes de pago, agrupados por proveedor: gastos generales no pagados, refacciones de mantenimientos pendientes, mano de obra de talleres pendiente, y logística externa pendiente. Cada uno se puede liquidar de forma independiente con su comprobante." },
+      { q: "¿Cómo pago Refacciones y Taller por separado en un mantenimiento?",
+        a: "Cada mantenimiento puede tener dos proveedores: uno para Refacciones y otro para Taller/M.O. En CxP aparecen como dos cuentas separadas. Al liquidar la cuenta de Taller, la de Refacciones sigue pendiente (y viceversa) — son completamente independientes." },
+      { q: "¿Qué es la Logística Externa en Proveedores?",
+        a: "Son los viajes que subcontratas a transportistas externos. Antes aparecían como una pestaña separada; ahora los transportistas son proveedores normales de categoría 'Viajes'. Sus cuentas pendientes aparecen en CxP y su costo total se refleja en Gráficas & Reportes como parte del costo operacional." },
     ]
   },
   {
@@ -11103,7 +11143,7 @@ export default function App() {
             onDelete={FacC.del}
             onMarcarPagada={marcarPagada}
           />}
-          {tab === "gastos" && isSupervisor && <GastosPage gastos={gastos} proveedores={proveedores}
+          {tab === "gastos" && isSupervisor && <GastosPage gastos={gastos} proveedores={proveedores} externos={externos}
             onAdd={() => setModal({ type: "gasto", data: null, _ts: Date.now() })}
             onEdit={g => setModal({ type: "gasto", data: g })}
             onDelete={GC.del} />}
