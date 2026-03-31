@@ -6259,17 +6259,29 @@ function PagoProveedorGenericoModal({ item, proveedor, branding, trips, maints, 
   const tipoIcon = (item.tipo==="mantenimiento_ref"||item.tipo==="mantenimiento_mo")?"🔧":item.tipo==="gasto"?"💵":"📋";
   const tipoLbl  = item.tipo==="mantenimiento_ref"?"Refacciones":item.tipo==="mantenimiento_mo"?"Taller / M.O.":item.tipo==="gasto"?"Gasto General":"Servicio";
 
-  const handleImg = e => {
-    Array.from(e.target.files).forEach(file => {
-      const r = new FileReader(); r.onload = ev => setF(p=>({...p,pagoEvidencias:[...(p.pagoEvidencias||[]),ev.target.result]})); r.readAsDataURL(file);
-    });
+  const [uploading, setUploading] = useState(false);
+  const handleImg = async e => {
+    const files = Array.from(e.target.files); if (!files.length) return;
+    setUploading(true);
+    try {
+      const urls = await Promise.all(files.map(f => compressAndUpload(f, "fleet-pro/comprobantes", 1200, 0.75)));
+      setF(p=>({...p, pagoEvidencias:[...(p.pagoEvidencias||[]),...urls]}));
+    } catch(err) { alert("Error al subir comprobante: " + err.message); }
+    finally { setUploading(false); }
   };
   const delImg = idx => setF(p=>({...p,pagoEvidencias:p.pagoEvidencias.filter((_,i)=>i!==idx)}));
-  const handleFactura = e => {
-    Array.from(e.target.files).forEach(file => {
-      const r = new FileReader(); r.onload = ev => setF(p=>({...p,facturaArchivos:[...(p.facturaArchivos||[]),ev.target.result]}));
-      r.readAsDataURL(file);
-    });
+  const handleFactura = async e => {
+    const files = Array.from(e.target.files); if (!files.length) return;
+    setUploading(true);
+    try {
+      const urls = await Promise.all(files.map(f =>
+        f.type.startsWith("image/")
+          ? compressAndUpload(f, "fleet-pro/facturas", 1400, 0.80)
+          : compressAndUpload(f, "fleet-pro/facturas")
+      ));
+      setF(p=>({...p, facturaArchivos:[...(p.facturaArchivos||[]),...urls]}));
+    } catch(err) { alert("Error al subir factura: " + err.message); }
+    finally { setUploading(false); }
   };
   const delFactura = idx => setF(p=>({...p,facturaArchivos:p.facturaArchivos.filter((_,i)=>i!==idx)}));
   const [lightbox, setLightbox] = useState(null); // src to show full screen
@@ -6372,7 +6384,7 @@ _${branding?.nombre||"Fleet Pro"} — Comprobante_`;
           <div style={{marginBottom:12}}>
             <label style={lbl}>📎 Comprobante de Pago</label>
             <label style={{display:"inline-flex",alignItems:"center",gap:8,padding:"8px 14px",background:"var(--bg2)",border:"1px dashed var(--border)",borderRadius:8,cursor:"pointer",fontSize:12}}>
-              📎 Adjuntar comprobante <input type="file" accept="image/*,application/pdf" multiple onChange={handleImg} style={{display:"none"}}/>
+              {uploading ? "⏳ Subiendo..." : "📎 Adjuntar comprobante"}<input type="file" accept="image/*,application/pdf" multiple onChange={handleImg} style={{display:"none"}}/>
             </label>
             {f.pagoEvidencias?.length>0 && (
               <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:8}}>
@@ -6392,7 +6404,7 @@ _${branding?.nombre||"Fleet Pro"} — Comprobante_`;
           <div style={{marginBottom:12}}>
             <label style={lbl}>🧾 Factura del Proveedor (XML / PDF / Imagen)</label>
             <label style={{display:"inline-flex",alignItems:"center",gap:8,padding:"8px 14px",background:"var(--bg2)",border:"1px dashed var(--cyan)",borderRadius:8,cursor:"pointer",fontSize:12,color:"var(--cyan)"}}>
-              🧾 Adjuntar factura <input type="file" accept="image/*,application/pdf,.xml" multiple onChange={handleFactura} style={{display:"none"}}/>
+              {uploading ? "⏳ Subiendo..." : "🧾 Adjuntar factura"}<input type="file" accept="image/*,application/pdf,.xml" multiple onChange={handleFactura} style={{display:"none"}}/>
             </label>
             {f.facturaArchivos?.length>0 && (
               <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:8}}>
@@ -6411,7 +6423,7 @@ _${branding?.nombre||"Fleet Pro"} — Comprobante_`;
         <div className="mftr">
           <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
           <button className="btn btn-ghost" style={{color:"var(--green)",border:"1px solid var(--green)"}} onClick={handleWhatsApp}>💬 WhatsApp</button>
-          <button className="btn btn-cyan" onClick={()=>onSave({...data,...f})}>💾 Guardar Pago</button>
+          <button className="btn btn-cyan" onClick={()=>onSave({...data,...f})} disabled={uploading}>{uploading ? "⏳ Subiendo..." : "💾 Guardar Pago"}</button>
         </div>
       {/* Lightbox */}
       {lightbox && (
