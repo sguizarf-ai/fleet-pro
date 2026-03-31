@@ -6830,11 +6830,12 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
 }
 
 
-function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [], onAdd, onEdit, onDelete, onEditMaint, onEditExterno }) {
+function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [], onAdd, onEdit, onDelete, onSavePagoProveedor, branding, trips = [] }) {
   const [q, setQ] = useState("");
   const [tf, setTf] = useState("TODOS");
   const [compModal, setCompModal] = useState(null);
   const [compModal2, setCompModal2] = useState(null); // lightbox
+  const [modalProvPago, setModalProvPago] = useState(null);
 
   // Computed vars — fuera del return para evitar crashes
   const fil = gastos.filter(g =>
@@ -6925,7 +6926,10 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                       <td style={{color:"var(--cyan)",fontWeight:700,fontSize:11}}>{cRef > 0 ? <>{fmt$(cRef)} {stRef}</> : "—"}</td>
                       <td style={{color:"var(--red)",fontWeight:700}}>{fmt$(cMO + cRef)}</td>
                       <td>{((m.pagoRefEvidencias||[]).length+(m.pagoMOEvidencias||[]).length+(m.pagoEvidencias||[]).length)>0 ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal([...(m.pagoMOEvidencias||[]),...(m.pagoRefEvidencias||[]),...(m.pagoEvidencias||[])])} style={{fontSize:11}}>📎 {(m.pagoRefEvidencias||[]).length+(m.pagoMOEvidencias||[]).length+(m.pagoEvidencias||[]).length}</button> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
-                      <td><div className="acts"><button className="btn btn-ghost btn-sm" title="Editar mantenimiento" onClick={()=>onEditMaint&&onEditMaint(m)}>✏️</button></div></td>
+                      <td><div className="acts">
+                        {m.proveedorRefId && <button className="btn btn-ghost btn-xs" title="Conciliar pago Refacciones" onClick={()=>setModalProvPago({item:{tipo:"mantenimiento_ref",id:m.id+"_ref",label:`Refac: ${m.descripcion||m.tipo||"—"}`,monto:Number(m.costoRef)||0,data:m},proveedor:(proveedores||[]).find(p=>p.id===m.proveedorRefId)})}>💳 Ref</button>}
+                        {m.proveedorId && <button className="btn btn-ghost btn-xs" title="Conciliar pago Taller" onClick={()=>setModalProvPago({item:{tipo:"mantenimiento_mo",id:m.id+"_mo",label:`Taller: ${m.descripcion||m.tipo||"—"}`,monto:Number(m.costoMO)||0,data:m},proveedor:(proveedores||[]).find(p=>p.id===m.proveedorId)})}>💳 M.O.</button>}
+                      </div></td>
                     </tr>
                   );
                 })}</tbody>
@@ -6960,7 +6964,7 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                       <td style={{color:"var(--purple)",fontWeight:700}}>{fmt$(e.costoPagar)}</td>
                       <td><span style={{fontSize:11,fontWeight:700,color:st.c}}>{st.lbl}</span></td>
                       <td>{((e.pagoEvidencias||[]).length+(e.facturaArchivos||[]).length)>0 ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal([...(e.pagoEvidencias||[]),...(e.facturaArchivos||[])])} style={{fontSize:11}}>📎 {(e.pagoEvidencias||[]).length+(e.facturaArchivos||[]).length}</button> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
-                      <td><div className="acts"><button className="btn btn-ghost btn-sm" title="Editar externo" onClick={()=>onEditExterno&&onEditExterno(e)}>✏️</button></div></td>
+                      <td><button className="btn btn-ghost btn-xs" title="Conciliar pago" onClick={()=>setModalProvPago({item:{tipo:"viaje",id:e.id,label:`${e.empresa||"—"}: ${e.origen||""} → ${e.destino||""}`,monto:Number(e.costoPagar)||0,data:e},proveedor:(proveedores||[]).find(p=>p.id===e.proveedorId)})}>💳 Pagar</button></td>
                     </tr>
                   );
                 })}</tbody>
@@ -7038,6 +7042,20 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                 </div>}
           </div>
         </div>
+      )}
+      {modalProvPago && (
+        <PagoProveedorGenericoModal
+          item={modalProvPago.item}
+          proveedor={modalProvPago.proveedor}
+          branding={branding}
+          trips={trips}
+          maints={maints}
+          onSave={(updated) => {
+            if (onSavePagoProveedor) onSavePagoProveedor(updated, modalProvPago.item.tipo);
+            setModalProvPago(null);
+          }}
+          onClose={() => setModalProvPago(null)}
+        />
       )}
     </div>
   );
@@ -11672,12 +11690,35 @@ export default function App() {
             onDelete={FacC.del}
             onMarcarPagada={marcarPagada}
           />}
-          {tab === "gastos" && isSupervisor && <GastosPage gastos={gastos} proveedores={proveedores} externos={externos} maints={maints} units={units}
+          {tab === "gastos" && isSupervisor && <GastosPage
+            gastos={gastos} proveedores={proveedores} externos={externos} maints={maints} units={units} trips={trips} branding={branding}
             onAdd={() => setModal({ type: "gasto", data: null, _ts: Date.now() })}
             onEdit={g => setModal({ type: "gasto", data: g })}
             onDelete={GC.del}
-            onEditMaint={m => setModal({ type: "maint", data: m })}
-            onEditExterno={e => setModal({ type: "externo", data: e })} />}
+            onSavePagoProveedor={async (updated, tipo) => {
+              if (tipo === "mantenimiento_ref") {
+                const orig = maints.find(m => m.id === updated.id);
+                if (orig) MC.save({ ...orig,
+                  pagoRefStatus: updated.pagoStatus, pagoRefFecha: updated.pagoFecha,
+                  pagoRefForma: updated.pagoForma, pagoRefReferencia: updated.pagoReferencia,
+                  pagoRefFactura: updated.pagoFactura, pagoRefNotas: updated.pagoNotas,
+                  pagoRefEvidencias: updated.pagoEvidencias, pagoRefFacturaArchivos: updated.facturaArchivos,
+                });
+              } else if (tipo === "mantenimiento_mo") {
+                const orig = maints.find(m => m.id === updated.id);
+                if (orig) MC.save({ ...orig,
+                  pagoMOStatus: updated.pagoStatus, pagoMOFecha: updated.pagoFecha,
+                  pagoMOForma: updated.pagoForma, pagoMOReferencia: updated.pagoReferencia,
+                  pagoMOFactura: updated.pagoFactura, pagoMONotas: updated.pagoNotas,
+                  pagoMOEvidencias: updated.pagoEvidencias, pagoMOFacturaArchivos: updated.facturaArchivos,
+                });
+              } else if (tipo === "viaje") {
+                EC.save(updated);
+              } else {
+                GC.save(updated);
+              }
+            }}
+          />}
           {tab === "nominas" && (userCan("verNominas") || userCan("verNominasAdmin")) && (
             <NominaPage
               drivers={userCan("verNominas") ? drivers : []}
