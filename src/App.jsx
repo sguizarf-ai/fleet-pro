@@ -1368,7 +1368,11 @@ function MaintModal({ maint, units, proveedores, onSave, onClose }) {
               <div className="field s2"><label>Nombre Taller (manual)</label><input value={f.taller} onChange={ch("taller")} placeholder="Nombre del taller" /></div>
             )}
             <div className="field"><label>Costo Refac. ($)</label><input value={f.costoRef} onChange={ch("costoRef")} type="number" /></div>
+            <div className="field"><label>Fecha Factura Refacciones <span style={{fontSize:10,color:"var(--muted)",fontWeight:400}}>(opcional)</span></label>
+              <DatePicker value={f.fechaFacturaRef||""} onChange={v=>setF(p=>({...p,fechaFacturaRef:v}))} /></div>
             <div className="field"><label>Costo M.O. ($)</label><input value={f.costoMO} onChange={ch("costoMO")} type="number" /></div>
+            <div className="field"><label>Fecha Factura Taller <span style={{fontSize:10,color:"var(--muted)",fontWeight:400}}>(opcional)</span></label>
+              <DatePicker value={f.fechaFacturaMO||""} onChange={v=>setF(p=>({...p,fechaFacturaMO:v}))} /></div>
             <div className="field s2"><label>Observaciones</label><textarea value={f.obs} onChange={ch("obs")} rows={2} /></div>
           </div>
         </div>
@@ -1732,7 +1736,7 @@ _${branding?.nombre||"Fleet Pro"} — Comprobante de liquidación_`;
 }
 
 function GastoModal({ gasto, proveedores, onSave, onClose }) {
-  const [f, setF] = useState(gasto || { fecha: "", tipo: GASTO_TIPOS[0], descripcion: "", monto: 0, responsable: "", proveedorId: "" });
+  const [f, setF] = useState(gasto || { fecha: "", fechaFactura: "", tipo: GASTO_TIPOS[0], descripcion: "", monto: 0, responsable: "", proveedorId: "", pagoStatus: "pendiente" });
   const [uploading, setUploading] = useState(false);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const ok = (_e) => { if (!f.tipo || !f.monto) return alert("Tipo y monto requeridos"); onSave({ ...f, id: f.id || uid() }) };
@@ -1743,7 +1747,8 @@ function GastoModal({ gasto, proveedores, onSave, onClose }) {
         <div className="mhdr"><h3>{f.id ? "✏️ Editar" : "💵 Nuevo Gasto General"}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
         <div className="mbody">
           <div className="fg">
-            <div className="field"><label>Fecha</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))} /></div>
+            <div className="field"><label>Fecha del Gasto</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))} /></div>
+            <div className="field"><label>Fecha Factura / Documento <span style={{fontSize:10,color:"var(--muted)",fontWeight:400}}>(opcional)</span></label><DatePicker value={f.fechaFactura||""} onChange={v=>setF(p=>({...p,fechaFactura:v}))} /></div>
             <div className="field"><label>Tipo de Gasto</label><select value={f.tipo} onChange={ch("tipo")}>{GASTO_TIPOS.map(t => <option key={t}>{t}</option>)}</select></div>
             <div className="field s2"><label>Descripción</label><input value={f.descripcion} onChange={ch("descripcion")} /></div>
             <div className="field"><label>Monto ($)</label><input value={f.monto} onChange={ch("monto")} type="number" /></div>
@@ -2748,8 +2753,27 @@ function ProveedorModal({ proveedor, onSave, onClose }) {
           <div className="sec-lbl">📋 Datos Generales</div>
           <div className="fg">
             <div className="field s2"><label>Nombre *</label><input value={f.nombre} onChange={ch("nombre")} placeholder="Nombre del proveedor" /></div>
-            <div className="field"><label>Categoría</label><select value={f.categoria} onChange={ch("categoria")}>{PROVEEDOR_CATS.map(c => <option key={c}>{c}</option>)}</select></div>
-            <div className="field"><label>Tipo de Proveedor</label><select value={f.tipoProv||""} onChange={ch("tipoProv")}><option value="">— Tipo —</option>{TIPO_PROVEEDOR_CATS.map(c=><option key={c}>{c}</option>)}</select></div>
+            <div className="field"><label>Categoría</label>
+              <select value={PROVEEDOR_CATS.includes(f.categoria)?f.categoria:"__otro__"}
+                onChange={e=>setF(p=>({...p,categoria:e.target.value==="__otro__"?"":e.target.value}))}>
+                {PROVEEDOR_CATS.map(cat=><option key={cat} value={cat}>{cat}</option>)}
+                <option value="__otro__">+ Nueva categoría...</option>
+              </select>
+              {!PROVEEDOR_CATS.includes(f.categoria)&&(
+                <input value={f.categoria} onChange={ch("categoria")} placeholder="Escribe la categoría" style={{marginTop:4}}/>
+              )}
+            </div>
+            <div className="field"><label>Tipo de Proveedor</label>
+              <select value={TIPO_PROVEEDOR_CATS.includes(f.tipoProv||"")||(f.tipoProv||"")===""?f.tipoProv||"":"__otro__"}
+                onChange={e=>setF(p=>({...p,tipoProv:e.target.value==="__otro__"?"":e.target.value}))}>
+                <option value="">— Tipo —</option>
+                {TIPO_PROVEEDOR_CATS.map(t=><option key={t} value={t}>{t}</option>)}
+                <option value="__otro__">+ Nuevo tipo...</option>
+              </select>
+              {f.tipoProv&&!TIPO_PROVEEDOR_CATS.includes(f.tipoProv)&&(
+                <input value={f.tipoProv} onChange={ch("tipoProv")} placeholder="Escribe el tipo" style={{marginTop:4}}/>
+              )}
+            </div>
             <div className="field"><label>Contacto</label><input value={f.contacto} onChange={ch("contacto")} /></div>
             <div className="field"><label>Teléfono</label><input value={f.tel} onChange={ch("tel")} /></div>
             <div className="field"><label>Email</label><input value={f.email} onChange={ch("email")} type="email" /></div>
@@ -6366,6 +6390,7 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
   const [q, setQ] = useState(""); const [cf, setCf] = useState("TODOS"); const [tab, setTab] = useState("lista");
   const [modalPago, setModalPago] = useState(null); // externo being paid (transportista)
   const [modalProvPago, setModalProvPago] = useState(null); // generic provider payment
+  const [compModal, setCompModal] = useState(null); // comprobantes/evidencias viewer
   const fil = proveedores.filter(p => (p.nombre + p.contacto + (p.tipoProv||"")).toLowerCase().includes(q.toLowerCase()) && (cf === "TODOS" || p.tipoProv === cf));
 
   const getStats = (pvId) => {
@@ -6624,7 +6649,7 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
                   <thead><tr>
                     <th>Tipo</th><th>Proveedor</th><th>Concepto</th><th>Fecha</th>
                     <th style={{textAlign:"right"}}>Monto</th><th>Estado</th>
-                    <th>Referencia</th><th>Factura</th><th>Acción</th>
+                    <th>Referencia</th><th>Factura</th><th>Comprobante</th><th>Acción</th>
                   </tr></thead>
                   <tbody>
                     {allPendingPayments.length===0
@@ -6645,6 +6670,13 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
                               <td><span style={{fontWeight:700,color:stColor,fontSize:12}}>{stIcon} {item.status==="pagado"?"Pagado":item.status==="parcial"?"Parcial":"Pendiente"}</span></td>
                               <td style={{fontSize:11,color:"var(--muted)"}}>{item.data?.pagoReferencia||"—"}</td>
                               <td style={{fontSize:11,color:"var(--muted)"}}>{item.data?.pagoFactura||"—"}</td>
+                              <td style={{textAlign:"center"}}>
+                                {(item.data?.pagoEvidencias||[]).length > 0
+                                  ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal(item.data.pagoEvidencias)}>
+                                      📎 {(item.data.pagoEvidencias).length}
+                                    </button>
+                                  : <span style={{color:"var(--muted)",fontSize:10}}>—</span>}
+                              </td>
                               <td>
                                 <button className="btn btn-cyan btn-xs"
                                   onClick={()=>{
@@ -6676,6 +6708,31 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
           onSave={(updated) => { onSaveExterno(updated); setModalPago(null); }}
           onClose={() => setModalPago(null)}
         />
+      )}
+      {compModal && (
+        <div className="modal-ov" onClick={()=>setCompModal(null)}>
+          <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:600}}>
+            <div className="mhdr"><h3>📎 Comprobantes de Pago ({compModal.length})</h3>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setCompModal(null)}>✕</button>
+            </div>
+            <div className="mbody">
+              <div style={{display:"flex",flexWrap:"wrap",gap:12,padding:8}}>
+                {compModal.map((src,i) => (
+                  <a key={i} href={src} target="_blank" rel="noopener noreferrer"
+                     style={{display:"block",border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
+                    {src.startsWith("data:image") || src.match(/\.(jpg|jpeg|png|gif|webp)/i)
+                      ? <img src={src} style={{width:160,height:120,objectFit:"cover"}} alt={`Comprobante ${i+1}`}/>
+                      : <div style={{width:160,height:120,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--bg2)",fontSize:12,color:"var(--cyan)",flexDirection:"column",gap:4}}>
+                          <span style={{fontSize:32}}>📄</span>
+                          <span>Comprobante {i+1}</span>
+                          <span style={{fontSize:10,color:"var(--muted)"}}>Click para abrir</span>
+                        </div>}
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
       {modalProvPago && (
         <PagoProveedorGenericoModal
@@ -7350,6 +7407,28 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
   const totFacturado = fFacturas.reduce((a,f)=>a+(Number(f.total)||0),0);
   const totCobrado   = fFactPag.reduce((a,f)=>a+(Number(f.total)||0),0);
   const totPendFact  = fFacturas.filter(f=>f.status==="PENDIENTE"||f.status==="VENCIDA").reduce((a,f)=>a+(Number(f.total)||0),0);
+  // ── Conciliación fiscal IVA ───────────────────────────────────────────────
+  // IVA TRASLADADO (cobrado a clientes en facturas emitidas)
+  const ivaTrasladadoTotal  = fFacturas.reduce((a,f)=>a+(Number(f.iva)||0),0);
+  const ivaRetenidoClientes = fFacturas.reduce((a,f)=>a+(Number(f.retencionIVA)||0),0);
+  const subtotalFacturado   = fFacturas.reduce((a,f)=>a+(Number(f.subtotal)||0),0);
+  // IVA ACREDITABLE (pagado a proveedores — estimado al 16% del gasto)
+  // Gastos con IVA (todos los gastos pagados a proveedores)
+  const baseGastosIVA  = fGastos.reduce((a,g)=>a+(Number(g.monto)||0),0);
+  const ivaAcreditable = Math.round(baseGastosIVA / 1.16 * 0.16);
+  const baseGastosSinIVA = baseGastosIVA - ivaAcreditable;
+  // Mantenimientos con IVA
+  const baseMaintIVA   = fMaints.reduce((a,m)=>a+(Number(m.costoRef)||0)+(Number(m.costoMO)||0),0);
+  const ivaAcredMaint  = Math.round(baseMaintIVA / 1.16 * 0.16);
+  // IVA a favor o a cargo
+  const totalIvaACargo  = ivaTrasladadoTotal - ivaRetenidoClientes;
+  const totalIvaAFavor  = ivaAcreditable + ivaAcredMaint;
+  const saldoIVA        = totalIvaACargo - totalIvaAFavor;
+  // Utilidad real (sin IVA)
+  const ingresoNeto      = subtotalFacturado;
+  const costoNetoTotal   = baseGastosSinIVA + (baseMaintIVA - ivaAcredMaint) + totComb + totCostoViaj + totExternos;
+  const utilidadNeta     = ingresoNeto - costoNetoTotal;
+
   const totGastos    = fGastos.reduce((a,g)=>a+(Number(g.monto)||0),0);
   const totComb      = fFuels.reduce((a,f)=>a+(Number(f.litros)||0)*(Number(f.precio)||0),0);
   const totLitros    = fFuels.reduce((a,f)=>a+(Number(f.litros)||0),0);
@@ -8370,6 +8449,111 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
   // ══════════════════════════════════════════════════════════════
   //  10. PROVEEDORES
   // ══════════════════════════════════════════════════════════════
+  const VistaFiscal = () => {
+    const fmxN = n => "$"+Number(n||0).toLocaleString("es-MX",{minimumFractionDigits:2});
+    const positivo = saldoIVA >= 0;
+    return (
+      <div>
+        {/* Aviso metodología */}
+        <div style={{background:"rgba(0,153,204,.08)",border:"1px solid var(--cyan)",borderRadius:10,padding:"10px 16px",marginBottom:16,fontSize:12,color:"var(--muted)"}}>
+          ℹ️ <strong>Estimación fiscal:</strong> El IVA acreditable de gastos/mantenimientos se calcula al 16% sobre el monto total registrado. Para una declaración oficial, usa los XML de tus proveedores. Este módulo es una guía de conciliación interna.
+        </div>
+
+        {/* KPIs principales */}
+        <div className="stats" style={{marginBottom:16}}>
+          <div className="stat" style={{"--c":"var(--green)"}}>
+            <div className="stat-icon">📤</div>
+            <div className="stat-val sm">{fmxN(ivaTrasladadoTotal)}</div>
+            <div className="stat-lbl">IVA Trasladado (cobrado)</div>
+          </div>
+          <div className="stat" style={{"--c":"var(--orange)"}}>
+            <div className="stat-icon">📥</div>
+            <div className="stat-val sm">{fmxN(totalIvaAFavor)}</div>
+            <div className="stat-lbl">IVA Acreditable (pagado)</div>
+          </div>
+          <div className="stat" style={{"--c":positivo?"var(--red)":"var(--green)"}}>
+            <div className="stat-icon">{positivo?"💳":"✅"}</div>
+            <div className="stat-val sm">{fmxN(Math.abs(saldoIVA))}</div>
+            <div className="stat-lbl">{positivo?"IVA a Cargo (pagar SAT)":"IVA a Favor"}</div>
+          </div>
+          <div className="stat" style={{"--c":utilidadNeta>=0?"var(--green)":"var(--red)"}}>
+            <div className="stat-icon">{utilidadNeta>=0?"💰":"📉"}</div>
+            <div className="stat-val sm">{fmxN(utilidadNeta)}</div>
+            <div className="stat-lbl">Utilidad Neta (sin IVA)</div>
+          </div>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+          {/* IVA TRASLADADO */}
+          <div className="card">
+            <div className="card-hdr"><h3 style={{color:"var(--green)"}}>📤 IVA Trasladado — Ingresos</h3></div>
+            <div className="card-body">
+              <table>
+                <thead><tr><th>Concepto</th><th style={{textAlign:"right"}}>Monto</th></tr></thead>
+                <tbody>
+                  <tr><td style={{fontSize:12}}>Subtotal facturado (base gravable)</td><td style={{textAlign:"right",fontWeight:700}}>{fmxN(subtotalFacturado)}</td></tr>
+                  <tr><td style={{fontSize:12}}>IVA trasladado (16%)</td><td style={{textAlign:"right",fontWeight:700,color:"var(--green)"}}>{fmxN(ivaTrasladadoTotal)}</td></tr>
+                  <tr><td style={{fontSize:12}}>Retención IVA clientes</td><td style={{textAlign:"right",color:"var(--orange)"}}>- {fmxN(ivaRetenidoClientes)}</td></tr>
+                  <tr style={{background:"var(--bg2)"}}><td style={{fontSize:12,fontWeight:700}}>IVA neto a cargo (trasladado - retención)</td><td style={{textAlign:"right",fontWeight:700,color:"var(--red)"}}>{fmxN(totalIvaACargo)}</td></tr>
+                </tbody>
+              </table>
+              <div style={{fontSize:11,color:"var(--muted)",marginTop:8}}>Basado en {fFacturas.length} facturas emitidas en el período</div>
+            </div>
+          </div>
+
+          {/* IVA ACREDITABLE */}
+          <div className="card">
+            <div className="card-hdr"><h3 style={{color:"var(--orange)"}}>📥 IVA Acreditable — Gastos</h3></div>
+            <div className="card-body">
+              <table>
+                <thead><tr><th>Concepto</th><th style={{textAlign:"right"}}>Base</th><th style={{textAlign:"right"}}>IVA Est.</th></tr></thead>
+                <tbody>
+                  <tr><td style={{fontSize:12}}>Gastos generales</td><td style={{textAlign:"right",fontSize:12}}>{fmxN(baseGastosSinIVA)}</td><td style={{textAlign:"right",fontWeight:700,color:"var(--orange)"}}>{fmxN(ivaAcreditable)}</td></tr>
+                  <tr><td style={{fontSize:12}}>Mantenimientos</td><td style={{textAlign:"right",fontSize:12}}>{fmxN(baseMaintIVA-ivaAcredMaint)}</td><td style={{textAlign:"right",fontWeight:700,color:"var(--orange)"}}>{fmxN(ivaAcredMaint)}</td></tr>
+                  <tr style={{background:"var(--bg2)"}}><td style={{fontSize:12,fontWeight:700}}>Total IVA acreditable</td><td></td><td style={{textAlign:"right",fontWeight:700,color:"var(--green)"}}>{fmxN(totalIvaAFavor)}</td></tr>
+                </tbody>
+              </table>
+              <div style={{fontSize:11,color:"var(--muted)",marginTop:8}}>Estimado al 16% sobre montos con IVA implícito</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Saldo IVA */}
+        <div className="card" style={{marginTop:16}}>
+          <div className="card-hdr"><h3>🏛️ Saldo IVA del Período</h3></div>
+          <div className="card-body">
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,textAlign:"center",padding:"8px 0"}}>
+              <div style={{padding:16,background:"rgba(0,200,100,.07)",borderRadius:10,border:"1px solid var(--green)"}}>
+                <div style={{fontSize:11,color:"var(--muted)",marginBottom:4}}>IVA a Cargo</div>
+                <div style={{fontSize:20,fontWeight:700,color:"var(--red)"}}>{fmxN(totalIvaACargo)}</div>
+                <div style={{fontSize:10,color:"var(--muted)"}}>Trasladado − Retenciones</div>
+              </div>
+              <div style={{padding:16,background:"rgba(255,140,0,.07)",borderRadius:10,border:"1px solid var(--orange)"}}>
+                <div style={{fontSize:11,color:"var(--muted)",marginBottom:4}}>IVA Acreditable</div>
+                <div style={{fontSize:20,fontWeight:700,color:"var(--orange)"}}>{fmxN(totalIvaAFavor)}</div>
+                <div style={{fontSize:10,color:"var(--muted)"}}>Gastos + Mantenimientos</div>
+              </div>
+              <div style={{padding:16,background:positivo?"rgba(220,50,50,.07)":"rgba(0,200,100,.07)",borderRadius:10,border:`1px solid ${positivo?"var(--red)":"var(--green)"}`}}>
+                <div style={{fontSize:11,color:"var(--muted)",marginBottom:4}}>{positivo?"SALDO A CARGO":"SALDO A FAVOR"}</div>
+                <div style={{fontSize:20,fontWeight:700,color:positivo?"var(--red)":"var(--green)"}}>{fmxN(Math.abs(saldoIVA))}</div>
+                <div style={{fontSize:10,color:"var(--muted)"}}>{positivo?"A pagar al SAT":"IVA a favor"}</div>
+              </div>
+            </div>
+            <div style={{marginTop:16,padding:"12px 16px",background:"var(--bg2)",borderRadius:8,fontSize:11}}>
+              <div style={{fontWeight:700,marginBottom:6,color:"var(--muted)",textTransform:"uppercase"}}>Desglose Utilidad Real (sin IVA)</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
+                <div>Ingresos netos (subtotal s/IVA):</div><div style={{textAlign:"right",fontWeight:700,color:"var(--green)"}}>{fmxN(ingresoNeto)}</div>
+                <div>Costos netos totales (s/IVA):</div><div style={{textAlign:"right",fontWeight:700,color:"var(--red)"}}>{fmxN(costoNetoTotal)}</div>
+                <div style={{fontWeight:700,borderTop:"1px solid var(--border)",paddingTop:4,marginTop:2}}>Utilidad Neta:</div>
+                <div style={{textAlign:"right",fontWeight:700,fontSize:15,color:utilidadNeta>=0?"var(--green)":"var(--red)",borderTop:"1px solid var(--border)",paddingTop:4,marginTop:2}}>{fmxN(utilidadNeta)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const VistaProveedores = () => {
     const porProv = proveedores.map(p=>{
       const gm   = maints.filter(m=>m.proveedorId===p.id).reduce((a,m)=>a+(Number(m.costoRef)||0)+(Number(m.costoMO)||0),0);
@@ -8435,6 +8619,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     ["nominas",        "👷 Nóminas"],
     ["viajes",         "🗺️ Viajes"],
     ["proveedores_chart","🏪 Proveedores"],
+    ["fiscal",           "🏛️ Fiscal / IVA"],
   ];
 
   return (
@@ -8457,6 +8642,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
       {vistaTab==="nominas"            && <VistaNominas/>}
       {vistaTab==="viajes"             && <VistaViajes/>}
       {vistaTab==="proveedores_chart"  && <VistaProveedores/>}
+      {vistaTab==="fiscal"              && <VistaFiscal/>}
     </div>
   );
 }
@@ -10390,7 +10576,7 @@ const AYUDA_DATA = [
       { q: "¿Cuál es la diferencia entre Gastos Generales y Costos de Viaje?",
         a: "Los Gastos Generales (renta, telefonía, servicios) se registran en Control → Gastos. Los costos de viaje (casetas, estadías, combustible específico de un viaje) se registran directamente en el viaje al editarlo. Ambos se consolidan en Gráficas & Reportes como costo operacional total." },
       { q: "¿Cómo registro un proveedor?",
-        a: "Ve a Control → Proveedores → '➕ Nuevo Proveedor'. Ingresa nombre, RFC, categoría (Refacciones, Talleres, Viajes, Servicios, etc.) y tipo de proveedor. Puedes asignarle días de crédito y límite de crédito. Los proveedores de contado (0 días de crédito) no generan alertas de vencimiento." },
+        a: "Ve a Control → Proveedores → '➕ Nuevo Proveedor'. Ingresa nombre, RFC, categoría y tipo de proveedor. Si la categoría o tipo que necesitas no está en la lista, selecciona '+ Nueva categoría...' o '+ Nuevo tipo...' y escribe el que necesitas. Puedes asignarle días de crédito y límite de crédito." },
       { q: "¿Cómo funciona el Saldo Pendiente del proveedor?",
         a: "El Saldo Pendiente se calcula automáticamente sumando todos los gastos, mantenimientos y viajes externos asociados a ese proveedor que aún no han sido liquidados. No necesitas llenarlo manualmente — se actualiza en tiempo real conforme registras y pagas cuentas." },
       { q: "¿Cómo funcionan las Cuentas por Pagar (CxP)?",
@@ -10405,8 +10591,16 @@ const AYUDA_DATA = [
     id: "reportes", icono: "📊", titulo: "Gráficas y Reportes",
     color: "var(--purple)",
     preguntas: [
-      { q: "¿Qué gráficas tiene el sistema?",
-        a: "Finanzas → Gráficas incluye 10 vistas: Utilidades vs Gastos mensuales, Desglose de gastos, Split propio/externo, Viajes por unidad, Costos por unidad, Rendimiento de combustible, Top clientes, Resumen de nóminas, Análisis de proveedores y Análisis de conducores." },
+      { q: "¿Qué vistas tiene el módulo de Gráficas & Reportes?",
+        a: "Finanzas → Gráficas incluye 11 vistas: Resumen, Unidades, Operadores, Combustible, Mantenimiento, Facturación, Gastos, Nóminas, Viajes, Proveedores y la nueva vista 🏛️ Fiscal / IVA para conciliación de impuestos." },
+      { q: "¿Qué muestra la vista Fiscal / IVA?",
+        a: "Muestra la conciliación de IVA del período seleccionado: IVA Trasladado (cobrado a clientes en facturas emitidas), IVA Acreditable (estimado al 16% sobre gastos y mantenimientos pagados a proveedores), Saldo IVA a cargo o a favor, y Utilidad Neta real ya descontado el IVA. Es una guía interna — para declaraciones fiscales usa los XML de tus proveedores." },
+      { q: "¿Cómo funciona el cálculo de IVA Acreditable?",
+        a: "El sistema estima el IVA acreditable al 16% sobre los montos de gastos generales y mantenimientos (costos de refacciones y mano de obra). Esto es una estimación — si tus proveedores son de régimen simplificado o exentos, el IVA real puede diferir. Registra la fecha de factura en cada gasto/mantenimiento para una mejor conciliación." },
+      { q: "¿Para qué sirve la Fecha de Factura en gastos y mantenimientos?",
+        a: "La fecha de factura es diferente a la fecha del gasto. Por ejemplo, un mantenimiento puede ejecutarse el día 15 pero la factura del taller llega el día 20. Al capturar la fecha de factura puedes conciliar correctamente los IVA acreditables por período fiscal (mes/bimestre) con tus proveedores de crédito." },
+      { q: "¿Dónde veo los comprobantes de pago adjuntos?",
+        a: "En Proveedores → Cuentas por Pagar, la columna 📎 muestra cuántos comprobantes tiene cada pago. Al hacer clic se abre la galería de comprobantes adjuntados durante la liquidación. También puedes reabrirlos con el botón '👁️ Ver' en cualquier pago ya liquidado." },
       { q: "¿Qué muestran los KPIs del Dashboard?",
         a: "El Dashboard muestra en tiempo real: unidades activas, viajes del mes, facturación, combustible, mantenimientos pendientes y alertas. La mayoría son clickeables para ver el detalle directamente." },
     ]
