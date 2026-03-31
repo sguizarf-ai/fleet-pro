@@ -1332,8 +1332,8 @@ function MaintModal({ maint, units, proveedores, onSave, onClose }) {
   const [uploading, setUploading] = useState(false);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const provs = (proveedores || []).filter(p => ["Talleres","Mano de Obra","Refacciones"].includes(p.categoria));
-  const provsRef = (proveedores || []).filter(p => ["Refacciones"].includes(p.categoria));
-  const provsTaller = (proveedores || []).filter(p => ["Talleres","Mano de Obra"].includes(p.categoria));
+  const provsRef    = (proveedores || []);  // Todos los proveedores disponibles
+  const provsTaller = (proveedores || []).filter(p => ["Talleres","Mano de Obra","Servicios","Llantas","Otro"].includes(p.categoria));
   const selectedProv = provs.find(p => p.id === f.proveedorId);
   const ok = (_e) => { if (!f.unidadId || !f.desc) return alert("Unidad y descripción requeridos"); onSave({ ...f, id: f.id || uid() }) };
   return (
@@ -1351,7 +1351,7 @@ function MaintModal({ maint, units, proveedores, onSave, onClose }) {
             <div className="field"><label>Realizado</label><select value={f.realizado} onChange={ch("realizado")}><option>NO</option><option>SI</option></select></div>
             <div className="field"><label>KM Servicio</label><input value={f.km} onChange={ch("km")} type="number" /></div>
             <div className="field">
-              <label>🔧 Proveedor Refacciones</label>
+              <label>🔧 Proveedor de Refacciones y Servicios</label>
               <select value={f.proveedorRefId||""} onChange={e => { const id = e.target.value; const pv = provsRef.find(p => p.id === id); setF(prev => ({ ...prev, proveedorRefId: id })) }}>
                 <option value="">— Sin vincular —</option>
                 {provsRef.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
@@ -2952,7 +2952,10 @@ function HojaViajeModal({ units, drivers, remitentes, onClose, companyLogo, comp
           <div className="fg">
             <div className="field" style={{ background: "#FFF9E6", border: "2px solid #FFB800" }}>
               <label>⏰ Hora de Cita *</label>
-              <input value={f.origenHoraCita} onChange={ch("origenHoraCita")} placeholder="08:00 hrs" />
+              <select value={f.origenHoraCita} onChange={ch("origenHoraCita")} style={{padding:"8px 10px",borderRadius:8,border:"2px solid #FFB800",background:"var(--bg0)",color:"var(--text)",width:"100%"}}>
+                <option value="">-- Seleccionar hora --</option>
+                {["00:00","00:30","01:00","01:30","02:00","02:30","03:00","03:30","04:00","04:30","05:00","05:30","06:00","06:30","07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30"].map(h => <option key={h} value={h+" hrs"}>{h} hrs</option>)}
+              </select>
             </div>
             <div className="field"><label>Cliente</label><input value={f.origenCliente} onChange={ch("origenCliente")} /></div>
             <div className="field s2"><label>Dirección</label><input value={f.origenDireccion} onChange={ch("origenDireccion")} /></div>
@@ -2964,7 +2967,10 @@ function HojaViajeModal({ units, drivers, remitentes, onClose, companyLogo, comp
           <div className="fg">
             <div className="field" style={{ background: "#FFF9E6", border: "2px solid #FFB800" }}>
               <label>⏰ Hora de Cita *</label>
-              <input value={f.destinoHoraCita} onChange={ch("destinoHoraCita")} placeholder="18:00 hrs" />
+              <select value={f.destinoHoraCita} onChange={ch("destinoHoraCita")} style={{padding:"8px 10px",borderRadius:8,border:"2px solid #FFB800",background:"var(--bg0)",color:"var(--text)",width:"100%"}}>
+                <option value="">-- Seleccionar hora --</option>
+                {["00:00","00:30","01:00","01:30","02:00","02:30","03:00","03:30","04:00","04:30","05:00","05:30","06:00","06:30","07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30"].map(h => <option key={h} value={h+" hrs"}>{h} hrs</option>)}
+              </select>
             </div>
             <div className="field"><label>Cliente</label><input value={f.destinoCliente} onChange={ch("destinoCliente")} /></div>
             <div className="field s2"><label>Dirección</label><input value={f.destinoDireccion} onChange={ch("destinoDireccion")} /></div>
@@ -10000,17 +10006,12 @@ ${c.notasImportantes&&c.notasImportantes.length>0 ? `
 
   const handleImprimir = () => {
     const html = htmlContent();
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    // En móvil: abrir en nueva pestaña (Safari puede guardarlo como PDF)
-    const a = document.createElement("a");
-    a.href = url;
-    a.target = "_blank";
-    a.rel = "noopener";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    const w = window.open("", "_blank");
+    if (!w) { alert("Permite ventanas emergentes para imprimir"); return; }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => { w.print(); }, 600);
   };
 
 
@@ -10175,6 +10176,8 @@ const AYUDA_DATA = [
         a: "Automáticamente. Cada conductor tiene configurado un % de comisión por viaje en su perfil. El sistema multiplica ese porcentaje por el ingreso del viaje completado. Puedes ver el desglose en Gráficas → Nóminas o en el módulo de Nóminas." },
       { q: "¿Qué diferencia hay entre viaje propio y logística externa en las finanzas?",
         a: "Viaje propio: genera ingreso para tu empresa, se asigna a una unidad de tu flota y afecta la nómina del operador. Logística externa: genera un costo (cuenta por pagar al transportista), no afecta tu flota ni nóminas. Ambos se pueden facturar al cliente desde el módulo de Facturación." },
+      { q: "¿Qué es la Hoja de Instrucción y cómo la genero?",
+        a: "La Hoja de Instrucción es un documento para el operador con los detalles del viaje: folio, unidad, ruta, hora de cita en origen y destino, datos del cliente, carga y notas. Se genera desde Viajes & Logística → botón '📋 Hoja de Instrucción'. Puedes seleccionar la hora de cita con un menú desplegable (intervalos de 30 minutos). Usa '🖨️ Imprimir / PDF' para abrir el diálogo de impresión y guardarla como PDF." },
     ]
   },
   {
@@ -10182,11 +10185,15 @@ const AYUDA_DATA = [
     color: "var(--yellow)",
     preguntas: [
       { q: "¿Cómo programo un mantenimiento?",
-        a: "Ve a Control → Mantenimientos → '➕ Nuevo'. Selecciona la unidad, tipo de servicio (preventivo/correctivo), fecha programada. Puedes vincular dos proveedores: uno para Refacciones (costo de partes) y otro para el Taller/Mano de Obra. Ambos generan su cuenta por pagar en Proveedores." },
+        a: "Ve a Control → Mantenimientos → '➕ Nuevo'. Selecciona la unidad, tipo de servicio (preventivo/correctivo), fecha programada. Puedes vincular dos proveedores: uno para 'Refacciones y Servicios', y otro para 'Taller/M.O.'. Ambos generan su cuenta por pagar de forma independiente en Proveedores → CxP." },
+      { q: "¿Qué proveedores puedo elegir en Proveedor de Refacciones y Servicios?",
+        a: "Cualquier proveedor registrado en el sistema sin importar su categoría: Llantas, Servicios, Refacciones, Talleres, etc. Así puedes asignar proveedores como 'Llantas y Servicios DEGA' aunque su categoría no sea Refacciones." },
+      { q: "¿Qué proveedores puedo elegir en Proveedor Taller / M.O.?",
+        a: "Proveedores de categoría Talleres, Mano de Obra, Servicios, Llantas u Otro. Si no aparece el que buscas, verifícalo en Control → Proveedores." },
+      { q: "¿Las cuentas de Refacciones y Taller se pagan por separado?",
+        a: "Sí, son completamente independientes. En Proveedores → Cuentas por Pagar aparecen como dos líneas separadas. Puedes liquidar la del Taller sin tocar la de Refacciones y viceversa." },
       { q: "¿Cómo sé qué unidades necesitan mantenimiento pronto?",
-        a: "El Dashboard muestra alertas de mantenimientos próximos. En el módulo Alertas (🔔 en el sidebar) verás todas las unidades con mantenimiento vencido o por vencer." },
-      { q: "¿Cómo funciona el seguimiento por KM?",
-        a: "En cada unidad defines los KM actuales y el intervalo de mantenimiento (ej: 5,000 km). Al registrar combustible con los KM recorridos, el sistema calcula automáticamente cuántos KM faltan para el próximo servicio." },
+        a: "El Dashboard muestra alertas de mantenimientos próximos por KM. La Ficha Técnica de cada unidad también muestra los KM faltantes para el próximo servicio con semáforo verde/naranja/rojo." },
       { q: "¿Puedo registrar mantenimientos correctivos (emergencias)?",
         a: "Sí. Al crear el mantenimiento, selecciona tipo 'Correctivo' y prioridad 'ALTA'. Puedes dejar la fecha programada como el mismo día del incidente." },
     ]
