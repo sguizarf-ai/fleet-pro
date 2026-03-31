@@ -6482,32 +6482,33 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
   };
 
   // Build a unified "pending payments" list for ALL provider types
-  const allPendingPayments = [
-    // From externos (transportistas)
-    ...externos.filter(e => e.pagoStatus !== "pagado" && (e.costoPagar||0) > 0).map(e => ({
+  const allCxpPayments = [
+    // From externos (transportistas) — todos, pagados y pendientes
+    ...externos.filter(e => (e.costoPagar||0) > 0).map(e => ({
       tipo: "viaje", id: e.id, label: `${e.empresa||"—"}: ${e.origen||""} → ${e.destino||""}`,
-      fecha: e.fecha, monto: Number(e.costoPagar)||0, status: e.pagoStatus||"pendiente",
+      fecha: e.fecha, pagoFecha: e.pagoFecha, monto: Number(e.costoPagar)||0, status: e.pagoStatus||"pendiente",
       proveedorId: e.proveedorId, data: e,
     })),
-    // From maints - refacciones (separate proveedor)
-    ...maints.filter(m => (m.pagoRefStatus||"pendiente") !== "pagado" && (Number(m.costoRef)||0) > 0 && m.proveedorRefId).map(m => ({
+    // From maints - refacciones
+    ...maints.filter(m => (Number(m.costoRef)||0) > 0 && m.proveedorRefId).map(m => ({
       tipo: "mantenimiento_ref", id: m.id+"_ref", label: `Refac: ${m.descripcion||m.tipo||"—"}`,
-      fecha: m.fecha, monto: Number(m.costoRef)||0, status: m.pagoRefStatus||"pendiente",
+      fecha: m.fecha, pagoFecha: m.pagoRefFecha, monto: Number(m.costoRef)||0, status: m.pagoRefStatus||"pendiente",
       proveedorId: m.proveedorRefId, data: m,
     })),
     // From maints - mano de obra / taller
-    ...maints.filter(m => (m.pagoMOStatus||"pendiente") !== "pagado" && (Number(m.costoMO)||0) > 0 && m.proveedorId).map(m => ({
+    ...maints.filter(m => (Number(m.costoMO)||0) > 0 && m.proveedorId).map(m => ({
       tipo: "mantenimiento_mo", id: m.id+"_mo", label: `Taller: ${m.descripcion||m.tipo||"—"}`,
-      fecha: m.fecha, monto: Number(m.costoMO)||0, status: m.pagoMOStatus||"pendiente",
+      fecha: m.fecha, pagoFecha: m.pagoMOFecha, monto: Number(m.costoMO)||0, status: m.pagoMOStatus||"pendiente",
       proveedorId: m.proveedorId, data: m,
     })),
-    // From gastos with pending balance
-    ...gastos.filter(g => g.pagoStatus !== "pagado" && (g.monto||0) > 0 && g.proveedorId).map(g => ({
+    // From gastos
+    ...gastos.filter(g => (g.monto||0) > 0 && g.proveedorId).map(g => ({
       tipo: "gasto", id: g.id, label: `Gasto: ${g.descripcion||g.tipo||"—"}`,
-      fecha: g.fecha, monto: Number(g.monto)||0, status: g.pagoStatus||"pendiente",
+      fecha: g.fecha, pagoFecha: g.pagoFecha, monto: Number(g.monto)||0, status: g.pagoStatus||"pendiente",
       proveedorId: g.proveedorId, data: g,
     })),
   ];
+  const allPendingPayments = allCxpPayments; // alias for stats
 
   // KPIs de crédito
   const conCredito = proveedores.filter(p => p.diasCredito > 0);
@@ -6676,15 +6677,17 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
 
       {/* ── Tab: Cuentas por Pagar — TODOS los proveedores ── */}
       {tab==="cxp" && (() => {
-        const fmx = n => "$"+Number(n||0).toLocaleString("es-MX",{minimumFractionDigits:2});
-        const totalPend = allPendingPayments.reduce((a,p)=>a+(Number(p.monto)||0),0);
+        const pendientes = allPendingPayments.filter(p=>p.status!=="pagado");
+        const pagadas = allPendingPayments.filter(p=>p.status==="pagado");
+        const totalPend = pendientes.reduce((a,p)=>a+(Number(p.monto)||0),0);
+        const totalPag  = pagadas.reduce((a,p)=>a+(Number(p.monto)||0),0);
         const tipoIcon = t => t==="viaje"?"🚛":t==="mantenimiento"?"🔧":t==="gasto"?"💵":"📋";
         return (
           <>
             <div className="stats" style={{marginBottom:14}}>
               <div className="stat" style={{"--c":"var(--orange)"}}>
                 <div className="stat-icon">⏳</div>
-                <div className="stat-val sm">{allPendingPayments.length}</div>
+                <div className="stat-val sm">{pendientes.length}</div>
                 <div className="stat-lbl">Por liquidar</div>
               </div>
               <div className="stat" style={{"--c":"var(--red)"}}>
@@ -6692,15 +6695,15 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
                 <div className="stat-val sm" style={{fontSize:15}}>{fmx(totalPend)}</div>
                 <div className="stat-lbl">Total pendiente</div>
               </div>
-              <div className="stat" style={{"--c":"var(--cyan)"}}>
-                <div className="stat-icon">🚛</div>
-                <div className="stat-val sm">{allPendingPayments.filter(p=>p.tipo==="viaje").length}</div>
-                <div className="stat-lbl">Transportistas</div>
+              <div className="stat" style={{"--c":"var(--green)"}}>
+                <div className="stat-icon">✅</div>
+                <div className="stat-val sm" style={{fontSize:15}}>{fmx(totalPag)}</div>
+                <div className="stat-lbl">Total pagado</div>
               </div>
-              <div className="stat" style={{"--c":"var(--purple)"}}>
-                <div className="stat-icon">🔧</div>
-                <div className="stat-val sm">{allPendingPayments.filter(p=>p.tipo==="mantenimiento").length}</div>
-                <div className="stat-lbl">Mantenimientos</div>
+              <div className="stat" style={{"--c":"var(--cyan)"}}>
+                <div className="stat-icon">📋</div>
+                <div className="stat-val sm">{allPendingPayments.length}</div>
+                <div className="stat-lbl">Total registros</div>
               </div>
             </div>
             <div className="card">
@@ -6725,17 +6728,19 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
                                 {pv?.tipoProv&&<div style={{fontSize:10,color:"var(--muted)"}}>{pv.tipoProv}</div>}
                               </td>
                               <td style={{fontSize:11,color:"var(--muted)",maxWidth:140,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.label}</td>
-                              <td style={{fontSize:12}}>{item.fecha||"—"}</td>
+                               <td style={{fontSize:12}}>{item.status==="pagado" ? <span style={{color:"var(--green)",fontWeight:600}}>{item.pagoFecha||item.fecha||"—"}</span> : (item.fecha||"—")}</td>
                               <td style={{textAlign:"right",fontWeight:700,color:"var(--orange)",fontFamily:"var(--font-hd)"}}>{fmx(item.monto)}</td>
                               <td><span style={{fontWeight:700,color:stColor,fontSize:12}}>{stIcon} {item.status==="pagado"?"Pagado":item.status==="parcial"?"Parcial":"Pendiente"}</span></td>
                               <td style={{fontSize:11,color:"var(--muted)"}}>{item.data?.pagoReferencia||"—"}</td>
                               <td style={{fontSize:11,color:"var(--muted)"}}>{item.data?.pagoFactura||"—"}</td>
                               <td style={{textAlign:"center"}}>
-                                {(item.data?.pagoEvidencias||[]).length > 0
-                                  ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal([...(item.data.pagoEvidencias||[]),...(item.data.facturaArchivos||[]),...(item.data.pagoRefEvidencias||[]),...(item.data.pagoRefFacturaArchivos||[]),...(item.data.pagoMOEvidencias||[]),...(item.data.pagoMOFacturaArchivos||[])])}>
-                                      📎 {(item.data.pagoEvidencias).length}
-                                    </button>
-                                  : <span style={{color:"var(--muted)",fontSize:10}}>—</span>}
+                                {(() => {
+                                  const d = item.data||{};
+                                  const all = [...(d.pagoEvidencias||[]),...(d.facturaArchivos||[]),...(d.pagoRefEvidencias||[]),...(d.pagoRefFacturaArchivos||[]),...(d.pagoMOEvidencias||[]),...(d.pagoMOFacturaArchivos||[])];
+                                  return all.length > 0
+                                    ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes/facturas" onClick={()=>setCompModal(all)} style={{fontSize:11}}>📎 {all.length}</button>
+                                    : <span style={{color:"var(--muted)",fontSize:10}}>—</span>;
+                                })()}
                               </td>
                               <td>
                                 <button className="btn btn-cyan btn-xs"
@@ -6743,7 +6748,7 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
                                     if(item.tipo==="viaje") setModalPago(item.data);
                                     else setModalProvPago({item, proveedor: pv});
                                   }}>
-                                  {item.status==="pagado"?"👁️ Ver":"💳 Pagar"}
+                                  {item.status==="pagado"?"✏️ Editar":"💳 Pagar"}
                                 </button>
                               </td>
                             </tr>
