@@ -6756,6 +6756,7 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
 function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [], onAdd, onEdit, onDelete }) {
   const [q, setQ] = useState("");
   const [tf, setTf] = useState("TODOS");
+  const [compModal, setCompModal] = useState(null);
 
   // Computed vars — fuera del return para evitar crashes
   const fil = gastos.filter(g =>
@@ -6796,7 +6797,7 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                 💵 Gastos Generales con Proveedor ({gastosConProv.length})
               </div>
               <table>
-                <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Proveedor</th><th>Monto</th><th>Estado</th><th>Acciones</th></tr></thead>
+                <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Proveedor</th><th>Monto</th><th>F.Factura</th><th>Estado</th><th>📎</th><th>Acciones</th></tr></thead>
                 <tbody>{gastosConProv.map(g => {
                   const prov = (proveedores||[]).find(p => p.id === g.proveedorId);
                   const st = g.pagoStatus === "pagado"
@@ -6809,7 +6810,9 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                       <td style={{fontSize:11}}>{g.descripcion||"—"}</td>
                       <td style={{fontSize:11}}>{prov ? <Bdg c="bp" t={prov.nombre}/> : "—"}</td>
                       <td style={{color:"var(--red)",fontWeight:700}}>{fmt$(g.monto)}</td>
+                      <td style={{fontSize:11,color:"var(--muted)"}}>{g.fechaFactura||"—"}</td>
                       <td><span style={{fontSize:11,fontWeight:700,color:st.c}}>{st.lbl}</span></td>
+                      <td>{(g.pagoEvidencias||[]).length>0 ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal(g.pagoEvidencias)} style={{fontSize:11}}>📎 {g.pagoEvidencias.length}</button> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
                       <td><div className="acts"><button className="btn btn-ghost btn-sm" onClick={()=>onEdit(g)}>✏️</button><button className="btn btn-red btn-sm" onClick={()=>onDelete(g.id)}>🗑</button></div></td>
                     </tr>
                   );
@@ -6824,7 +6827,7 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                 🔧 Mantenimientos con Proveedor ({maintsConProv.length})
               </div>
               <table>
-                <thead><tr><th>Fecha</th><th>Unidad</th><th>Descripción</th><th>Taller / M.O.</th><th>M.O. $</th><th>Refacciones</th><th>Ref. $</th><th>Total</th></tr></thead>
+                <thead><tr><th>Fecha</th><th>Unidad</th><th>Descripción</th><th>Taller / M.O.</th><th>M.O. $</th><th>Refacciones</th><th>Ref. $</th><th>Total</th><th>📎</th></tr></thead>
                 <tbody>{maintsConProv.map(m => {
                   const provMO  = (proveedores||[]).find(p => p.id === m.proveedorId);
                   const provRef = (proveedores||[]).find(p => p.id === m.proveedorRefId);
@@ -6843,6 +6846,7 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                       <td style={{fontSize:11}}>{provRef ? <Bdg c="bp" t={provRef.nombre}/> : "—"}</td>
                       <td style={{color:"var(--cyan)",fontWeight:700,fontSize:11}}>{cRef > 0 ? <>{fmt$(cRef)} {stRef}</> : "—"}</td>
                       <td style={{color:"var(--red)",fontWeight:700}}>{fmt$(cMO + cRef)}</td>
+                      <td>{((m.pagoRefEvidencias||[]).length+(m.pagoMOEvidencias||[]).length+(m.pagoEvidencias||[]).length)>0 ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal([...(m.pagoMOEvidencias||[]),(m.pagoRefEvidencias||[]),(m.pagoEvidencias||[])])} style={{fontSize:11}}>📎 {(m.pagoRefEvidencias||[]).length+(m.pagoMOEvidencias||[]).length+(m.pagoEvidencias||[]).length}</button> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
                     </tr>
                   );
                 })}</tbody>
@@ -6856,7 +6860,7 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                 🚛 Logística Externa / Transportistas ({extConProv.length})
               </div>
               <table>
-                <thead><tr><th>Fecha</th><th>Empresa</th><th>Ruta</th><th>Proveedor</th><th>Costo</th><th>Estado Pago</th></tr></thead>
+                <thead><tr><th>Fecha</th><th>Empresa</th><th>Ruta</th><th>Proveedor</th><th>Costo</th><th>Estado Pago</th><th>📎</th></tr></thead>
                 <tbody>{extConProv.map(e => {
                   const prov = (proveedores||[]).find(p => p.id === e.proveedorId);
                   const st = e.pagoStatus === "pagado"
@@ -6876,6 +6880,7 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                       </td>
                       <td style={{color:"var(--purple)",fontWeight:700}}>{fmt$(e.costoPagar)}</td>
                       <td><span style={{fontSize:11,fontWeight:700,color:st.c}}>{st.lbl}</span></td>
+                      <td>{(e.pagoEvidencias||[]).length>0 ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal(e.pagoEvidencias)} style={{fontSize:11}}>📎 {e.pagoEvidencias.length}</button> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
                     </tr>
                   );
                 })}</tbody>
@@ -6894,7 +6899,7 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
             {fil.length === 0
               ? <div className="empty"><div className="empty-icon">💵</div><p>Sin gastos registrados</p></div>
               : <table>
-                  <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Monto</th><th>Proveedor</th><th>Responsable</th><th>Acciones</th></tr></thead>
+                  <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Monto</th><th>F.Factura</th><th>Proveedor</th><th>Responsable</th><th>📎</th><th></th></tr></thead>
                   <tbody>{fil.map(g => {
                     const prov = (proveedores||[]).find(p => p.id === g.proveedorId);
                     return (
@@ -6903,8 +6908,10 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                         <td><Bdg c="bo" t={g.tipo} /></td>
                         <td style={{ fontSize: 12 }}>{g.descripcion || "—"}</td>
                         <td style={{ color: "var(--red)", fontWeight: 700 }}>{fmt$(g.monto)}</td>
-                        <td style={{ fontSize: 11 }}>{prov ? <Bdg c="bp" t={prov.nombre} /> : <span style={{ color: "var(--muted)" }}>—</span>}</td>
+                        <td style={{ fontSize: 11, color: "var(--muted)" }}>{g.fechaFactura||"—"}</td>
+                        <td style={{ fontSize: 11 }}>{prov ? <Bdg c="bp" t={prov.nombre} /> : <span style={{ color: "var(--muted)", fontSize: 10 }}>Sin proveedor</span>}</td>
                         <td style={{ fontSize: 12 }}>{g.responsable || "—"}</td>
+                        <td>{(g.pagoEvidencias||[]).length>0 ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal(g.pagoEvidencias)} style={{fontSize:11}}>📎 {g.pagoEvidencias.length}</button> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
                         <td><div className="acts"><button className="btn btn-ghost btn-sm" onClick={() => onEdit(g)}>✏️</button><button className="btn btn-red btn-sm" onClick={() => onDelete(g.id)}>🗑</button></div></td>
                       </tr>
                     );
@@ -6913,6 +6920,26 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
             }
           </div>
         </>
+      )}
+      {compModal && (
+        <div className="modal-ov" onClick={()=>setCompModal(null)}>
+          <div className="modal" style={{maxWidth:600}} onClick={e=>e.stopPropagation()}>
+            <div className="mhdr"><h3>📎 Comprobantes de Pago ({compModal.length})</h3>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setCompModal(null)}>✕</button>
+            </div>
+            <div style={{padding:16,display:"flex",flexWrap:"wrap",gap:12}}>
+              {compModal.map((src,i)=>
+                src.startsWith("data:image") || src.startsWith("http")
+                  ? <img key={i} src={src} style={{width:160,height:120,objectFit:"cover",borderRadius:8,border:"1px solid var(--border)"}} alt={`Comprobante ${i+1}`}/>
+                  : <div key={i} style={{width:160,height:120,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"var(--bg2)",borderRadius:8,border:"1px solid var(--border)",gap:6}}>
+                      <span style={{fontSize:32}}>📄</span>
+                      <a href={src} target="_blank" rel="noreferrer" style={{fontSize:11,color:"var(--cyan)"}}>Ver PDF</a>
+                      <span style={{fontSize:10,color:"var(--muted)"}}>Comprobante {i+1}</span>
+                    </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
