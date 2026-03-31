@@ -6846,7 +6846,7 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                       <td style={{fontSize:11}}>{provRef ? <Bdg c="bp" t={provRef.nombre}/> : "—"}</td>
                       <td style={{color:"var(--cyan)",fontWeight:700,fontSize:11}}>{cRef > 0 ? <>{fmt$(cRef)} {stRef}</> : "—"}</td>
                       <td style={{color:"var(--red)",fontWeight:700}}>{fmt$(cMO + cRef)}</td>
-                      <td>{((m.pagoRefEvidencias||[]).length+(m.pagoMOEvidencias||[]).length+(m.pagoEvidencias||[]).length)>0 ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal([...(m.pagoMOEvidencias||[]),(m.pagoRefEvidencias||[]),(m.pagoEvidencias||[])])} style={{fontSize:11}}>📎 {(m.pagoRefEvidencias||[]).length+(m.pagoMOEvidencias||[]).length+(m.pagoEvidencias||[]).length}</button> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
+                      <td>{((m.pagoRefEvidencias||[]).length+(m.pagoMOEvidencias||[]).length+(m.pagoEvidencias||[]).length)>0 ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal([...(m.pagoMOEvidencias||[]),...(m.pagoRefEvidencias||[]),...(m.pagoEvidencias||[])])} style={{fontSize:11}}>📎 {(m.pagoRefEvidencias||[]).length+(m.pagoMOEvidencias||[]).length+(m.pagoEvidencias||[]).length}</button> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
                     </tr>
                   );
                 })}</tbody>
@@ -7451,11 +7451,6 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
   const totalIvaACargo  = ivaTrasladadoTotal - ivaRetenidoClientes;
   const totalIvaAFavor  = ivaAcreditable + ivaAcredMaint;
   const saldoIVA        = totalIvaACargo - totalIvaAFavor;
-  // Utilidad real (sin IVA)
-  const ingresoNeto      = subtotalFacturado;
-  const costoNetoTotal   = baseGastosSinIVA + (baseMaintIVA - ivaAcredMaint) + totComb + totCostoViaj + totExternos;
-  const utilidadNeta     = ingresoNeto - costoNetoTotal;
-
   const totGastos    = fGastos.reduce((a,g)=>a+(Number(g.monto)||0),0);
   const totComb      = fFuels.reduce((a,f)=>a+(Number(f.litros)||0)*(Number(f.precio)||0),0);
   const totLitros    = fFuels.reduce((a,f)=>a+(Number(f.litros)||0),0);
@@ -7463,6 +7458,11 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
   const totIngresos  = fTrips.reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0);
   const totCostoViaj = fTrips.reduce((a,t)=>a+(Number(t.gastosExtras)||0)+(Number(t.costoEstadias)||0)+(Number(t.costoPagar)||0),0);
   const totExternos  = fExternos.reduce((a,e)=>a+(Number(e.costoPagar)||0),0);
+  // Utilidad real (sin IVA)
+  const ingresoNeto      = subtotalFacturado;
+  const costoNetoTotal   = baseGastosSinIVA + (baseMaintIVA - ivaAcredMaint) + totComb + totCostoViaj + totExternos;
+  const utilidadNeta     = ingresoNeto - costoNetoTotal;
+
   const totCostoOper = totComb+totMant+totGastos+totCostoViaj+totExternos;
   const utilidadBruta= totIngresos-totCostoOper;
   const margen       = totIngresos>0?((utilidadBruta/totIngresos)*100).toFixed(1):0;
