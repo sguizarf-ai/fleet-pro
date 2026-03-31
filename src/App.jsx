@@ -6238,6 +6238,7 @@ function PagoProveedorGenericoModal({ item, proveedor, branding, trips, maints, 
   const initFact   = isRef ? (data.pagoRefFactura||"") : isMO ? (data.pagoMOFactura||"") : (data.pagoFactura||"");
   const initNotas  = isRef ? (data.pagoRefNotas||"")  : isMO ? (data.pagoMONotas||"")  : (data.pagoNotas||"");
   const initEvidencias = isRef ? (data.pagoRefEvidencias||[]) : isMO ? (data.pagoMOEvidencias||[]) : (data.pagoEvidencias||[]);
+  const initFacturaArchivos = isRef ? (data.pagoRefFacturaArchivos||[]) : isMO ? (data.pagoMOFacturaArchivos||[]) : (data.pagoFacturaArchivos||[]);
   const [f, setF] = useState({
     pagoStatus:      initStatus,
     pagoFecha:       initFecha,
@@ -6246,6 +6247,7 @@ function PagoProveedorGenericoModal({ item, proveedor, branding, trips, maints, 
     pagoFactura:     initFact,
     pagoNotas:       initNotas,
     pagoEvidencias:  initEvidencias,
+    facturaArchivos:   initFacturaArchivos,
     pagoMontoParcial:data.pagoMontoParcial|| "",
   });
   const ch = k => e => setF(p=>({...p,[k]:e.target.value}));
@@ -6263,6 +6265,14 @@ function PagoProveedorGenericoModal({ item, proveedor, branding, trips, maints, 
     });
   };
   const delImg = idx => setF(p=>({...p,pagoEvidencias:p.pagoEvidencias.filter((_,i)=>i!==idx)}));
+  const handleFactura = e => {
+    Array.from(e.target.files).forEach(file => {
+      const r = new FileReader(); r.onload = ev => setF(p=>({...p,facturaArchivos:[...(p.facturaArchivos||[]),ev.target.result]}));
+      r.readAsDataURL(file);
+    });
+  };
+  const delFactura = idx => setF(p=>({...p,facturaArchivos:p.facturaArchivos.filter((_,i)=>i!==idx)}));
+  const [lightbox, setLightbox] = useState(null); // src to show full screen
 
   const handleWhatsApp = () => {
     const msg =
@@ -6358,17 +6368,40 @@ _${branding?.nombre||"Fleet Pro"} — Comprobante_`;
             <label style={lbl}>📝 Notas</label>
             <textarea value={f.pagoNotas} onChange={ch("pagoNotas")} rows={2} placeholder="Descuentos, condiciones, aclaraciones..." style={{...inp,resize:"vertical"}}/>
           </div>
+          {/* Comprobante de pago */}
           <div style={{marginBottom:12}}>
-            <label style={lbl}>📎 Comprobante</label>
-            <label style={{display:"inline-flex",alignItems:"center",gap:8,padding:"8px 14px",background:"var(--bg2)",border:"1.5px dashed var(--border)",borderRadius:8,cursor:"pointer",fontSize:12,color:"var(--cyan)"}}>
-              📎 Adjuntar archivo <input type="file" accept="image/*,application/pdf" multiple onChange={handleImg} style={{display:"none"}}/>
+            <label style={lbl}>📎 Comprobante de Pago</label>
+            <label style={{display:"inline-flex",alignItems:"center",gap:8,padding:"8px 14px",background:"var(--bg2)",border:"1px dashed var(--border)",borderRadius:8,cursor:"pointer",fontSize:12}}>
+              📎 Adjuntar comprobante <input type="file" accept="image/*,application/pdf" multiple onChange={handleImg} style={{display:"none"}}/>
             </label>
             {f.pagoEvidencias?.length>0 && (
               <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:8}}>
                 {f.pagoEvidencias.map((src,i)=>(
                   <div key={i} style={{position:"relative",width:72,height:72}}>
-                    <img src={src} style={{width:72,height:72,objectFit:"cover",borderRadius:8,border:"1px solid var(--border)"}} alt="ev"/>
-                    <button onClick={()=>delImg(i)} style={{position:"absolute",top:-6,right:-6,width:20,height:20,borderRadius:"50%",background:"var(--red)",color:"#fff",border:"none",fontSize:11,cursor:"pointer"}}>✕</button>
+                    {src.startsWith("data:image")||src.startsWith("http")
+                      ? <img src={src} onClick={()=>setLightbox(src)} style={{width:72,height:72,objectFit:"cover",borderRadius:8,border:"1px solid var(--border)",cursor:"zoom-in"}} title="Clic para ver en grande"/>
+                      : <div onClick={()=>setLightbox(src)} style={{width:72,height:72,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"var(--bg2)",borderRadius:8,border:"1px solid var(--border)",cursor:"pointer",gap:2}}><span style={{fontSize:26}}>📄</span><span style={{fontSize:9,color:"var(--cyan)"}}>PDF</span></div>}
+                    <button onClick={()=>delImg(i)} style={{position:"absolute",top:-6,right:-6,width:20,height:20,borderRadius:"50%",background:"var(--red)",color:"#fff",border:"none",cursor:"pointer",fontSize:12,lineHeight:1}}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Factura del proveedor */}
+          <div style={{marginBottom:12}}>
+            <label style={lbl}>🧾 Factura del Proveedor (XML / PDF / Imagen)</label>
+            <label style={{display:"inline-flex",alignItems:"center",gap:8,padding:"8px 14px",background:"var(--bg2)",border:"1px dashed var(--cyan)",borderRadius:8,cursor:"pointer",fontSize:12,color:"var(--cyan)"}}>
+              🧾 Adjuntar factura <input type="file" accept="image/*,application/pdf,.xml" multiple onChange={handleFactura} style={{display:"none"}}/>
+            </label>
+            {f.facturaArchivos?.length>0 && (
+              <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:8}}>
+                {f.facturaArchivos.map((src,i)=>(
+                  <div key={i} style={{position:"relative",width:72,height:72}}>
+                    {src.startsWith("data:image")||src.startsWith("http")
+                      ? <img src={src} onClick={()=>setLightbox(src)} style={{width:72,height:72,objectFit:"cover",borderRadius:8,border:"1px solid var(--cyan)",cursor:"zoom-in"}} title="Clic para ver en grande"/>
+                      : <div onClick={()=>setLightbox(src)} style={{width:72,height:72,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"var(--bg2)",borderRadius:8,border:"1px solid var(--cyan)",cursor:"pointer",gap:2}}><span style={{fontSize:26}}>🧾</span><span style={{fontSize:9,color:"var(--cyan)"}}>Factura</span></div>}
+                    <button onClick={()=>delFactura(i)} style={{position:"absolute",top:-6,right:-6,width:20,height:20,borderRadius:"50%",background:"var(--red)",color:"#fff",border:"none",cursor:"pointer",fontSize:12,lineHeight:1}}>×</button>
                   </div>
                 ))}
               </div>
@@ -6380,6 +6413,20 @@ _${branding?.nombre||"Fleet Pro"} — Comprobante_`;
           <button className="btn btn-ghost" style={{color:"var(--green)",border:"1px solid var(--green)"}} onClick={handleWhatsApp}>💬 WhatsApp</button>
           <button className="btn btn-cyan" onClick={()=>onSave({...data,...f})}>💾 Guardar Pago</button>
         </div>
+      {/* Lightbox */}
+      {lightbox && (
+        <div onClick={()=>setLightbox(null)} style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div onClick={e=>e.stopPropagation()} style={{position:"relative",maxWidth:"90vw",maxHeight:"90vh"}}>
+            <button onClick={()=>setLightbox(null)} style={{position:"absolute",top:-16,right:-16,width:32,height:32,borderRadius:"50%",background:"var(--red)",color:"#fff",border:"none",cursor:"pointer",fontSize:18,zIndex:1}}>×</button>
+            {lightbox.startsWith("data:image")||lightbox.startsWith("http")
+              ? <img src={lightbox} style={{maxWidth:"88vw",maxHeight:"88vh",borderRadius:12,boxShadow:"0 8px 40px rgba(0,0,0,.6)"}}/>
+              : <div style={{padding:40,background:"var(--bg1)",borderRadius:12,textAlign:"center"}}>
+                  <div style={{fontSize:64,marginBottom:16}}>📄</div>
+                  <a href={lightbox} target="_blank" rel="noreferrer" style={{color:"var(--cyan)",fontSize:16}}>Abrir PDF en nueva pestaña</a>
+                </div>}
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );
@@ -6391,6 +6438,7 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
   const [modalPago, setModalPago] = useState(null); // externo being paid (transportista)
   const [modalProvPago, setModalProvPago] = useState(null); // generic provider payment
   const [compModal, setCompModal] = useState(null); // comprobantes/evidencias viewer
+  const [lightboxProv, setLightboxProv] = useState(null); // lightbox para ver archivos en grande
   const fil = proveedores.filter(p => (p.nombre + p.contacto + (p.tipoProv||"")).toLowerCase().includes(q.toLowerCase()) && (cf === "TODOS" || p.tipoProv === cf));
 
   const getStats = (pvId) => {
@@ -6672,7 +6720,7 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
                               <td style={{fontSize:11,color:"var(--muted)"}}>{item.data?.pagoFactura||"—"}</td>
                               <td style={{textAlign:"center"}}>
                                 {(item.data?.pagoEvidencias||[]).length > 0
-                                  ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal(item.data.pagoEvidencias)}>
+                                  ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal([...(item.data.pagoEvidencias||[]),...(item.data.facturaArchivos||[]),...(item.data.pagoRefEvidencias||[]),...(item.data.pagoRefFacturaArchivos||[]),...(item.data.pagoMOEvidencias||[]),...(item.data.pagoMOFacturaArchivos||[])])}>
                                       📎 {(item.data.pagoEvidencias).length}
                                     </button>
                                   : <span style={{color:"var(--muted)",fontSize:10}}>—</span>}
@@ -6711,23 +6759,22 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
       )}
       {compModal && (
         <div className="modal-ov" onClick={()=>setCompModal(null)}>
-          <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:600}}>
-            <div className="mhdr"><h3>📎 Comprobantes de Pago ({compModal.length})</h3>
+          <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:650}}>
+            <div className="mhdr"><h3>📎 Archivos del Pago ({compModal.length})</h3>
               <button className="btn btn-ghost btn-sm" onClick={()=>setCompModal(null)}>✕</button>
             </div>
             <div className="mbody">
               <div style={{display:"flex",flexWrap:"wrap",gap:12,padding:8}}>
                 {compModal.map((src,i) => (
-                  <a key={i} href={src} target="_blank" rel="noopener noreferrer"
-                     style={{display:"block",border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
+                  <div key={i} style={{display:"flex",flexDirection:"column",gap:4,alignItems:"center"}}>
                     {src.startsWith("data:image") || src.match(/\.(jpg|jpeg|png|gif|webp)/i)
-                      ? <img src={src} style={{width:160,height:120,objectFit:"cover"}} alt={`Comprobante ${i+1}`}/>
-                      : <div style={{width:160,height:120,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--bg2)",fontSize:12,color:"var(--cyan)",flexDirection:"column",gap:4}}>
-                          <span style={{fontSize:32}}>📄</span>
-                          <span>Comprobante {i+1}</span>
-                          <span style={{fontSize:10,color:"var(--muted)"}}>Click para abrir</span>
+                      ? <img src={src} onClick={()=>setLightboxProv(src)} style={{width:160,height:120,objectFit:"cover",borderRadius:8,border:"1px solid var(--border)",cursor:"zoom-in"}} title="Clic para ver en grande" alt={`Archivo ${i+1}`}/>
+                      : <div onClick={()=>setLightboxProv(src)} style={{width:160,height:120,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"var(--bg2)",borderRadius:8,border:"1px solid var(--border)",gap:6,cursor:"pointer"}}>
+                          <span style={{fontSize:36}}>📄</span>
+                          <span style={{fontSize:10,color:"var(--cyan)"}}>Ver archivo</span>
                         </div>}
-                  </a>
+                    <span style={{fontSize:10,color:"var(--muted)"}}>Archivo {i+1}</span>
+                  </div>
                 ))}
               </div>
             </div>
@@ -6748,6 +6795,19 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
           onClose={() => setModalProvPago(null)}
         />
       )}
+      {lightboxProv && (
+        <div onClick={()=>setLightboxProv(null)} style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div onClick={e=>e.stopPropagation()} style={{position:"relative",maxWidth:"90vw",maxHeight:"90vh"}}>
+            <button onClick={()=>setLightboxProv(null)} style={{position:"absolute",top:-16,right:-16,width:32,height:32,borderRadius:"50%",background:"var(--red)",color:"#fff",border:"none",cursor:"pointer",fontSize:18,zIndex:1}}>×</button>
+            {lightboxProv.startsWith("data:image")||lightboxProv.startsWith("http")
+              ? <img src={lightboxProv} style={{maxWidth:"88vw",maxHeight:"88vh",borderRadius:12,boxShadow:"0 8px 40px rgba(0,0,0,.6)"}}/>
+              : <div style={{padding:40,background:"var(--bg1)",borderRadius:12,textAlign:"center"}}>
+                  <div style={{fontSize:64,marginBottom:16}}>📄</div>
+                  <a href={lightboxProv} target="_blank" rel="noreferrer" style={{color:"var(--cyan)",fontSize:16}}>Abrir en nueva pestaña</a>
+                </div>}
+          </div>
+        </div>
+      )}
   </div>
   );
 }
@@ -6757,6 +6817,7 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
   const [q, setQ] = useState("");
   const [tf, setTf] = useState("TODOS");
   const [compModal, setCompModal] = useState(null);
+  const [compModal2, setCompModal2] = useState(null); // lightbox
 
   // Computed vars — fuera del return para evitar crashes
   const fil = gastos.filter(g =>
@@ -6812,7 +6873,7 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                       <td style={{color:"var(--red)",fontWeight:700}}>{fmt$(g.monto)}</td>
                       <td style={{fontSize:11,color:"var(--muted)"}}>{g.fechaFactura||"—"}</td>
                       <td><span style={{fontSize:11,fontWeight:700,color:st.c}}>{st.lbl}</span></td>
-                      <td>{(g.pagoEvidencias||[]).length>0 ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal(g.pagoEvidencias)} style={{fontSize:11}}>📎 {g.pagoEvidencias.length}</button> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
+                      <td>{((g.pagoEvidencias||[]).length+(g.facturaArchivos||[]).length)>0 ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal([...(g.pagoEvidencias||[]),...(g.facturaArchivos||[])])} style={{fontSize:11}}>📎 {(g.pagoEvidencias||[]).length+(g.facturaArchivos||[]).length}</button> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
                       <td><div className="acts"><button className="btn btn-ghost btn-sm" onClick={()=>onEdit(g)}>✏️</button><button className="btn btn-red btn-sm" onClick={()=>onDelete(g.id)}>🗑</button></div></td>
                     </tr>
                   );
@@ -6880,7 +6941,7 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                       </td>
                       <td style={{color:"var(--purple)",fontWeight:700}}>{fmt$(e.costoPagar)}</td>
                       <td><span style={{fontSize:11,fontWeight:700,color:st.c}}>{st.lbl}</span></td>
-                      <td>{(e.pagoEvidencias||[]).length>0 ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal(e.pagoEvidencias)} style={{fontSize:11}}>📎 {e.pagoEvidencias.length}</button> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
+                      <td>{((e.pagoEvidencias||[]).length+(e.facturaArchivos||[]).length)>0 ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal([...(e.pagoEvidencias||[]),...(e.facturaArchivos||[])])} style={{fontSize:11}}>📎 {(e.pagoEvidencias||[]).length+(e.facturaArchivos||[]).length}</button> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
                     </tr>
                   );
                 })}</tbody>
@@ -6923,21 +6984,39 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
       )}
       {compModal && (
         <div className="modal-ov" onClick={()=>setCompModal(null)}>
-          <div className="modal" style={{maxWidth:600}} onClick={e=>e.stopPropagation()}>
-            <div className="mhdr"><h3>📎 Comprobantes de Pago ({compModal.length})</h3>
+          <div className="modal" style={{maxWidth:650}} onClick={e=>e.stopPropagation()}>
+            <div className="mhdr"><h3>📎 Archivos del Pago ({compModal.length})</h3>
               <button className="btn btn-ghost btn-sm" onClick={()=>setCompModal(null)}>✕</button>
             </div>
             <div style={{padding:16,display:"flex",flexWrap:"wrap",gap:12}}>
               {compModal.map((src,i)=>
                 src.startsWith("data:image") || src.startsWith("http")
-                  ? <img key={i} src={src} style={{width:160,height:120,objectFit:"cover",borderRadius:8,border:"1px solid var(--border)"}} alt={`Comprobante ${i+1}`}/>
-                  : <div key={i} style={{width:160,height:120,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"var(--bg2)",borderRadius:8,border:"1px solid var(--border)",gap:6}}>
-                      <span style={{fontSize:32}}>📄</span>
-                      <a href={src} target="_blank" rel="noreferrer" style={{fontSize:11,color:"var(--cyan)"}}>Ver PDF</a>
-                      <span style={{fontSize:10,color:"var(--muted)"}}>Comprobante {i+1}</span>
+                  ? <div key={i} style={{display:"flex",flexDirection:"column",gap:4,alignItems:"center"}}>
+                      <img src={src} onClick={()=>setCompModal2(src)} style={{width:160,height:120,objectFit:"cover",borderRadius:8,border:"1px solid var(--border)",cursor:"zoom-in"}} title="Clic para ver en grande"/>
+                      <span style={{fontSize:10,color:"var(--muted)"}}>Archivo {i+1}</span>
+                    </div>
+                  : <div key={i} style={{display:"flex",flexDirection:"column",gap:4,alignItems:"center"}}>
+                      <div onClick={()=>setCompModal2(src)} style={{width:160,height:120,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"var(--bg2)",borderRadius:8,border:"1px solid var(--border)",gap:6,cursor:"pointer"}}>
+                        <span style={{fontSize:32}}>📄</span>
+                        <span style={{fontSize:10,color:"var(--cyan)"}}>Ver archivo</span>
+                      </div>
+                      <span style={{fontSize:10,color:"var(--muted)"}}>Archivo {i+1}</span>
                     </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+      {compModal2 && (
+        <div onClick={()=>setCompModal2(null)} style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div onClick={e=>e.stopPropagation()} style={{position:"relative",maxWidth:"90vw",maxHeight:"90vh"}}>
+            <button onClick={()=>setCompModal2(null)} style={{position:"absolute",top:-16,right:-16,width:32,height:32,borderRadius:"50%",background:"var(--red)",color:"#fff",border:"none",cursor:"pointer",fontSize:18,zIndex:1}}>×</button>
+            {compModal2.startsWith("data:image")||compModal2.startsWith("http")
+              ? <img src={compModal2} style={{maxWidth:"88vw",maxHeight:"88vh",borderRadius:12,boxShadow:"0 8px 40px rgba(0,0,0,.6)"}}/>
+              : <div style={{padding:40,background:"var(--bg1)",borderRadius:12,textAlign:"center"}}>
+                  <div style={{fontSize:64,marginBottom:16}}>📄</div>
+                  <a href={compModal2} target="_blank" rel="noreferrer" style={{color:"var(--cyan)",fontSize:16}}>Abrir en nueva pestaña</a>
+                </div>}
           </div>
         </div>
       )}
@@ -11613,6 +11692,7 @@ export default function App() {
                   pagoRefFactura:     updated.pagoFactura,
                   pagoRefNotas:       updated.pagoNotas,
                   pagoRefEvidencias:  updated.pagoEvidencias,
+                  pagoRefFacturaArchivos: updated.facturaArchivos,
                 });
               } else if (tipo === "mantenimiento_mo") {
                 const orig = maints.find(m => m.id === updated.id);
@@ -11624,6 +11704,7 @@ export default function App() {
                   pagoMOFactura:     updated.pagoFactura,
                   pagoMONotas:       updated.pagoNotas,
                   pagoMOEvidencias:  updated.pagoEvidencias,
+                  pagoMOFacturaArchivos: updated.facturaArchivos,
                 });
               } else if (tipo === "gasto") {
                 GC.save(updated);
