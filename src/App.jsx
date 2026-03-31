@@ -6970,7 +6970,7 @@ function FuelPage({ units, fuels, onAdd, onEdit, onDelete }) {
 const ALMACEN_CATS = ["Refacciones","Herramientas","Lubricantes","Filtros","Llantas","Eléctrico","Consumibles","Seguridad","Otro"];
 const ALMACEN_UNIDADES = ["pieza","litro","galón","kit","par","juego","caja","metro"];
 
-function AlmacenModal({ item, onSave, onClose }) {
+function AlmacenModal({ item, proveedores = [], onSave, onClose }) {
   const [f, setF] = useState(item || {
     nombre:"", categoria:ALMACEN_CATS[0], marca:"", numParte:"",
     unidad:"pieza", stockMin:1, stockActual:0, ubicacion:"",
@@ -6978,6 +6978,10 @@ function AlmacenModal({ item, onSave, onClose }) {
   });
   const [uploading, setUploading] = useState(false);
   const ch = k => e => setF(p=>({...p,[k]:e.target.value}));
+  // Proveedores disponibles para almacén (excluir Talleres y Mano de Obra)
+  const provsAlmacen = proveedores.filter(p =>
+    !["Talleres","Mano de Obra"].includes(p.categoria)
+  );
   const ok = () => {
     if (!f.nombre) return alert("Nombre requerido");
     onSave({...f, id: f.id||uid()});
@@ -7018,7 +7022,16 @@ function AlmacenModal({ item, onSave, onClose }) {
             <div className="field"><label>Stock Mínimo</label><input value={f.stockMin} onChange={ch("stockMin")} type="number" min="0"/></div>
             <div className="field"><label>Precio Unitario ($) <span style={{fontSize:10,color:"var(--muted)",fontWeight:400}}>(referencia)</span></label><input value={f.precio} onChange={ch("precio")} type="number" min="0" placeholder="Solo referencia, no afecta finanzas"/></div>
             <div className="field"><label>Ubicación / Rack</label><input value={f.ubicacion} onChange={ch("ubicacion")} placeholder="Ej: Estante A-3"/></div>
-            <div className="field"><label>Proveedor habitual</label><input value={f.proveedor} onChange={ch("proveedor")} placeholder="Ej: Autozone"/></div>
+            <div className="field"><label>Proveedor habitual</label>
+              {provsAlmacen.length > 0 ? (
+                <select value={f.proveedor} onChange={ch("proveedor")}>
+                  <option value="">— Sin proveedor —</option>
+                  {provsAlmacen.map(p => <option key={p.id} value={p.nombre}>{p.nombre} ({p.categoria})</option>)}
+                </select>
+              ) : (
+                <input value={f.proveedor} onChange={ch("proveedor")} placeholder="Ej: Autozone"/>
+              )}
+            </div>
             <div className="field s2"><label>Notas</label><textarea value={f.notas} onChange={ch("notas")} rows={2}/></div>
           </div>
         </div>
@@ -7118,6 +7131,75 @@ function AlmacenPage({ almacen, isAdmin, onAdd, onEdit, onDelete }) {
   const stockBajo = almacen.filter(a=>(Number(a.stockActual)||0)<=(Number(a.stockMin)||1)).length;
   const valorTotal = almacen.reduce((s,a)=>(s+(Number(a.stockActual)||0)*(Number(a.precio)||0)),0);
 
+  const printReporteInventario = () => {
+    const fecha = new Date().toLocaleDateString("es-MX",{day:"2-digit",month:"long",year:"numeric"});
+    const fmtN = n => Number(n||0).toLocaleString("es-MX");
+    const fmtP = n => "$"+Number(n||0).toLocaleString("es-MX",{minimumFractionDigits:2});
+    // Agrupar por categoría
+    const cats = [...new Set(almacen.map(a=>a.categoria||"Sin categoría"))].sort();
+    const rows = cats.map(cat => {
+      const items = almacen.filter(a=>(a.categoria||"Sin categoría")===cat);
+      return `
+        <tr style="background:#E8F5FA"><td colspan="7" style="font-weight:700;color:#006699;padding:8px 10px;font-size:12px">📦 ${cat} (${items.length} artículos)</td></tr>
+        ${items.map(a=>{
+          const stk = Number(a.stockActual)||0;
+          const min = Number(a.stockMin)||1;
+          const val = stk*(Number(a.precio)||0);
+          const color = stk===0?"#C62828":stk<=min?"#E65100":"#2E7D32";
+          const estado = stk===0?"❌ Sin stock":stk<=min?"⚠️ Stock bajo":"✅ OK";
+          return `<tr>
+            <td style="font-size:11px;padding:6px 10px">${a.nombre||"—"}</td>
+            <td style="font-size:11px">${a.marca||"—"}</td>
+            <td style="font-size:11px;font-family:monospace">${a.numParte||"—"}</td>
+            <td style="font-size:11px;text-align:center;font-weight:700;color:${color}">${fmtN(stk)} ${a.unidad||""}</td>
+            <td style="font-size:11px;text-align:center;color:#666">${fmtN(min)} ${a.unidad||""}</td>
+            <td style="font-size:11px;text-align:right;color:#0066CC;font-weight:600">${a.precio>0?fmtP(val):"—"}</td>
+            <td style="font-size:11px;font-weight:700;color:${color}">${estado}</td>
+          </tr>`;
+        }).join("")}
+      `;
+    }).join("");
+    const totalValor = almacen.reduce((s,a)=>s+(Number(a.stockActual)||0)*(Number(a.precio)||0),0);
+    const totalBajo  = almacen.filter(a=>(Number(a.stockActual)||0)<=(Number(a.stockMin)||1)).length;
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
+      <title>Reporte de Inventario</title>
+      <style>
+        body{font-family:Arial,sans-serif;padding:20px;color:#000;max-width:900px;margin:0 auto}
+        h1{font-size:18px;color:#0099CC;border-bottom:3px solid #0099CC;padding-bottom:6px;margin-bottom:4px}
+        .sub{font-size:11px;color:#666;margin-bottom:16px}
+        .kpis{display:flex;gap:20px;margin-bottom:16px}
+        .kpi{border:1px solid #ddd;border-radius:8px;padding:10px 16px;flex:1;text-align:center}
+        .kpi .val{font-size:20px;font-weight:700;color:#0099CC}
+        .kpi .lbl{font-size:10px;color:#666;text-transform:uppercase}
+        table{width:100%;border-collapse:collapse;margin-bottom:12px}
+        th{background:#0099CC;color:#fff;padding:7px 10px;text-align:left;font-size:11px}
+        td{padding:5px 10px;border-bottom:1px solid #eee}
+        tr:hover{background:#f9f9f9}
+        @media print{@page{size:A4;margin:10mm}.no-print{display:none}}
+      </style></head><body>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h1>📦 REPORTE DE INVENTARIO — ALMACÉN</h1>
+        <div style="font-size:11px;color:#666;text-align:right">${fecha}</div>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><div class="val">${almacen.length}</div><div class="lbl">Total artículos</div></div>
+        <div class="kpi"><div class="val" style="color:${totalBajo>0?"#C62828":"#2E7D32"}">${totalBajo}</div><div class="lbl">Stock bajo / sin stock</div></div>
+        <div class="kpi"><div class="val" style="color:#E65100">${fmtP(totalValor)}</div><div class="lbl">Valor total inventario</div></div>
+      </div>
+      <button class="no-print" onclick="window.print()" style="background:#0099CC;color:#fff;border:none;padding:8px 18px;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:14px">🖨️ Imprimir / Guardar PDF</button>
+      <table>
+        <thead><tr><th>Artículo</th><th>Marca</th><th>No. Parte</th><th style="text-align:center">Stock Actual</th><th style="text-align:center">Stock Mín.</th><th style="text-align:right">Valor</th><th>Estado</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div style="font-size:10px;color:#999;text-align:right;margin-top:8px">Generado por Fleet Pro v6 · ${fecha}</div>
+    </body></html>`;
+    const w = window.open("","_blank");
+    if (!w) { alert("Permite ventanas emergentes para generar el reporte"); return; }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+  };
+
   return (
     <div>
       <div className="stats" style={{marginBottom:18}}>
@@ -7131,6 +7213,7 @@ function AlmacenPage({ almacen, isAdmin, onAdd, onEdit, onDelete }) {
         <div className="card-hdr">
           <h3>📦 Almacén ({fil.length})</h3>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <button className="btn btn-ghost btn-sm" onClick={printReporteInventario}>📊 Reporte</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>setMovModal({})}>📋 Registrar Movimiento</button>
             {isAdmin&&onAdd&&<button className="btn btn-cyan btn-sm" onClick={onAdd}>➕ Nuevo Artículo</button>}
           </div>
@@ -10205,15 +10288,19 @@ const AYUDA_DATA = [
       { q: "¿Para qué sirve el módulo de Almacén?",
         a: "Permite llevar el control de inventario de refacciones, herramientas, lubricantes y cualquier artículo que uses en el taller. Puedes registrar stock actual, stock mínimo de alerta, foto, número de parte, proveedor habitual y ubicación física en el almacén." },
       { q: "¿Cómo agrego un artículo al almacén?",
-        a: "Ve a Control → Almacén → '➕ Nuevo Artículo'. Llena el nombre, categoría (Refacciones, Herramientas, Lubricantes, Filtros, Llantas, Eléctrico, Consumibles, Seguridad u Otro personalizado), marca, número de parte, unidad de medida, stock actual y stock mínimo. Puedes agregar foto desde Cloudinary." },
+        a: "Ve a Control → Almacén → '➕ Nuevo Artículo'. Llena el nombre, categoría, marca, número de parte, unidad de medida, stock actual y mínimo. En 'Proveedor habitual' puedes seleccionar directamente desde la lista de proveedores registrados (excluye talleres y mano de obra). Puedes agregar foto desde Cloudinary." },
       { q: "¿Cómo registro una entrada o salida de inventario?",
         a: "Haz clic en '📋 Mov.' en la tarjeta del artículo, o en el botón '📋 Registrar Movimiento' del encabezado. Selecciona el artículo, el tipo (Entrada = compra/recepción, Salida = uso en mantenimiento, Ajuste = corrección de inventario), la cantidad y el motivo. El stock se actualiza automáticamente." },
       { q: "¿Qué significan los colores en las tarjetas de artículos?",
         a: "La franja izquierda de cada tarjeta indica el estado del stock: 🟢 Verde = stock por encima del mínimo (todo bien), 🟡 Amarillo = stock igual o por debajo del mínimo (reabastecer pronto), 🔴 Rojo = sin stock (crítico). El KPI 'Stock Bajo' en la parte superior muestra cuántos artículos están en alerta." },
       { q: "¿El precio del artículo afecta las finanzas?",
         a: "No directamente. El precio unitario en el almacén es solo de referencia para calcular el valor total del inventario. Para registrar un gasto financiero real (como una compra de refacciones), debes registrarlo también en Gastos Generales o vincularlo a un mantenimiento con su proveedor de refacciones." },
+      { q: "¿Cómo asigno un proveedor habitual a un artículo?",
+        a: "Al agregar o editar un artículo en Almacén, el campo 'Proveedor habitual' muestra un selector con todos los proveedores registrados en el sistema, excepto los de categoría Talleres y Mano de Obra. Así puedes vincular fácilmente el artículo a su proveedor de compra habitual (Refaccionaria, Llantera, Distribuidor, etc.)." },
       { q: "¿Cómo busco un artículo específico?",
         a: "Usa la barra de búsqueda para filtrar por nombre. También puedes filtrar por categoría con el selector desplegable que está junto a la búsqueda. El historial de los últimos movimientos aparece al final de la pantalla." },
+      { q: "¿Cómo genero un reporte de inventario?",
+        a: "En Control → Almacén, haz clic en el botón '📊 Reporte'. Se abre una hoja de reporte con todos los artículos agrupados por categoría, mostrando: stock actual vs mínimo, valor por artículo y estado (✅ OK / ⚠️ Stock bajo / ❌ Sin stock), más el valor total del inventario. Desde esa pantalla puedes imprimirlo o guardarlo como PDF con el botón '🖨️ Imprimir / Guardar PDF'." },
     ]
   },
   {
@@ -11359,7 +11446,7 @@ export default function App() {
       {modal?.type === "driver" && <DriverModal key={modal.data?.id || modal._ts || "new-driver"} driver={modal.data} units={units} onSave={d => DC.save({ ...d, id: d.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "unit" && <UnitModal key={modal.data?.id || modal._ts || "new-unit"} unit={modal.data} drivers={drivers} tiposPersonalizados={tiposPersonalizados} onAddTipo={async (t) => { const newTipos = [...tiposPersonalizados, t]; setTiposPersonalizados(newTipos); await sv("fp6:tipos", newTipos); }} onSave={u => UC.save({ ...u, id: u.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "doc" && <DocModal key={modal.data?.id || modal._ts || "new-doc"} doc={modal.data} units={units} drivers={drivers} onSave={d => DoC.save({ ...d, id: d.id || uid() })} onClose={() => setModal(null)} />}
-      {modal?.type === "almacen" && <AlmacenModal item={modal.data} onSave={d=>ALC.save({...d,id:d.id||uid()})} onClose={()=>setModal(null)}/>}
+      {modal?.type === "almacen" && <AlmacenModal item={modal.data} proveedores={proveedores} onSave={d=>ALC.save({...d,id:d.id||uid()})} onClose={()=>setModal(null)}/>}
       {modal?.type === "maint" && <MaintModal key={modal.data?.id || modal._ts || "new-maint"} maint={modal.data} units={units} proveedores={proveedores} onSave={m => MC.save({ ...m, id: m.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "fuel" && <FuelModal key={modal.data?.id || modal._ts || "new-fuel"} fuel={modal.data} units={units} onSave={f => FC.save({ ...f, id: f.id || uid() })} onClose={() => setModal(null)} onUpdateUnit={UC.save} />}
       {modal?.type === "trip" && <TripModal key={modal.data?.id || modal._ts || "new-trip"} trip={modal.data} units={units} onSave={t => TC.save({ ...t, id: t.id || uid(), esExterno: false })} onClose={() => setModal(null)} />}
