@@ -1738,6 +1738,8 @@ _${branding?.nombre||"Fleet Pro"} — Comprobante de liquidación_`;
 function GastoModal({ gasto, proveedores, onSave, onClose }) {
   const [f, setF] = useState(gasto || { fecha: "", fechaFactura: "", tipo: GASTO_TIPOS[0], descripcion: "", monto: 0, responsable: "", proveedorId: "", pagoStatus: "pendiente" });
   const [uploading, setUploading] = useState(false);
+  const [nuevoTipoInput, setNuevoTipoInput] = useState("");
+  const gastosCustomTipos = (gasto?.customTipos||[]);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const ok = (_e) => { if (!f.tipo || !f.monto) return alert("Tipo y monto requeridos"); onSave({ ...f, id: f.id || uid() }) };
   const selectedProv = (proveedores||[]).find(p => p.id === f.proveedorId);
@@ -1749,7 +1751,19 @@ function GastoModal({ gasto, proveedores, onSave, onClose }) {
           <div className="fg">
             <div className="field"><label>Fecha del Gasto</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))} /></div>
             <div className="field"><label>Fecha Factura / Documento <span style={{fontSize:10,color:"var(--muted)",fontWeight:400}}>(opcional)</span></label><DatePicker value={f.fechaFactura||""} onChange={v=>setF(p=>({...p,fechaFactura:v}))} /></div>
-            <div className="field"><label>Tipo de Gasto</label><select value={f.tipo} onChange={ch("tipo")}>{GASTO_TIPOS.map(t => <option key={t}>{t}</option>)}</select></div>
+            <div className="field">
+              <label>Tipo de Gasto</label>
+              <select value={GASTO_TIPOS.includes(f.tipo)?f.tipo:"__custom__"} onChange={e=>{
+                if(e.target.value==="__custom__") setF(p=>({...p,tipo:""}));
+                else setF(p=>({...p,tipo:e.target.value}));
+              }}>
+                {GASTO_TIPOS.map(t=><option key={t} value={t}>{t}</option>)}
+                <option value="__custom__">✏️ Agregar tipo nuevo...</option>
+              </select>
+              {(!GASTO_TIPOS.includes(f.tipo)||f.tipo==="")&&(
+                <input value={f.tipo} onChange={ch("tipo")} placeholder="Escribe el tipo de gasto" style={{marginTop:6}}/>
+              )}
+            </div>
             <div className="field s2"><label>Descripción</label><input value={f.descripcion} onChange={ch("descripcion")} /></div>
             <div className="field"><label>Monto ($)</label><input value={f.monto} onChange={ch("monto")} type="number" /></div>
             <div className="field"><label>Responsable</label><input value={f.responsable} onChange={ch("responsable")} /></div>
@@ -6856,6 +6870,7 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
   const [compModal2, setCompModal2] = useState(null); // lightbox
   const [modalProvPago, setModalProvPago] = useState(null);
 
+  const customTiposGasto = [...new Set(gastos.map(g=>g.tipo).filter(t=>t&&!GASTO_TIPOS.includes(t)))];
   // Computed vars — fuera del return para evitar crashes
   const fil = gastos.filter(g =>
     ((g.descripcion||"") + (g.responsable||"")).toLowerCase().includes(q.toLowerCase()) &&
@@ -6880,7 +6895,7 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
         </div>
       </div>
       <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--border)" }}>
-        <div className="ftabs">{["TODOS", ...GASTO_TIPOS].map(t => <button key={t} className={`ftab${tf === t ? " on" : ""}`} onClick={() => setTf(t)}>{t}</button>)}</div>
+        <div className="ftabs">{["TODOS", ...GASTO_TIPOS, ...customTiposGasto].map(t => <button key={t} className={`ftab${tf === t ? " on" : ""}`} onClick={() => setTf(t)}>{t}</button>)}</div>
       </div>
 
       {showUnificado ? (
@@ -7012,9 +7027,9 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                         <td style={{ fontSize: 11, color: "var(--muted)" }}>{g.fechaFactura||"—"}</td>
                         <td style={{ fontSize: 11 }}>{prov ? <Bdg c="bp" t={prov.nombre} /> : <span style={{ color: "var(--muted)", fontSize: 10 }}>Sin proveedor</span>}</td>
                         <td style={{ fontSize: 12 }}>{g.responsable || "—"}</td>
-                        <td>{g.pagoStatus==="pagado" ? <span style={{color:"var(--green)",fontWeight:700,fontSize:11}}>✅ Pagado</span> : g.pagoStatus==="parcial" ? <span style={{color:"var(--cyan)",fontWeight:700,fontSize:11}}>🔄 Parcial</span> : g.proveedorId ? <span style={{color:"var(--orange)",fontWeight:700,fontSize:11}}>⏳ Pendiente</span> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
-                        <td>{(g.pagoEvidencias||[]).length>0 ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal(g.pagoEvidencias)} style={{fontSize:11}}>📎 {g.pagoEvidencias.length}</button> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
-                        <td><div className="acts">{g.proveedorId && <button className="btn btn-cyan btn-xs" onClick={()=>setModalProvPago({item:{tipo:"gasto",id:g.id,label:`Gasto: ${g.descripcion||g.tipo||"—"}`,monto:Number(g.monto)||0,data:g},proveedor:(proveedores||[]).find(p=>p.id===g.proveedorId)})}>💳</button>}<button className="btn btn-ghost btn-sm" onClick={() => onEdit(g)}>✏️</button><button className="btn btn-red btn-sm" onClick={() => onDelete(g.id)}>🗑</button></div></td>
+                        <td>{g.pagoStatus==="pagado" ? <span style={{color:"var(--green)",fontWeight:700,fontSize:11}}>✅ Pagado</span> : g.pagoStatus==="parcial" ? <span style={{color:"var(--cyan)",fontWeight:700,fontSize:11}}>🔄 Parcial</span> : <span style={{color:"var(--orange)",fontWeight:700,fontSize:11}}>⏳ Pendiente</span>}</td>
+                        <td>{((g.pagoEvidencias||[]).length+(g.facturaArchivos||[]).length)>0 ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes/facturas" onClick={()=>setCompModal([...(g.pagoEvidencias||[]),...(g.facturaArchivos||[])])} style={{fontSize:11}}>📎 {(g.pagoEvidencias||[]).length+(g.facturaArchivos||[]).length}</button> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
+                        <td><div className="acts"><button className="btn btn-cyan btn-xs" onClick={()=>setModalProvPago({item:{tipo:"gasto",id:g.id,label:`Gasto: ${g.descripcion||g.tipo||"—"}`,monto:Number(g.monto)||0,data:g},proveedor:(proveedores||[]).find(p=>p.id===g.proveedorId)})}>💳</button><button className="btn btn-ghost btn-sm" onClick={() => onEdit(g)}>✏️</button><button className="btn btn-red btn-sm" onClick={() => onDelete(g.id)}>🗑</button></div></td>
                       </tr>
                     );
                   })}</tbody>
