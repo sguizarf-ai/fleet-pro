@@ -6513,7 +6513,8 @@ function CxPTab({ allPayments, proveedores, cxpFiltro, setCxpFiltro, setModalPag
                     const stColor = item.status==="pagado"?"var(--green)":item.status==="parcial"?"var(--cyan)":"var(--orange)";
                     const stIcon  = item.status==="pagado"?"✅":item.status==="parcial"?"🔄":"⏳";
                     const d = item.data||{};
-                    const allFiles = [...(d.pagoEvidencias||[]),...(d.facturaArchivos||[]),...(d.pagoRefEvidencias||[]),...(d.pagoRefFacturaArchivos||[]),...(d.pagoMOEvidencias||[]),...(d.pagoMOFacturaArchivos||[])];
+                    const factFiles = [...(d.facturaArchivos||[]),...(d.pagoRefFacturaArchivos||[]),...(d.pagoMOFacturaArchivos||[])];
+                    const compFiles = [...(d.pagoEvidencias||[]),...(d.pagoRefEvidencias||[]),...(d.pagoMOEvidencias||[])];
                     return (
                       <tr key={`${item.tipo}-${item.id}`} style={{background:item.status==="pagado"?"rgba(0,200,100,.03)":"rgba(255,140,0,.02)"}}>
                         <td><span style={{fontSize:18}}>{tipoIcon(item.tipo)}</span></td>
@@ -6526,12 +6527,8 @@ function CxPTab({ allPayments, proveedores, cxpFiltro, setCxpFiltro, setModalPag
                         <td style={{textAlign:"right",fontWeight:700,color:"var(--orange)",fontFamily:"var(--font-hd)"}}>{fmx(item.monto)}</td>
                         <td><span style={{fontWeight:700,color:stColor,fontSize:12}}>{stIcon} {item.status==="pagado"?"Pagado":item.status==="parcial"?"Parcial":"Pendiente"}</span></td>
                         <td style={{fontSize:11,color:"var(--muted)"}}>{d.pagoReferencia||"—"}</td>
-                        <td style={{fontSize:11,color:"var(--muted)"}}>{d.pagoFactura||"—"}</td>
-                        <td style={{textAlign:"center"}}>
-                          {allFiles.length > 0
-                            ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes/facturas" onClick={()=>setCompModal(allFiles)} style={{fontSize:11}}>📎 {allFiles.length}</button>
-                            : <span style={{color:"var(--muted)",fontSize:10}}>—</span>}
-                        </td>
+                        <td style={{textAlign:"center"}}>{factFiles.length>0 ? <button className="btn btn-ghost btn-xs" style={{fontSize:11,color:"var(--cyan)"}} onClick={()=>setCompModal(factFiles)} title="Ver facturas">🧾 {factFiles.length}</button> : <span style={{color:"var(--muted)",fontSize:10}}>{d.pagoFactura||"—"}</span>}</td>
+                        <td style={{textAlign:"center"}}>{compFiles.length>0 ? <button className="btn btn-ghost btn-xs" style={{fontSize:11}} onClick={()=>setCompModal(compFiles)} title="Ver comprobantes">📎 {compFiles.length}</button> : <span style={{color:"var(--muted)",fontSize:10}}>—</span>}</td>
                         <td>
                           <button className="btn btn-cyan btn-xs" onClick={()=>{
                             if(item.tipo==="viaje") setModalPago(item.data);
