@@ -6682,7 +6682,7 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
         const pagadas = allPendingPayments.filter(p=>p.status==="pagado");
         const totalPend = pendientes.reduce((a,p)=>a+(Number(p.monto)||0),0);
         const totalPag  = pagadas.reduce((a,p)=>a+(Number(p.monto)||0),0);
-        const tipoIcon = t => t==="viaje"?"🚛":t==="mantenimiento"?"🔧":t==="gasto"?"💵":"📋";
+        const tipoIcon = t => (t==="mantenimiento_ref"||t==="mantenimiento_mo"||t==="mantenimiento")?"🔧":t==="viaje"?"🚛":t==="gasto"?"💵":"📋";
         const cxpVisible = cxpFiltro==="todos" ? allPendingPayments : pendientes;
         return (
           <>
@@ -6852,6 +6852,7 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
 
   // Vista unificada "Gastos a Proveedores": agrupa todos los orígenes
   const showUnificado = tf === "Gastos a Proveedores";
+  const showProvSection = tf === "Gastos a Proveedores" || tf === "TODOS";
   const gastosConProv = gastos.filter(g => g.proveedorId);
   const maintsConProv = maints.filter(m => m.proveedorId || m.proveedorRefId);
   const extConProv    = externos;
@@ -6859,7 +6860,7 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
   return (
     <div className="card">
       <div className="card-hdr">
-        <h3>💵 Gastos Generales ({gastos.length}) 🔒</h3>
+        <h3>💵 Gastos Generales ({gastos.length + maints.filter(m=>m.proveedorId||m.proveedorRefId).length + externos.length}) 🔒</h3>
         <div className="row-gap">
           <div className="sw"><span style={{ color: "var(--muted)" }}>🔍</span><input placeholder="Buscar..." value={q} onChange={e => setQ(e.target.value)} /></div>
           <button className="btn btn-cyan" onClick={onAdd}>+ Nuevo Gasto</button>
@@ -6898,7 +6899,7 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                       <td style={{fontSize:11,color:"var(--muted)"}}>{g.fechaFactura||"—"}</td>
                       <td><span style={{fontSize:11,fontWeight:700,color:st.c}}>{st.lbl}</span></td>
                       <td>{((g.pagoEvidencias||[]).length+(g.facturaArchivos||[]).length)>0 ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal([...(g.pagoEvidencias||[]),...(g.facturaArchivos||[])])} style={{fontSize:11}}>📎 {(g.pagoEvidencias||[]).length+(g.facturaArchivos||[]).length}</button> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
-                      <td><div className="acts"><button className="btn btn-ghost btn-sm" onClick={()=>onEdit(g)}>✏️</button><button className="btn btn-red btn-sm" onClick={()=>onDelete(g.id)}>🗑</button></div></td>
+                      <td><div className="acts"><button className="btn btn-cyan btn-xs" onClick={()=>setModalProvPago({item:{tipo:"gasto",id:g.id,label:`Gasto: ${g.descripcion||g.tipo||"—"}`,monto:Number(g.monto)||0,data:g},proveedor:prov})}>💳 Conciliar</button><button className="btn btn-ghost btn-sm" onClick={()=>onEdit(g)}>✏️</button><button className="btn btn-red btn-sm" onClick={()=>onDelete&&onDelete(g.id)}>🗑</button></div></td>
                     </tr>
                   );
                 })}</tbody>
@@ -7006,6 +7007,60 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                 </table>
             }
           </div>
+          {showProvSection && maintsConProv.length > 0 && (
+            <div className="card-body" style={{paddingTop:0}}>
+              <div style={{fontWeight:700,fontSize:12,color:"var(--muted)",textTransform:"uppercase",padding:"8px 0 4px"}}>🔧 Mantenimientos con Proveedor ({maintsConProv.length})</div>
+              <table>
+                <thead><tr><th>Fecha</th><th>Unidad</th><th>Descripción</th><th>Taller/M.O.</th><th>M.O.$</th><th>Refacciones</th><th>Ref.$</th><th>Total</th><th>📎</th><th></th></tr></thead>
+                <tbody>{maintsConProv.map(m => {
+                  const provMO  = (proveedores||[]).find(p => p.id === m.proveedorId);
+                  const provRef = (proveedores||[]).find(p => p.id === m.proveedorRefId);
+                  const cMO = Number(m.costoMO)||0; const cRef = Number(m.costoRef)||0;
+                  const stMO = (m.pagoMOStatus||"pendiente")==="pagado"?"✅":"⏳";
+                  const stRef = (m.pagoRefStatus||"pendiente")==="pagado"?"✅":"⏳";
+                  const unit = units.find(u => u.id === m.unidadId);
+                  return (
+                    <tr key={m.id}>
+                      <td style={{fontSize:11}}>{m.fechaEjec||m.fechaProg||"—"}</td>
+                      <td style={{fontSize:11,fontWeight:700}}>{unit?unit.num:(m.unidadId||"—")}</td>
+                      <td style={{fontSize:11}}>{m.desc||m.tipo||"—"}</td>
+                      <td style={{fontSize:11}}>{provMO?<Bdg c="bo" t={provMO.nombre}/>:"—"}</td>
+                      <td style={{color:"var(--orange)",fontWeight:700,fontSize:11}}>{cMO>0?<>{fmt$(cMO)} {stMO}</>:"—"}</td>
+                      <td style={{fontSize:11}}>{provRef?<Bdg c="bp" t={provRef.nombre}/>:"—"}</td>
+                      <td style={{color:"var(--cyan)",fontWeight:700,fontSize:11}}>{cRef>0?<>{fmt$(cRef)} {stRef}</>:"—"}</td>
+                      <td style={{color:"var(--red)",fontWeight:700}}>{fmt$(cMO+cRef)}</td>
+                      <td>{((m.pagoRefEvidencias||[]).length+(m.pagoMOEvidencias||[]).length+(m.pagoRefFacturaArchivos||[]).length+(m.pagoMOFacturaArchivos||[]).length)>0?<button className="btn btn-ghost btn-xs" onClick={()=>setCompModal([...(m.pagoMOEvidencias||[]),...(m.pagoRefEvidencias||[]),...(m.pagoRefFacturaArchivos||[]),...(m.pagoMOFacturaArchivos||[])])}>📎</button>:"—"}</td>
+                      <td><button className="btn btn-cyan btn-xs" onClick={()=>setModalProvPago({item:{tipo:m.proveedorRefId?"mantenimiento_ref":"mantenimiento_mo",id:m.id+(m.proveedorRefId?"_ref":"_mo"),label:`${m.descripcion||m.tipo||"—"}`,monto:m.proveedorRefId?Number(m.costoRef)||0:Number(m.costoMO)||0,data:m},proveedor:(proveedores||[]).find(p=>p.id===(m.proveedorRefId||m.proveedorId))})}>💳</button></td>
+                    </tr>
+                  );
+                })}</tbody>
+              </table>
+            </div>
+          )}
+          {showProvSection && extConProv.length > 0 && (
+            <div className="card-body" style={{paddingTop:0}}>
+              <div style={{fontWeight:700,fontSize:12,color:"var(--muted)",textTransform:"uppercase",padding:"8px 0 4px"}}>🚛 Logística Externa / Transportistas ({extConProv.length})</div>
+              <table>
+                <thead><tr><th>Fecha</th><th>Empresa</th><th>Ruta</th><th>Proveedor</th><th>Costo</th><th>Estado</th><th>📎</th><th></th></tr></thead>
+                <tbody>{extConProv.map(e => {
+                  const prov = (proveedores||[]).find(p => p.id === e.proveedorId);
+                  const st = e.pagoStatus==="pagado"?{lbl:"Pagado",c:"var(--green)"}:e.pagoStatus==="parcial"?{lbl:"Parcial",c:"var(--cyan)"}:{lbl:"Pendiente",c:"var(--orange)"};
+                  return (
+                    <tr key={e.id}>
+                      <td style={{fontSize:11}}>{e.fecha||"—"}</td>
+                      <td style={{fontWeight:600,fontSize:11}}>{e.empresa||"—"}</td>
+                      <td style={{fontSize:11,color:"var(--muted)"}}>{e.origen||""}{e.destino?" → "+e.destino:""}</td>
+                      <td style={{fontSize:11}}>{prov?<Bdg c="bp" t={prov.nombre}/>:<span style={{color:"var(--orange)",fontSize:10}}>⚠️ Sin proveedor</span>}</td>
+                      <td style={{color:"var(--purple)",fontWeight:700}}>{fmt$(e.costoPagar)}</td>
+                      <td><span style={{fontSize:11,fontWeight:700,color:st.c}}>{st.lbl}</span></td>
+                      <td>{((e.pagoEvidencias||[]).length+(e.facturaArchivos||[]).length)>0?<button className="btn btn-ghost btn-xs" onClick={()=>setCompModal([...(e.pagoEvidencias||[]),...(e.facturaArchivos||[])])}>📎 {(e.pagoEvidencias||[]).length+(e.facturaArchivos||[]).length}</button>:"—"}</td>
+                      <td><button className="btn btn-cyan btn-xs" onClick={()=>setModalProvPago({item:{tipo:"viaje",id:e.id,label:`${e.empresa||"—"}: ${e.origen||""} → ${e.destino||""}`,monto:Number(e.costoPagar)||0,data:e},proveedor:prov})}>💳</button></td>
+                    </tr>
+                  );
+                })}</tbody>
+              </table>
+            </div>
+          )}
         </>
       )}
       {compModal && (
