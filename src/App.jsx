@@ -7000,7 +7000,7 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
             {fil.length === 0
               ? <div className="empty"><div className="empty-icon">💵</div><p>Sin gastos registrados</p></div>
               : <table>
-                  <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Monto</th><th>F.Factura</th><th>Proveedor</th><th>Responsable</th><th>📎</th><th></th></tr></thead>
+                  <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Monto</th><th>F.Factura</th><th>Proveedor</th><th>Responsable</th><th>Estado</th><th>📎</th><th></th></tr></thead>
                   <tbody>{fil.map(g => {
                     const prov = (proveedores||[]).find(p => p.id === g.proveedorId);
                     return (
@@ -7012,8 +7012,9 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                         <td style={{ fontSize: 11, color: "var(--muted)" }}>{g.fechaFactura||"—"}</td>
                         <td style={{ fontSize: 11 }}>{prov ? <Bdg c="bp" t={prov.nombre} /> : <span style={{ color: "var(--muted)", fontSize: 10 }}>Sin proveedor</span>}</td>
                         <td style={{ fontSize: 12 }}>{g.responsable || "—"}</td>
+                        <td>{g.pagoStatus==="pagado" ? <span style={{color:"var(--green)",fontWeight:700,fontSize:11}}>✅ Pagado</span> : g.pagoStatus==="parcial" ? <span style={{color:"var(--cyan)",fontWeight:700,fontSize:11}}>🔄 Parcial</span> : g.proveedorId ? <span style={{color:"var(--orange)",fontWeight:700,fontSize:11}}>⏳ Pendiente</span> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
                         <td>{(g.pagoEvidencias||[]).length>0 ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal(g.pagoEvidencias)} style={{fontSize:11}}>📎 {g.pagoEvidencias.length}</button> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
-                        <td><div className="acts"><button className="btn btn-ghost btn-sm" onClick={() => onEdit(g)}>✏️</button><button className="btn btn-red btn-sm" onClick={() => onDelete(g.id)}>🗑</button></div></td>
+                        <td><div className="acts">{g.proveedorId && <button className="btn btn-cyan btn-xs" onClick={()=>setModalProvPago({item:{tipo:"gasto",id:g.id,label:`Gasto: ${g.descripcion||g.tipo||"—"}`,monto:Number(g.monto)||0,data:g},proveedor:(proveedores||[]).find(p=>p.id===g.proveedorId)})}>💳</button>}<button className="btn btn-ghost btn-sm" onClick={() => onEdit(g)}>✏️</button><button className="btn btn-red btn-sm" onClick={() => onDelete(g.id)}>🗑</button></div></td>
                       </tr>
                     );
                   })}</tbody>
