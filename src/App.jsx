@@ -6445,6 +6445,99 @@ _${branding?.nombre||"Fleet Pro"} — Comprobante_`;
 }
 
 
+// ── CxP Tab — extracted to avoid IIFE/render issues ─────────────────────────
+function CxPTab({ allPayments, proveedores, cxpFiltro, setCxpFiltro, setModalPago, setModalProvPago, setCompModal }) {
+  const fmx = n => "$"+Number(n||0).toLocaleString("es-MX",{minimumFractionDigits:2});
+  const tipoIcon = t => (t==="mantenimiento_ref"||t==="mantenimiento_mo"||t==="mantenimiento")?"🔧":t==="viaje"?"🚛":t==="gasto"?"💵":"📋";
+  const pendientes = allPayments.filter(p=>p.status!=="pagado");
+  const pagadas    = allPayments.filter(p=>p.status==="pagado");
+  const totalPend  = pendientes.reduce((a,p)=>a+(Number(p.monto)||0),0);
+  const totalPag   = pagadas.reduce((a,p)=>a+(Number(p.monto)||0),0);
+  const visible    = cxpFiltro==="todos" ? allPayments : pendientes;
+
+  return (
+    <>
+      <div className="stats" style={{marginBottom:14}}>
+        <div className="stat" style={{"--c":"var(--orange)"}}>
+          <div className="stat-icon">⏳</div>
+          <div className="stat-val sm">{pendientes.length}</div>
+          <div className="stat-lbl">Por liquidar</div>
+        </div>
+        <div className="stat" style={{"--c":"var(--red)"}}>
+          <div className="stat-icon">💸</div>
+          <div className="stat-val sm" style={{fontSize:15}}>{fmx(totalPend)}</div>
+          <div className="stat-lbl">Total pendiente</div>
+        </div>
+        <div className="stat" style={{"--c":"var(--green)"}}>
+          <div className="stat-icon">✅</div>
+          <div className="stat-val sm" style={{fontSize:15}}>{fmx(totalPag)}</div>
+          <div className="stat-lbl">Total pagado</div>
+        </div>
+        <div className="stat" style={{"--c":"var(--cyan)"}}>
+          <div className="stat-icon">📋</div>
+          <div className="stat-val sm">{allPayments.length}</div>
+          <div className="stat-lbl">Total registros</div>
+        </div>
+      </div>
+      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8,gap:8}}>
+        <button className={`btn btn-sm ${cxpFiltro==="pendiente"?"btn-cyan":"btn-ghost"}`} onClick={()=>setCxpFiltro("pendiente")}>⏳ Solo pendientes ({pendientes.length})</button>
+        <button className={`btn btn-sm ${cxpFiltro==="todos"?"btn-cyan":"btn-ghost"}`} onClick={()=>setCxpFiltro("todos")}>📋 Ver todos ({allPayments.length})</button>
+      </div>
+      <div className="card">
+        <div className="card-body" style={{padding:0}}>
+          <table>
+            <thead><tr>
+              <th>Tipo</th><th>Proveedor</th><th>Concepto</th><th>Fecha</th>
+              <th style={{textAlign:"right"}}>Monto</th><th>Estado</th>
+              <th>Referencia</th><th>Factura</th><th>Comprobante</th><th>Acción</th>
+            </tr></thead>
+            <tbody>
+              {visible.length===0
+                ? <tr><td colSpan={10} style={{textAlign:"center",color:"var(--muted)",padding:32}}>✅ Sin cuentas pendientes</td></tr>
+                : [...visible].sort((a,b)=>(a.status==="pendiente"?0:1)-(b.status==="pendiente"?0:1)).map(item => {
+                    const pv = (proveedores||[]).find(p=>p.id===item.proveedorId);
+                    const stColor = item.status==="pagado"?"var(--green)":item.status==="parcial"?"var(--cyan)":"var(--orange)";
+                    const stIcon  = item.status==="pagado"?"✅":item.status==="parcial"?"🔄":"⏳";
+                    const d = item.data||{};
+                    const allFiles = [...(d.pagoEvidencias||[]),...(d.facturaArchivos||[]),...(d.pagoRefEvidencias||[]),...(d.pagoRefFacturaArchivos||[]),...(d.pagoMOEvidencias||[]),...(d.pagoMOFacturaArchivos||[])];
+                    return (
+                      <tr key={`${item.tipo}-${item.id}`} style={{background:item.status==="pagado"?"rgba(0,200,100,.03)":"rgba(255,140,0,.02)"}}>
+                        <td><span style={{fontSize:18}}>{tipoIcon(item.tipo)}</span></td>
+                        <td style={{fontWeight:600,fontSize:12}}>
+                          {pv?.nombre||item.data?.empresa||"—"}
+                          {pv?.tipoProv&&<div style={{fontSize:10,color:"var(--muted)"}}>{pv.tipoProv}</div>}
+                        </td>
+                        <td style={{fontSize:11,color:"var(--muted)",maxWidth:140,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.label}</td>
+                        <td style={{fontSize:12}}>{item.status==="pagado" ? <span style={{color:"var(--green)",fontWeight:600}}>{item.pagoFecha||item.fecha||"—"}</span> : (item.fecha||"—")}</td>
+                        <td style={{textAlign:"right",fontWeight:700,color:"var(--orange)",fontFamily:"var(--font-hd)"}}>{fmx(item.monto)}</td>
+                        <td><span style={{fontWeight:700,color:stColor,fontSize:12}}>{stIcon} {item.status==="pagado"?"Pagado":item.status==="parcial"?"Parcial":"Pendiente"}</span></td>
+                        <td style={{fontSize:11,color:"var(--muted)"}}>{d.pagoReferencia||"—"}</td>
+                        <td style={{fontSize:11,color:"var(--muted)"}}>{d.pagoFactura||"—"}</td>
+                        <td style={{textAlign:"center"}}>
+                          {allFiles.length > 0
+                            ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes/facturas" onClick={()=>setCompModal(allFiles)} style={{fontSize:11}}>📎 {allFiles.length}</button>
+                            : <span style={{color:"var(--muted)",fontSize:10}}>—</span>}
+                        </td>
+                        <td>
+                          <button className="btn btn-cyan btn-xs" onClick={()=>{
+                            if(item.tipo==="viaje") setModalPago(item.data);
+                            else setModalProvPago({item, proveedor: pv});
+                          }}>
+                            {item.status==="pagado"?"✏️ Editar":"💳 Pagar"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [], onAdd, onEdit, onDelete, onSaveExterno, onSavePagoProveedor, branding }) {
   const [q, setQ] = useState(""); const [cf, setCf] = useState("TODOS"); const [tab, setTab] = useState("lista");
   const [modalPago, setModalPago] = useState(null); // externo being paid (transportista)
@@ -6677,97 +6770,17 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
       })()}
 
       {/* ── Tab: Cuentas por Pagar — TODOS los proveedores ── */}
-      {tab==="cxp" && (() => {
-        const pendientes = allPendingPayments.filter(p=>p.status!=="pagado");
-        const pagadas = allPendingPayments.filter(p=>p.status==="pagado");
-        const totalPend = pendientes.reduce((a,p)=>a+(Number(p.monto)||0),0);
-        const totalPag  = pagadas.reduce((a,p)=>a+(Number(p.monto)||0),0);
-        const tipoIcon = t => (t==="mantenimiento_ref"||t==="mantenimiento_mo"||t==="mantenimiento")?"🔧":t==="viaje"?"🚛":t==="gasto"?"💵":"📋";
-        const cxpVisible = cxpFiltro==="todos" ? allPendingPayments : pendientes;
-        return (
-          <>
-            <div className="stats" style={{marginBottom:14}}>
-              <div className="stat" style={{"--c":"var(--orange)"}}>
-                <div className="stat-icon">⏳</div>
-                <div className="stat-val sm">{pendientes.length}</div>
-                <div className="stat-lbl">Por liquidar</div>
-              </div>
-              <div className="stat" style={{"--c":"var(--red)"}}>
-                <div className="stat-icon">💸</div>
-                <div className="stat-val sm" style={{fontSize:15}}>{fmx(totalPend)}</div>
-                <div className="stat-lbl">Total pendiente</div>
-              </div>
-              <div className="stat" style={{"--c":"var(--green)"}}>
-                <div className="stat-icon">✅</div>
-                <div className="stat-val sm" style={{fontSize:15}}>{fmx(totalPag)}</div>
-                <div className="stat-lbl">Total pagado</div>
-              </div>
-              <div className="stat" style={{"--c":"var(--cyan)"}}>
-                <div className="stat-icon">📋</div>
-                <div className="stat-val sm">{allPendingPayments.length}</div>
-                <div className="stat-lbl">Total registros</div>
-              </div>
-            </div>
-            <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8,gap:8}}>
-              <button className={`btn btn-sm ${cxpFiltro==="pendiente"?"btn-cyan":"btn-ghost"}`} onClick={()=>setCxpFiltro("pendiente")}>⏳ Solo pendientes ({pendientes.length})</button>
-              <button className={`btn btn-sm ${cxpFiltro==="todos"?"btn-cyan":"btn-ghost"}`} onClick={()=>setCxpFiltro("todos")}>📋 Ver todos ({allPendingPayments.length})</button>
-            </div>
-            <div className="card">
-              <div className="card-body" style={{padding:0}}>
-                <table>
-                  <thead><tr>
-                    <th>Tipo</th><th>Proveedor</th><th>Concepto</th><th>Fecha</th>
-                    <th style={{textAlign:"right"}}>Monto</th><th>Estado</th>
-                    <th>Referencia</th><th>Factura</th><th>Comprobante</th><th>Acción</th>
-                  </tr></thead>
-                  <tbody>
-                    {cxpVisible.length===0
-                      ? <tr><td colSpan={9} style={{textAlign:"center",color:"var(--muted)",padding:32}}>✅ Sin cuentas pendientes</td></tr>
-                      : [...cxpVisible].sort((a,b)=>(a.status==="pendiente"?0:1)-(b.status==="pendiente"?0:1)).map(item => {
-                          const pv = proveedores.find(p=>p.id===item.proveedorId);
-                          const stColor = item.status==="pagado"?"var(--green)":item.status==="parcial"?"var(--cyan)":"var(--orange)";
-                          const stIcon = item.status==="pagado"?"✅":item.status==="parcial"?"🔄":"⏳";
-                          return (
-                            <tr key={`${item.tipo}-${item.id}`} style={{background:item.status==="pagado"?"rgba(0,200,100,.03)":"rgba(255,184,0,.03)"}}>
-                              <td><span style={{fontSize:18}}>{tipoIcon(item.tipo)}</span></td>
-                              <td style={{fontWeight:600,fontSize:12}}>{pv?.nombre||item.data?.empresa||"—"}
-                                {pv?.tipoProv&&<div style={{fontSize:10,color:"var(--muted)"}}>{pv.tipoProv}</div>}
-                              </td>
-                              <td style={{fontSize:11,color:"var(--muted)",maxWidth:140,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.label}</td>
-                               <td style={{fontSize:12}}>{item.status==="pagado" ? <span style={{color:"var(--green)",fontWeight:600}}>{item.pagoFecha||item.fecha||"—"}</span> : (item.fecha||"—")}</td>
-                              <td style={{textAlign:"right",fontWeight:700,color:"var(--orange)",fontFamily:"var(--font-hd)"}}>{fmx(item.monto)}</td>
-                              <td><span style={{fontWeight:700,color:stColor,fontSize:12}}>{stIcon} {item.status==="pagado"?"Pagado":item.status==="parcial"?"Parcial":"Pendiente"}</span></td>
-                              <td style={{fontSize:11,color:"var(--muted)"}}>{item.data?.pagoReferencia||"—"}</td>
-                              <td style={{fontSize:11,color:"var(--muted)"}}>{item.data?.pagoFactura||"—"}</td>
-                              <td style={{textAlign:"center"}}>
-                                {(() => {
-                                  const d = item.data||{};
-                                  const all = [...(d.pagoEvidencias||[]),...(d.facturaArchivos||[]),...(d.pagoRefEvidencias||[]),...(d.pagoRefFacturaArchivos||[]),...(d.pagoMOEvidencias||[]),...(d.pagoMOFacturaArchivos||[])];
-                                  return all.length > 0
-                                    ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes/facturas" onClick={()=>setCompModal(all)} style={{fontSize:11}}>📎 {all.length}</button>
-                                    : <span style={{color:"var(--muted)",fontSize:10}}>—</span>;
-                                })()}
-                              </td>
-                              <td>
-                                <button className="btn btn-cyan btn-xs"
-                                  onClick={()=>{
-                                    if(item.tipo==="viaje") setModalPago(item.data);
-                                    else setModalProvPago({item, proveedor: pv});
-                                  }}>
-                                  {item.status==="pagado"?"✏️ Editar":"💳 Pagar"}
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })
-                    }
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        );
-      })()}
+      {tab==="cxp" && (
+        <CxPTab
+          allPayments={allCxpPayments}
+          proveedores={proveedores}
+          cxpFiltro={cxpFiltro}
+          setCxpFiltro={setCxpFiltro}
+          setModalPago={setModalPago}
+          setModalProvPago={setModalProvPago}
+          setCompModal={setCompModal}
+        />
+      )}
 
       {/* ── Modales de pago ── */}
       {modalPago && (
