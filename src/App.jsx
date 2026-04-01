@@ -6451,6 +6451,7 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
   const [modalProvPago, setModalProvPago] = useState(null); // generic provider payment
   const [compModal, setCompModal] = useState(null); // comprobantes/evidencias viewer
   const [lightboxProv, setLightboxProv] = useState(null); // lightbox para ver archivos en grande
+  const [cxpFiltro, setCxpFiltro] = useState("pendiente"); // "pendiente" | "todos"
   const fil = proveedores.filter(p => (p.nombre + p.contacto + (p.tipoProv||"")).toLowerCase().includes(q.toLowerCase()) && (cf === "TODOS" || p.tipoProv === cf));
 
   const getStats = (pvId) => {
@@ -6682,6 +6683,7 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
         const totalPend = pendientes.reduce((a,p)=>a+(Number(p.monto)||0),0);
         const totalPag  = pagadas.reduce((a,p)=>a+(Number(p.monto)||0),0);
         const tipoIcon = t => t==="viaje"?"🚛":t==="mantenimiento"?"🔧":t==="gasto"?"💵":"📋";
+        const cxpVisible = cxpFiltro==="todos" ? allPendingPayments : pendientes;
         return (
           <>
             <div className="stats" style={{marginBottom:14}}>
@@ -6706,6 +6708,10 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
                 <div className="stat-lbl">Total registros</div>
               </div>
             </div>
+            <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8,gap:8}}>
+              <button className={`btn btn-sm ${cxpFiltro==="pendiente"?"btn-cyan":"btn-ghost"}`} onClick={()=>setCxpFiltro("pendiente")}>⏳ Solo pendientes ({pendientes.length})</button>
+              <button className={`btn btn-sm ${cxpFiltro==="todos"?"btn-cyan":"btn-ghost"}`} onClick={()=>setCxpFiltro("todos")}>📋 Ver todos ({allPendingPayments.length})</button>
+            </div>
             <div className="card">
               <div className="card-body" style={{padding:0}}>
                 <table>
@@ -6715,9 +6721,9 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
                     <th>Referencia</th><th>Factura</th><th>Comprobante</th><th>Acción</th>
                   </tr></thead>
                   <tbody>
-                    {allPendingPayments.length===0
+                    {cxpVisible.length===0
                       ? <tr><td colSpan={9} style={{textAlign:"center",color:"var(--muted)",padding:32}}>✅ Sin cuentas pendientes</td></tr>
-                      : [...allPendingPayments].sort((a,b)=>(a.status==="pendiente"?0:1)-(b.status==="pendiente"?0:1)).map(item => {
+                      : [...cxpVisible].sort((a,b)=>(a.status==="pendiente"?0:1)-(b.status==="pendiente"?0:1)).map(item => {
                           const pv = proveedores.find(p=>p.id===item.proveedorId);
                           const stColor = item.status==="pagado"?"var(--green)":item.status==="parcial"?"var(--cyan)":"var(--orange)";
                           const stIcon = item.status==="pagado"?"✅":item.status==="parcial"?"🔄":"⏳";
@@ -6925,11 +6931,8 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                       <td style={{fontSize:11}}>{provRef ? <Bdg c="bp" t={provRef.nombre}/> : "—"}</td>
                       <td style={{color:"var(--cyan)",fontWeight:700,fontSize:11}}>{cRef > 0 ? <>{fmt$(cRef)} {stRef}</> : "—"}</td>
                       <td style={{color:"var(--red)",fontWeight:700}}>{fmt$(cMO + cRef)}</td>
-                      <td>{((m.pagoRefEvidencias||[]).length+(m.pagoMOEvidencias||[]).length+(m.pagoEvidencias||[]).length)>0 ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal([...(m.pagoMOEvidencias||[]),...(m.pagoRefEvidencias||[]),...(m.pagoEvidencias||[])])} style={{fontSize:11}}>📎 {(m.pagoRefEvidencias||[]).length+(m.pagoMOEvidencias||[]).length+(m.pagoEvidencias||[]).length}</button> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
-                      <td><div className="acts">
-                        {m.proveedorRefId && <button className="btn btn-ghost btn-xs" title="Conciliar pago Refacciones" onClick={()=>setModalProvPago({item:{tipo:"mantenimiento_ref",id:m.id+"_ref",label:`Refac: ${m.descripcion||m.tipo||"—"}`,monto:Number(m.costoRef)||0,data:m},proveedor:(proveedores||[]).find(p=>p.id===m.proveedorRefId)})}>💳 Ref</button>}
-                        {m.proveedorId && <button className="btn btn-ghost btn-xs" title="Conciliar pago Taller" onClick={()=>setModalProvPago({item:{tipo:"mantenimiento_mo",id:m.id+"_mo",label:`Taller: ${m.descripcion||m.tipo||"—"}`,monto:Number(m.costoMO)||0,data:m},proveedor:(proveedores||[]).find(p=>p.id===m.proveedorId)})}>💳 M.O.</button>}
-                      </div></td>
+                      <td>{((m.pagoRefEvidencias||[]).length+(m.pagoMOEvidencias||[]).length+(m.pagoEvidencias||[]).length+(m.pagoRefFacturaArchivos||[]).length+(m.pagoMOFacturaArchivos||[]).length+(m.facturaArchivos||[]).length)>0 ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes/facturas" onClick={()=>setCompModal([...(m.pagoMOEvidencias||[]),...(m.pagoRefEvidencias||[]),...(m.pagoEvidencias||[]),...(m.pagoRefFacturaArchivos||[]),...(m.pagoMOFacturaArchivos||[]),...(m.facturaArchivos||[])])} style={{fontSize:11}}>📎 {(m.pagoRefEvidencias||[]).length+(m.pagoMOEvidencias||[]).length+(m.pagoEvidencias||[]).length+(m.pagoRefFacturaArchivos||[]).length+(m.pagoMOFacturaArchivos||[]).length+(m.facturaArchivos||[]).length}</button> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
+                      <td><div className="acts"><button className="btn btn-cyan btn-xs" title="Conciliar pago" onClick={()=>setModalProvPago({item:{tipo:m.proveedorRefId?"mantenimiento_ref":"mantenimiento_mo",id:m.id+(m.proveedorRefId?"_ref":"_mo"),label:`${m.descripcion||m.tipo||"—"}`,monto:m.proveedorRefId?Number(m.costoRef)||0:Number(m.costoMO)||0,data:m},proveedor:(proveedores||[]).find(p=>p.id===(m.proveedorRefId||m.proveedorId))})}>💳 Conciliar</button></div></td>
                     </tr>
                   );
                 })}</tbody>
