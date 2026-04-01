@@ -6513,8 +6513,14 @@ function CxPTab({ allPayments, proveedores, cxpFiltro, setCxpFiltro, setModalPag
                     const stColor = item.status==="pagado"?"var(--green)":item.status==="parcial"?"var(--cyan)":"var(--orange)";
                     const stIcon  = item.status==="pagado"?"✅":item.status==="parcial"?"🔄":"⏳";
                     const d = item.data||{};
-                    const factFiles = [...(d.facturaArchivos||[]),...(d.pagoRefFacturaArchivos||[]),...(d.pagoMOFacturaArchivos||[])];
-                    const compFiles = [...(d.pagoEvidencias||[]),...(d.pagoRefEvidencias||[]),...(d.pagoMOEvidencias||[])];
+                    const isRef = item.tipo==="mantenimiento_ref";
+                    const isMO  = item.tipo==="mantenimiento_mo";
+                    const factFiles = isRef ? (d.pagoRefFacturaArchivos||[])
+                                    : isMO  ? (d.pagoMOFacturaArchivos||[])
+                                    : [...(d.facturaArchivos||[]),...(d.pagoRefFacturaArchivos||[]),...(d.pagoMOFacturaArchivos||[])];
+                    const compFiles = isRef ? (d.pagoRefEvidencias||[])
+                                    : isMO  ? (d.pagoMOEvidencias||[])
+                                    : [...(d.pagoEvidencias||[]),...(d.pagoRefEvidencias||[]),...(d.pagoMOEvidencias||[])];
                     return (
                       <tr key={`${item.tipo}-${item.id}`} style={{background:item.status==="pagado"?"rgba(0,200,100,.03)":"rgba(255,140,0,.02)"}}>
                         <td><span style={{fontSize:18}}>{tipoIcon(item.tipo)}</span></td>
@@ -6656,11 +6662,15 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
 
         <button className={`btn btn-sm ${tab==="cxp"?"btn-cyan":"btn-ghost"}`} onClick={()=>setTab("cxp")}>
           💳 Cuentas por Pagar
-          {allPendingPayments.length>0 && (
-            <span style={{background:"var(--orange)",color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:10,marginLeft:4}}>
-              {allPendingPayments.length}
-            </span>
-          )}
+          {(() => {
+            const pend = allCxpPayments.filter(p=>p.status!=="pagado").length;
+            const total = allCxpPayments.length;
+            return pend > 0
+              ? <span style={{background:"var(--orange)",color:"#fff",borderRadius:10,padding:"1px 7px",fontSize:10,marginLeft:6,fontWeight:700}}>{pend} pendientes</span>
+              : total > 0
+              ? <span style={{background:"var(--green)",color:"#fff",borderRadius:10,padding:"1px 7px",fontSize:10,marginLeft:6}}>✅ Al día</span>
+              : null;
+          })()}
         </button>
       </div>
 
