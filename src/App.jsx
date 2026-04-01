@@ -6914,9 +6914,6 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                 <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Proveedor</th><th>Monto</th><th>F.Factura</th><th>Estado</th><th>📎</th><th>Acciones</th></tr></thead>
                 <tbody>{gastosConProv.map(g => {
                   const prov = (proveedores||[]).find(p => p.id === g.proveedorId);
-                  const st = g.pagoStatus === "pagado"
-                    ? { lbl: "Pagado", c: "var(--green)" }
-                    : { lbl: "Pendiente", c: "var(--orange)" };
                   return (
                     <tr key={g.id}>
                       <td style={{fontSize:11}}>{g.fecha||"—"}</td>
@@ -6925,7 +6922,7 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                       <td style={{fontSize:11}}>{prov ? <Bdg c="bp" t={prov.nombre}/> : "—"}</td>
                       <td style={{color:"var(--red)",fontWeight:700}}>{fmt$(g.monto)}</td>
                       <td style={{fontSize:11,color:"var(--muted)"}}>{g.fechaFactura||"—"}</td>
-                      <td><span style={{fontSize:11,fontWeight:700,color:st.c}}>{st.lbl}</span></td>
+                      <td>{g.pagoStatus==="pagado" ? <span style={{color:"var(--green)",fontWeight:700,fontSize:11}}>✅ Pagado</span> : g.pagoStatus==="parcial" ? <span style={{color:"var(--cyan)",fontWeight:700,fontSize:11}}>🔄 Parcial</span> : <span style={{color:"var(--orange)",fontWeight:700,fontSize:11}}>⏳ Pendiente</span>}</td>
                       <td>{((g.pagoEvidencias||[]).length+(g.facturaArchivos||[]).length)>0 ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal([...(g.pagoEvidencias||[]),...(g.facturaArchivos||[])])} style={{fontSize:11}}>📎 {(g.pagoEvidencias||[]).length+(g.facturaArchivos||[]).length}</button> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
                       <td><div className="acts"><button className="btn btn-cyan btn-xs" onClick={()=>setModalProvPago({item:{tipo:"gasto",id:g.id,label:`Gasto: ${g.descripcion||g.tipo||"—"}`,monto:Number(g.monto)||0,data:g},proveedor:prov})}>💳 Conciliar</button><button className="btn btn-ghost btn-sm" onClick={()=>onEdit(g)}>✏️</button><button className="btn btn-red btn-sm" onClick={()=>onDelete&&onDelete(g.id)}>🗑</button></div></td>
                     </tr>
@@ -6978,11 +6975,6 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                 <thead><tr><th>Fecha</th><th>Empresa</th><th>Ruta</th><th>Proveedor</th><th>Costo</th><th>Estado Pago</th><th>📎</th></tr></thead>
                 <tbody>{extConProv.map(e => {
                   const prov = (proveedores||[]).find(p => p.id === e.proveedorId);
-                  const st = e.pagoStatus === "pagado"
-                    ? { lbl: "Pagado",   c: "var(--green)"  }
-                    : e.pagoStatus === "parcial"
-                    ? { lbl: "Parcial",  c: "var(--cyan)"   }
-                    : { lbl: "Pendiente",c: "var(--orange)" };
                   return (
                     <tr key={e.id}>
                       <td style={{fontSize:11}}>{e.fecha||"—"}</td>
@@ -6994,7 +6986,7 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                           : <span style={{color:"var(--orange)",fontSize:10}}>⚠️ Sin proveedor registrado</span>}
                       </td>
                       <td style={{color:"var(--purple)",fontWeight:700}}>{fmt$(e.costoPagar)}</td>
-                      <td><span style={{fontSize:11,fontWeight:700,color:st.c}}>{st.lbl}</span></td>
+                      <td><span style={{fontSize:11,fontWeight:700,color:e.pagoStatus==="pagado"?"var(--green)":e.pagoStatus==="parcial"?"var(--cyan)":"var(--orange)"}}>{e.pagoStatus==="pagado"?"✅ Pagado":e.pagoStatus==="parcial"?"🔄 Parcial":"⏳ Pendiente"}</span></td>
                       <td>{((e.pagoEvidencias||[]).length+(e.facturaArchivos||[]).length)>0 ? <button className="btn btn-ghost btn-xs" title="Ver comprobantes" onClick={()=>setCompModal([...(e.pagoEvidencias||[]),...(e.facturaArchivos||[])])} style={{fontSize:11}}>📎 {(e.pagoEvidencias||[]).length+(e.facturaArchivos||[]).length}</button> : <span style={{color:"var(--muted)",fontSize:11}}>—</span>}</td>
                       <td><button className="btn btn-ghost btn-xs" title="Conciliar pago" onClick={()=>setModalProvPago({item:{tipo:"viaje",id:e.id,label:`${e.empresa||"—"}: ${e.origen||""} → ${e.destino||""}`,monto:Number(e.costoPagar)||0,data:e},proveedor:(proveedores||[]).find(p=>p.id===e.proveedorId)})}>💳 Pagar</button></td>
                     </tr>
@@ -7073,7 +7065,6 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                 <thead><tr><th>Fecha</th><th>Empresa</th><th>Ruta</th><th>Proveedor</th><th>Costo</th><th>Estado</th><th>📎</th><th></th></tr></thead>
                 <tbody>{extConProv.map(e => {
                   const prov = (proveedores||[]).find(p => p.id === e.proveedorId);
-                  const st = e.pagoStatus==="pagado"?{lbl:"Pagado",c:"var(--green)"}:e.pagoStatus==="parcial"?{lbl:"Parcial",c:"var(--cyan)"}:{lbl:"Pendiente",c:"var(--orange)"};
                   return (
                     <tr key={e.id}>
                       <td style={{fontSize:11}}>{e.fecha||"—"}</td>
@@ -7081,7 +7072,7 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                       <td style={{fontSize:11,color:"var(--muted)"}}>{e.origen||""}{e.destino?" → "+e.destino:""}</td>
                       <td style={{fontSize:11}}>{prov?<Bdg c="bp" t={prov.nombre}/>:<span style={{color:"var(--orange)",fontSize:10}}>⚠️ Sin proveedor</span>}</td>
                       <td style={{color:"var(--purple)",fontWeight:700}}>{fmt$(e.costoPagar)}</td>
-                      <td><span style={{fontSize:11,fontWeight:700,color:st.c}}>{st.lbl}</span></td>
+                      <td><span style={{fontSize:11,fontWeight:700,color:e.pagoStatus==="pagado"?"var(--green)":e.pagoStatus==="parcial"?"var(--cyan)":"var(--orange)"}}>{e.pagoStatus==="pagado"?"✅ Pagado":e.pagoStatus==="parcial"?"🔄 Parcial":"⏳ Pendiente"}</span></td>
                       <td>{((e.pagoEvidencias||[]).length+(e.facturaArchivos||[]).length)>0?<button className="btn btn-ghost btn-xs" onClick={()=>setCompModal([...(e.pagoEvidencias||[]),...(e.facturaArchivos||[])])}>📎 {(e.pagoEvidencias||[]).length+(e.facturaArchivos||[]).length}</button>:"—"}</td>
                       <td><button className="btn btn-cyan btn-xs" onClick={()=>setModalProvPago({item:{tipo:"viaje",id:e.id,label:`${e.empresa||"—"}: ${e.origen||""} → ${e.destino||""}`,monto:Number(e.costoPagar)||0,data:e},proveedor:prov})}>💳</button></td>
                     </tr>
