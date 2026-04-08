@@ -1736,8 +1736,18 @@ _${branding?.nombre||"Fleet Pro"} — Comprobante de liquidación_`;
 }
 
 function GastoModal({ gasto, proveedores, onSave, onClose }) {
-  const [f, setF] = useState(gasto || { fecha: "", fechaFactura: "", tipo: GASTO_TIPOS[0], descripcion: "", monto: 0, responsable: "", proveedorId: "", pagoStatus: "pendiente" });
+  const [f, setF] = useState(gasto ? {...gasto, pagoEvidencias: gasto.pagoEvidencias||[]} : { fecha: "", fechaFactura: "", tipo: GASTO_TIPOS[0], descripcion: "", monto: 0, responsable: "", proveedorId: "", pagoStatus: "pendiente", pagoEvidencias: [] });
   const [uploading, setUploading] = useState(false);
+  const handleEvidencia = async e => {
+    const files = Array.from(e.target.files); if(!files.length) return;
+    setUploading(true);
+    try {
+      const urls = await Promise.all(files.map(f=>compressAndUpload(f,"fleet-pro/gastos",1200,0.75)));
+      setF(p=>({...p,pagoEvidencias:[...(p.pagoEvidencias||[]),...urls]}));
+    } catch(err){alert("Error al subir: "+err.message);}
+    finally{setUploading(false);}
+  };
+  const delEvidencia = idx => setF(p=>({...p,pagoEvidencias:p.pagoEvidencias.filter((_,i)=>i!==idx)}));
   const [nuevoTipoInput, setNuevoTipoInput] = useState("");
   const gastosCustomTipos = (gasto?.customTipos||[]);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
@@ -1780,6 +1790,24 @@ function GastoModal({ gasto, proveedores, onSave, onClose }) {
                   🏪 <strong>{selectedProv.nombre}</strong> · {selectedProv.categoria}
                   {selectedProv.tel && <span style={{ color: "var(--muted)" }}> · {selectedProv.tel}</span>}
                 </div>
+              </div>
+            )}
+          </div>
+          <div style={{marginTop:12,padding:"0 0 4px"}}>
+            <label style={{fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",display:"block",marginBottom:6}}>📎 Comprobante / Factura del Gasto</label>
+            <label style={{display:"inline-flex",alignItems:"center",gap:8,padding:"8px 14px",background:"var(--bg2)",border:"1px dashed var(--border)",borderRadius:8,cursor:"pointer",fontSize:12}}>
+              {uploading ? "⏳ Subiendo..." : "📎 Adjuntar archivo"}<input type="file" accept="image/*,application/pdf" multiple onChange={handleEvidencia} style={{display:"none"}}/>
+            </label>
+            {(f.pagoEvidencias||[]).length>0 && (
+              <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:8}}>
+                {f.pagoEvidencias.map((src,i)=>(
+                  <div key={i} style={{position:"relative",width:64,height:64}}>
+                    {src.startsWith("data:image")||src.startsWith("http")
+                      ? <img src={src} style={{width:64,height:64,objectFit:"cover",borderRadius:8,border:"1px solid var(--border)"}}/>
+                      : <div style={{width:64,height:64,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--bg2)",borderRadius:8,border:"1px solid var(--border)",fontSize:22}}>📄</div>}
+                    <button onClick={()=>delEvidencia(i)} style={{position:"absolute",top:-5,right:-5,width:18,height:18,borderRadius:"50%",background:"var(--red)",color:"#fff",border:"none",cursor:"pointer",fontSize:11,lineHeight:1}}>×</button>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -3729,13 +3757,30 @@ function EvidenciasModal({ trip, unit, ext, clientes, remitentes, onClose }) {
     URL.revokeObjectURL(a.href);
   };
 
-  const descargarFotos = () => {
-    evidencias.forEach((src, i) => {
-      const a = document.createElement("a");
-      a.href = src;
-      a.download = `Evidencia_${trip.origen?.replace(/\s/g,"-")}_${i+1}.jpg`;
-      setTimeout(() => a.click(), i * 300);
-    });
+  const descargarFotos = async () => {
+    for (let i = 0; i < evidencias.length; i++) {
+      const src = evidencias[i];
+      const fname = `Evidencia_${(trip.origen||"").replace(/\s/g,"-")}_${i+1}.jpg`;
+      try {
+        if (src.startsWith("http")) {
+          // Cloudinary URL - fetch as blob to force download
+          const res = await fetch(src);
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url; a.download = fname;
+          document.body.appendChild(a); a.click();
+          setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 500);
+        } else {
+          // base64
+          const a = document.createElement("a");
+          a.href = src; a.download = fname;
+          document.body.appendChild(a); a.click();
+          setTimeout(() => document.body.removeChild(a), 300);
+        }
+      } catch(e) { window.open(src, "_blank"); }
+      await new Promise(r => setTimeout(r, 400));
+    }
   };
 
   // Buscar clienteId si el trip.cliente coincide con algún cliente del catálogo
@@ -3804,11 +3849,24 @@ function EvidenciasModal({ trip, unit, ext, clientes, remitentes, onClose }) {
                       <div style={{ position:"absolute", bottom:4, right:4, display:"flex", gap:3 }}>
                         <button style={{ background:"rgba(0,0,0,.6)", border:"none", borderRadius:4,
                           padding:"2px 6px", fontSize:10, color:"#fff", cursor:"pointer" }}
-                          onClick={e => { e.stopPropagation();
-                            const a = document.createElement("a");
-                            a.href = src;
-                            a.download = `Evidencia_${i+1}.jpg`;
-                            a.click();
+                          onClick={async e => { e.stopPropagation();
+                            const fname = `Evidencia_${i+1}.jpg`;
+                            try {
+                              if (src.startsWith("http")) {
+                                const res = await fetch(src);
+                                const blob = await res.blob();
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url; a.download = fname;
+                                document.body.appendChild(a); a.click();
+                                setTimeout(()=>{URL.revokeObjectURL(url);document.body.removeChild(a);},500);
+                              } else {
+                                const a = document.createElement("a");
+                                a.href = src; a.download = fname;
+                                document.body.appendChild(a); a.click();
+                                setTimeout(()=>document.body.removeChild(a),300);
+                              }
+                            } catch(err){window.open(src,"_blank");}
                           }}>⬇️</button>
                         <button style={{ background:"rgba(0,0,0,.6)", border:"none", borderRadius:4,
                           padding:"2px 6px", fontSize:10, color:"#fff", cursor:"pointer" }}
@@ -5656,6 +5714,9 @@ function DocsPage({ units, drivers, docs, clientes, remitentes, onAdd, onEdit, o
 
 function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes, onAdd, onEdit, onDelete, onAddExt, onEditExt, onDeleteExt, isAdmin, branding = {} }) {
   const [q, setQ] = useState(""); const [sf, setSf] = useState("TODOS"); const [tf, setTf] = useState("TODOS");
+  const [periodoF, setPeriodoF] = useState("todos"); // todos | semana | mes | trimestre | anio
+  const [mesF, setMesF] = useState(new Date().getMonth());
+  const [anioF, setAnioF] = useState(new Date().getFullYear());
   const [evidModal, setEvidModal] = useState(null); // { trip, unit, ext }
   const allTrips = [
     ...trips.filter(t => !t.esExterno).map(t => ({ ...t, tipo: "PROPIO" })),
@@ -5671,6 +5732,20 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
       fechaReg: e.fecha,
     })),
   ];
+  const hoy = new Date();
+  const enRangoTrip = (fechaStr) => {
+    if (periodoF === "todos" || !fechaStr) return true;
+    const parts = (fechaStr||"").split("/");
+    let d;
+    if (parts.length === 3) { d = new Date(parts[2], parts[1]-1, parts[0]); }
+    else { d = new Date(fechaStr); }
+    if (isNaN(d)) return true;
+    if (periodoF === "mes") return d.getMonth()===mesF && d.getFullYear()===anioF;
+    if (periodoF === "semana") { const start = new Date(hoy); start.setDate(hoy.getDate()-hoy.getDay()); const end = new Date(start); end.setDate(start.getDate()+6); return d>=start && d<=end; }
+    if (periodoF === "trimestre") { const trim = Math.floor(mesF/3); const m = d.getMonth(); return Math.floor(m/3)===trim && d.getFullYear()===anioF; }
+    if (periodoF === "anio") return d.getFullYear()===anioF;
+    return true;
+  };
   const fil = allTrips.filter(t => {
     const u   = t.tipo === "PROPIO" ? units.find(u => u.id === t.unidadId) : null;
     const searchStr = [t.origen||"", t.destino||"", t.carga||"", t.cliente||"",
@@ -5695,6 +5770,28 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
       <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--border)", display: "flex", gap: 12, flexWrap: "wrap" }}>
         <div className="ftabs"><span style={{ fontSize: 10, color: "var(--muted)", marginRight: 4, fontWeight: 700 }}>TIPO:</span>{["TODOS", "PROPIO", "EXTERNO"].map(s => <button key={s} className={`ftab${tf === s ? " on" : ""}`} onClick={() => setTf(s)}>{s}</button>)}</div>
         <div className="ftabs"><span style={{ fontSize: 10, color: "var(--muted)", marginRight: 4, fontWeight: 700 }}>STATUS:</span>{["TODOS", "EN RUTA", "COMPLETADO", "CANCELADO"].map(s => <button key={s} className={`ftab${sf === s ? " on" : ""}`} onClick={() => setSf(s)}>{s}</button>)}</div>
+      <div style={{padding:"6px 16px",borderBottom:"1px solid var(--border)",display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+        <span style={{fontSize:11,color:"var(--muted)",fontWeight:700}}>📅 Período:</span>
+        {[["todos","Todos"],["semana","Esta semana"],["mes","Mes"],["trimestre","Trimestre"],["anio","Año"]].map(([v,l])=>(
+          <button key={v} className={`ftab${periodoF===v?" on":""}`} onClick={()=>setPeriodoF(v)} style={{fontSize:11}}>{l}</button>
+        ))}
+        {(periodoF==="mes"||periodoF==="trimestre"||periodoF==="anio")&&(
+          <select value={anioF} onChange={e=>setAnioF(Number(e.target.value))} style={{fontSize:11,padding:"2px 6px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)"}}>
+            {[2024,2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}
+          </select>
+        )}
+        {periodoF==="mes"&&(
+          <select value={mesF} onChange={e=>setMesF(Number(e.target.value))} style={{fontSize:11,padding:"2px 6px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)"}}>
+            {["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"].map((m,i)=><option key={i} value={i}>{m}</option>)}
+          </select>
+        )}
+        {periodoF==="trimestre"&&(
+          <select value={Math.floor(mesF/3)} onChange={e=>setMesF(Number(e.target.value)*3)} style={{fontSize:11,padding:"2px 6px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)"}}>
+            {["T1 (Ene-Mar)","T2 (Abr-Jun)","T3 (Jul-Sep)","T4 (Oct-Dic)"].map((t,i)=><option key={i} value={i}>{t}</option>)}
+          </select>
+        )}
+        <span style={{fontSize:11,color:"var(--muted)",marginLeft:4}}>{fil.length} viajes filtrados</span>
+      </div>
       </div>
       <div className="sbar">
         <span>Registros: <strong>{fil.length}</strong></span>
@@ -6951,8 +7048,8 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
                   const provRef = (proveedores||[]).find(p => p.id === m.proveedorRefId);
                   const cMO  = Number(m.costoMO)  || 0;
                   const cRef = Number(m.costoRef) || 0;
-                  const stMO  = (m.pagoMOStatus  || "pendiente") === "pagado" ? "✅" : "⏳";
-                  const stRef = (m.pagoRefStatus || "pendiente") === "pagado" ? "✅" : "⏳";
+                  const stMO  = (m.pagoMOStatus  || "pendiente") === "pagado" ? <span style={{color:"var(--green)",fontWeight:700,fontSize:10}}>✅ Pagado</span> : <span style={{color:"var(--orange)",fontSize:10}}>⏳ Pend.</span>;
+                  const stRef = (m.pagoRefStatus || "pendiente") === "pagado" ? <span style={{color:"var(--green)",fontWeight:700,fontSize:10}}>✅ Pagado</span> : <span style={{color:"var(--orange)",fontSize:10}}>⏳ Pend.</span>;
                   const unit  = units.find(u => u.id === m.unidadId);
                   return (
                     <tr key={m.id}>
@@ -7253,7 +7350,7 @@ function FuelPage({ units, fuels, onAdd, onEdit, onDelete }) {
 // ════════════════════════════════════════════════════════════════
 
 const ALMACEN_CATS = ["Refacciones","Herramientas","Lubricantes","Filtros","Llantas","Eléctrico","Consumibles","Seguridad","Otro"];
-const ALMACEN_UNIDADES = ["pieza","litro","galón","kit","par","juego","caja","metro"];
+const ALMACEN_UNIDADES = ["pieza","litro","galón","kit","par","juego","caja","metro","cubeta","tambor","kilogramo","tonelada","rollo","otro"];
 
 function AlmacenModal({ item, proveedores = [], onSave, onClose }) {
   const [f, setF] = useState(item || {
@@ -7299,9 +7396,10 @@ function AlmacenModal({ item, proveedores = [], onSave, onClose }) {
             </div>
             <div className="field"><label>No. Parte / SKU</label><input value={f.numParte} onChange={ch("numParte")} placeholder="Ej: WIX-51334"/></div>
             <div className="field"><label>Unidad</label>
-              <select value={f.unidad} onChange={ch("unidad")}>
-                {ALMACEN_UNIDADES.map(u=><option key={u}>{u}</option>)}
+              <select value={ALMACEN_UNIDADES.includes(f.unidad)?f.unidad:"__custom__"} onChange={e=>{if(e.target.value!=="__custom__")setF(p=>({...p,unidad:e.target.value}));else setF(p=>({...p,unidad:""}));}}>
+                {ALMACEN_UNIDADES.map(u=><option key={u}>{u}</option>)}<option value="__custom__">✏️ Otro...</option>
               </select>
+              {(!ALMACEN_UNIDADES.includes(f.unidad)||f.unidad==="")&&<input value={f.unidad} onChange={ch("unidad")} placeholder="Escribe la unidad (ej: cubeta)" style={{marginTop:6}}/>}
             </div>
             <div className="field"><label>Stock Actual</label><input value={f.stockActual} onChange={ch("stockActual")} type="number" min="0"/></div>
             <div className="field"><label>Stock Mínimo</label><input value={f.stockMin} onChange={ch("stockMin")} type="number" min="0"/></div>
@@ -8668,6 +8766,33 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
                 </div>
               ))}
             </div>
+
+        {/* Logística Externa */}
+        {fExternos.length > 0 && (
+          <div className="card">
+            <div className="card-hdr"><h3>🚛 Logística Externa — {lblPeriodo()}</h3></div>
+            <div className="card-body" style={{padding:0}}>
+              <table>
+                <thead><tr><th>Fecha</th><th>Empresa</th><th>Ruta</th><th>Costo</th><th>Estado Pago</th></tr></thead>
+                <tbody>{fExternos.map(e=>(
+                  <tr key={e.id}>
+                    <td style={{fontSize:11}}>{e.fecha||"—"}</td>
+                    <td style={{fontWeight:600,fontSize:12}}>{e.empresa||"—"}</td>
+                    <td style={{fontSize:11,color:"var(--muted)"}}>{e.origen||""}{e.destino?" → "+e.destino:""}</td>
+                    <td style={{color:"var(--purple)",fontWeight:700}}>{fmt$(e.costoPagar)}</td>
+                    <td><span style={{fontSize:11,fontWeight:700,color:e.pagoStatus==="pagado"?"var(--green)":"var(--orange)"}}>{e.pagoStatus==="pagado"?"✅ Pagado":"⏳ Pendiente"}</span></td>
+                  </tr>
+                ))}</tbody>
+              </table>
+              <div style={{padding:"8px 16px",borderTop:"1px solid var(--border)",display:"flex",gap:16,fontSize:12}}>
+                <span>Total: <strong>{fExternos.length} viajes</strong></span>
+                <span style={{color:"var(--purple)"}}>Costo total: <strong>{fmt$(fExternos.reduce((a,e)=>a+(Number(e.costoPagar)||0),0))}</strong></span>
+                <span style={{color:"var(--green)"}}>Pagado: <strong>{fmt$(fExternos.filter(e=>e.pagoStatus==="pagado").reduce((a,e)=>a+(Number(e.costoPagar)||0),0))}</strong></span>
+                <span style={{color:"var(--orange)"}}>Pendiente: <strong>{fmt$(fExternos.filter(e=>e.pagoStatus!=="pagado").reduce((a,e)=>a+(Number(e.costoPagar)||0),0))}</strong></span>
+              </div>
+            </div>
+          </div>
+        )}
           </div>
         </div>
       </div>
@@ -8784,12 +8909,20 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
 
   const VistaProveedores = () => {
     const porProv = proveedores.map(p=>{
-      const gm   = maints.filter(m=>m.proveedorId===p.id).reduce((a,m)=>a+(Number(m.costoRef)||0)+(Number(m.costoMO)||0),0);
-      const gg   = gastos.filter(g=>g.proveedorId===p.id).reduce((a,g)=>a+(Number(g.monto)||0),0);
-      const ge   = externos.filter(e=>e.proveedorId===p.id).reduce((a,e)=>a+(Number(e.costoPagar)||0),0);
-      const total= gm+gg+ge;
-      const pend = externos.filter(e=>e.proveedorId===p.id&&e.pagoStatus!=="pagado").reduce((a,e)=>a+(Number(e.costoPagar)||0),0)
-                 + maints.filter(m=>m.proveedorId===p.id&&m.pagoStatus!=="pagado").reduce((a,m)=>a+(Number(m.costoRef)||0)+(Number(m.costoMO)||0),0);
+      // Use filtered data (fMaints, fGastos, fExternos respect the period filter)
+      // Maints: a provider can be taller (proveedorId) or refacciones (proveedorRefId)
+      const gmMO  = fMaints.filter(m=>m.proveedorId===p.id).reduce((a,m)=>a+(Number(m.costoMO)||0),0);
+      const gmRef = fMaints.filter(m=>m.proveedorRefId===p.id).reduce((a,m)=>a+(Number(m.costoRef)||0),0);
+      const gm    = gmMO + gmRef;
+      const gg    = fGastos.filter(g=>g.proveedorId===p.id).reduce((a,g)=>a+(Number(g.monto)||0),0);
+      const ge    = fExternos.filter(e=>e.proveedorId===p.id).reduce((a,e)=>a+(Number(e.costoPagar)||0),0);
+      const total = gm+gg+ge;
+      // Pending: use correct status fields per type
+      const pendMO  = fMaints.filter(m=>m.proveedorId===p.id&&(m.pagoMOStatus||"pendiente")!=="pagado").reduce((a,m)=>a+(Number(m.costoMO)||0),0);
+      const pendRef = fMaints.filter(m=>m.proveedorRefId===p.id&&(m.pagoRefStatus||"pendiente")!=="pagado").reduce((a,m)=>a+(Number(m.costoRef)||0),0);
+      const pendGg  = fGastos.filter(g=>g.proveedorId===p.id&&(g.pagoStatus||"pendiente")!=="pagado").reduce((a,g)=>a+(Number(g.monto)||0),0);
+      const pendGe  = fExternos.filter(e=>e.proveedorId===p.id&&(e.pagoStatus||"pendiente")!=="pagado").reduce((a,e)=>a+(Number(e.costoPagar)||0),0);
+      const pend  = pendMO + pendRef + pendGg + pendGe;
       return { ...p, gm, gg, ge, total, pend };
     }).filter(p=>p.total>0).sort((a,b)=>b.total-a.total);
 
@@ -11001,12 +11134,24 @@ function FacturacionPage({ facturas, clientes, viajes, onAdd, onEdit, onDelete, 
   const [q, setQ] = useState("");
   const [sf, setSf] = useState("TODOS");
   const [cf, setCf] = useState("TODOS");
+  const [periodoFac, setPeriodoFac] = useState("todos");
+  const [mesFac, setMesFac] = useState(new Date().getMonth());
+  const [anioFac, setAnioFac] = useState(new Date().getFullYear());
 
+  const enRangoFac = (fecha) => {
+    if (periodoFac==="todos"||!fecha) return true;
+    const d = new Date(fecha);
+    if (isNaN(d)) return true;
+    if (periodoFac==="mes") return d.getMonth()===mesFac&&d.getFullYear()===anioFac;
+    if (periodoFac==="trimestre") return Math.floor(d.getMonth()/3)===Math.floor(mesFac/3)&&d.getFullYear()===anioFac;
+    if (periodoFac==="anio") return d.getFullYear()===anioFac;
+    return true;
+  };
   const fil = facturas.filter(f => {
     const matchQ = (f.folio || f.serie + "-" + f.numeroFactura + (f.cliente||"") + (f.rfcCliente||"")).toLowerCase().includes(q.toLowerCase());
     const matchS = sf === "TODOS" || f.status === sf;
     const matchC = cf === "TODOS" || f.clienteId === cf;
-    return matchQ && matchS && matchC;
+    return matchQ && matchS && matchC && enRangoFac(f.fechaEmision);
   });
 
   const pendientes = facturas.filter(f => f.status === "PENDIENTE");
@@ -11037,6 +11182,28 @@ function FacturacionPage({ facturas, clientes, viajes, onAdd, onEdit, onDelete, 
             <div className="sw"><span style={{ color: "var(--muted)" }}>🔍</span><input placeholder="Buscar factura..." value={q} onChange={e => setQ(e.target.value)} /></div>
             <button className="btn btn-cyan" onClick={onAdd}>+ Nueva Factura</button>
           </div>
+        </div>
+        <div style={{padding:"6px 16px",borderBottom:"1px solid var(--border)",display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <span style={{fontSize:11,color:"var(--muted)",fontWeight:700}}>📅 Período:</span>
+          {[["todos","Todos"],["mes","Mes"],["trimestre","Trimestre"],["anio","Año"]].map(([v,l])=>(
+            <button key={v} className={`ftab${periodoFac===v?" on":""}`} onClick={()=>setPeriodoFac(v)} style={{fontSize:11}}>{l}</button>
+          ))}
+          {(periodoFac==="mes"||periodoFac==="trimestre"||periodoFac==="anio")&&(
+            <select value={anioFac} onChange={e=>setAnioFac(Number(e.target.value))} style={{fontSize:11,padding:"2px 6px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)"}}>
+              {[2024,2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}
+            </select>
+          )}
+          {periodoFac==="mes"&&(
+            <select value={mesFac} onChange={e=>setMesFac(Number(e.target.value))} style={{fontSize:11,padding:"2px 6px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)"}}>
+              {["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"].map((m,i)=><option key={i} value={i}>{m}</option>)}
+            </select>
+          )}
+          {periodoFac==="trimestre"&&(
+            <select value={Math.floor(mesFac/3)} onChange={e=>setMesFac(Number(e.target.value)*3)} style={{fontSize:11,padding:"2px 6px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)"}}>
+              {["T1 (Ene-Mar)","T2 (Abr-Jun)","T3 (Jul-Sep)","T4 (Oct-Dic)"].map((t,i)=><option key={i} value={i}>{t}</option>)}
+            </select>
+          )}
+          <span style={{fontSize:11,color:"var(--muted)"}}>{fil.length} facturas</span>
         </div>
         <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--border)", display: "flex", gap: 20, flexWrap: "wrap" }}>
           <div className="ftabs">
@@ -11771,7 +11938,7 @@ export default function App() {
             clientes={clientes}
             viajes={trips}
             onAdd={() => setModal({ type: "factura", data: null, _ts: Date.now() })}
-            onEdit={f => FacC.save(f)}
+            onEdit={f => setModal({ type: "factura", data: f })}
             onDelete={FacC.del}
             onMarcarPagada={marcarPagada}
           />}
