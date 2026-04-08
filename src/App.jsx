@@ -4907,7 +4907,7 @@ function printAndDownloadDoc(doc, unit, driver) {
   .field{border:1px solid #ddd;padding:8px 12px;border-radius:6px;background:#FAFBFC}
   .field label{font-size:9px;font-weight:700;display:block;color:#666;text-transform:uppercase}
   .status{display:inline-block;padding:6px 18px;border-radius:20px;font-weight:700;font-size:14px;color:#fff;background:${statusColor};margin-bottom:16px}
-  .photo{max-width:100%;max-height:200px;border-radius:8px;border:2px solid #0099CC;margin-top:10px;display:block}
+  .photo{width:100%;border-radius:8px;border:2px solid #0099CC;margin-top:10px;display:block;page-break-inside:avoid}
   .btn-row{display:flex;gap:12px;margin-top:20px}
   button{padding:8px 20px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:700}
   .print-btn{background:#0099CC;color:#fff}
@@ -4926,7 +4926,7 @@ function printAndDownloadDoc(doc, unit, driver) {
   ${doc.notas ? `<div class="field" style="margin-bottom:12px"><label>Notas</label>${doc.notas}</div>` : ""}
   ${(() => {
     const fotos = doc.fotos?.length ? doc.fotos : doc.foto ? [doc.foto] : [];
-    return fotos.map((src,i) => `<img src="${src}" class="photo" alt="Foto ${i+1}" style="margin-bottom:8px"/>`).join('\n');
+    return fotos.map((src,i) => `<div style="margin-bottom:20px;page-break-inside:avoid"><p style="font-size:11px;color:#666;margin:4px 0">Foto ${i+1} de ${fotos.length}</p><img src="${src}" class="photo" alt="Foto ${i+1}"/><div style="margin-top:4px;text-align:right"><a href="${src}" download="documento-foto-${i+1}.jpg" style="font-size:11px;color:#0099CC;text-decoration:none">⬇️ Descargar foto ${i+1}</a></div></div>`).join('\n');
   })()}
   <div class="btn-row"><button class="print-btn" onclick="window.print()">🖨️ Imprimir</button><button class="close-btn" onclick="window.close()">✕ Cerrar</button></div>
   <p style="margin-top:16px;font-size:10px;color:#999">Generado: ${new Date().toLocaleDateString("es-MX",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p>
@@ -4935,14 +4935,39 @@ function printAndDownloadDoc(doc, unit, driver) {
 }
 
 function downloadDocAsHtml(doc, unit, driver) {
-  const html = printAndDownloadDoc(doc, unit, driver);
-  const blob = new Blob([html], { type: "text/html" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${doc.nombre}_${unit ? unit.num : (driver?.nombre || "doc")}.html`;
-  a.click();
-  URL.revokeObjectURL(url);
+  // Download each photo as JPG, or HTML if no photos
+  const fotos = doc.fotos?.length ? doc.fotos : doc.foto ? [doc.foto] : [];
+  if (fotos.length > 0) {
+    fotos.forEach(async (src, i) => {
+      const fname = `${doc.nombre.replace(/[^a-zA-Z0-9]/g,"-")}-${unit?unit.num:(driver?.nombre||"doc")}-foto${i+1}.jpg`;
+      try {
+        if (src.startsWith("http")) {
+          const res = await fetch(src);
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url; a.download = fname;
+          document.body.appendChild(a); a.click();
+          setTimeout(()=>{URL.revokeObjectURL(url);document.body.removeChild(a);},500);
+        } else {
+          const a = document.createElement("a");
+          a.href = src; a.download = fname;
+          document.body.appendChild(a); a.click();
+          setTimeout(()=>document.body.removeChild(a),300);
+        }
+      } catch(e) { window.open(src, "_blank"); }
+    });
+  } else {
+    // No photos — download as HTML
+    const html = printAndDownloadDoc(doc, unit, driver);
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${doc.nombre}_${unit?unit.num:(driver?.nombre||"doc")}.html`;
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{URL.revokeObjectURL(url);document.body.removeChild(a);},500);
+  }
 }
 
 function openDocPrint(doc, unit, driver) {
@@ -5751,7 +5776,7 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
     const searchStr = [t.origen||"", t.destino||"", t.carga||"", t.cliente||"",
                        t.empresa||"", u?.placas||"", u?.num||""].join(" ").toLowerCase();
     const tipoMatch = tf === "TODOS" || t.tipo === tf || (tf === "EXTERNO" && t._esExternoRec);
-    return searchStr.includes(q.toLowerCase()) && (sf === "TODOS" || t.status === sf) && tipoMatch;
+    return searchStr.includes(q.toLowerCase()) && (sf === "TODOS" || t.status === sf) && tipoMatch && enRangoTrip(t.fecha||t.fechaReg);
   });
   const totKm = fil.reduce((a, t) => a + ((Number(t.kmLlegada) || 0) - (Number(t.kmSalida) || 0)), 0);
   const totIng = fil.filter(t => t.status === "COMPLETADO" && !t._esExternoRec).reduce((a, t) => a + (Number(t.costoOfrecido) || 0), 0);
@@ -6349,7 +6374,7 @@ function PagoProveedorGenericoModal({ item, proveedor, branding, trips, maints, 
   const initFact   = isRef ? (data.pagoRefFactura||"") : isMO ? (data.pagoMOFactura||"") : (data.pagoFactura||"");
   const initNotas  = isRef ? (data.pagoRefNotas||"")  : isMO ? (data.pagoMONotas||"")  : (data.pagoNotas||"");
   const initEvidencias = isRef ? (data.pagoRefEvidencias||[]) : isMO ? (data.pagoMOEvidencias||[]) : (data.pagoEvidencias||[]);
-  const initFacturaArchivos = isRef ? (data.pagoRefFacturaArchivos||[]) : isMO ? (data.pagoMOFacturaArchivos||[]) : (data.pagoFacturaArchivos||[]);
+  const initFacturaArchivos = isRef ? (data.pagoRefFacturaArchivos||[]) : isMO ? (data.pagoMOFacturaArchivos||[]) : [...(data.facturaArchivos||[]),...(data.pagoFacturaArchivos||[])];
   const [f, setF] = useState({
     pagoStatus:      initStatus,
     pagoFecha:       initFecha,
@@ -6652,6 +6677,70 @@ function CxPTab({ allPayments, proveedores, cxpFiltro, setCxpFiltro, setModalPag
   );
 }
 
+// ── Transportistas Tab component — avoids IIFE freeze ────────────────────────
+function TransportistasTab({ externos, proveedores, fmt$, setModalPago }) {
+  const pendientes = externos.filter(e=>e.pagoStatus!=="pagado"&&e.costoPagar>0);
+  const pagados    = externos.filter(e=>e.pagoStatus==="pagado");
+  const totalPend  = pendientes.reduce((s,e)=>s+(Number(e.costoPagar)||0),0);
+  const totalPag   = pagados.reduce((s,e)=>s+(Number(e.costoPagar)||0),0);
+  const fmx = n => "$"+Number(n||0).toLocaleString("es-MX",{minimumFractionDigits:2});
+  return (
+    <div>
+      <div className="stats" style={{marginBottom:14}}>
+        <div className="stat" style={{"--c":"var(--orange)"}}>
+          <div className="stat-icon">⏳</div><div className="stat-val sm">{pendientes.length}</div><div className="stat-lbl">Pendientes</div>
+        </div>
+        <div className="stat" style={{"--c":"var(--red)"}}>
+          <div className="stat-icon">💸</div><div className="stat-val sm" style={{fontSize:16}}>{fmx(totalPend)}</div><div className="stat-lbl">Total pendiente</div>
+        </div>
+        <div className="stat" style={{"--c":"var(--green)"}}>
+          <div className="stat-icon">✅</div><div className="stat-val sm">{pagados.length}</div><div className="stat-lbl">Pagados</div>
+        </div>
+        <div className="stat" style={{"--c":"var(--muted)"}}>
+          <div className="stat-icon">💰</div><div className="stat-val sm" style={{fontSize:16}}>{fmx(totalPag)}</div><div className="stat-lbl">Total pagado</div>
+        </div>
+      </div>
+      <div className="card">
+        <div className="card-body" style={{padding:0}}>
+          <table>
+            <thead><tr><th>Empresa Transportista</th><th>Ruta</th><th>Fecha Viaje</th><th style={{textAlign:"right"}}>Costo</th><th>Estado</th><th>F.Pago</th><th>Referencia</th><th>Acción</th></tr></thead>
+            <tbody>
+              {externos.length===0
+                ? <tr><td colSpan={8} style={{textAlign:"center",color:"var(--muted)",padding:24}}>Sin viajes externos registrados</td></tr>
+                : [...externos].sort((a,b)=>{const ord={pendiente:0,parcial:1,pagado:2};return (ord[a.pagoStatus||"pendiente"]||0)-(ord[b.pagoStatus||"pendiente"]||0);}).map(e => {
+                    const pv = (proveedores||[]).find(p=>p.id===e.proveedorId);
+                    const stColor = e.pagoStatus==="pagado"?"var(--green)":e.pagoStatus==="parcial"?"var(--cyan)":"var(--orange)";
+                    const stIcon  = e.pagoStatus==="pagado"?"✅":e.pagoStatus==="parcial"?"🔄":"⏳";
+                    return (
+                      <tr key={e.id} style={{background:e.pagoStatus==="pagado"?"rgba(0,200,100,.03)":"rgba(255,140,0,.02)"}}>
+                        <td>
+                          <div style={{fontWeight:700}}>{e.empresa}</div>
+                          {e.contacto&&<div style={{fontSize:10,color:"var(--muted)"}}>{e.contacto}{e.tel?" · "+e.tel:""}</div>}
+                          {pv&&<Bdg c="bb" t="En catálogo"/>}
+                        </td>
+                        <td style={{fontSize:12}}>{e.origen} → {e.destino||"—"}</td>
+                        <td style={{fontSize:12}}>{e.fecha}</td>
+                        <td style={{textAlign:"right",fontWeight:700,color:"var(--orange)",fontSize:14}}>${Number(e.costoPagar||0).toLocaleString("es-MX",{minimumFractionDigits:2})}</td>
+                        <td><span style={{fontWeight:700,color:stColor,fontSize:12}}>{stIcon} {e.pagoStatus==="pagado"?"Pagado":e.pagoStatus==="parcial"?"Parcial":"Pendiente"}</span></td>
+                        <td style={{fontSize:12,color:"var(--muted)"}}>{e.pagoFecha||"—"}</td>
+                        <td style={{fontSize:11,color:"var(--muted)",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis"}}>{e.pagoReferencia||"—"}</td>
+                        <td>
+                          <button className="btn btn-cyan btn-xs" onClick={()=>setModalPago(e)}>
+                            {e.pagoStatus==="pagado"?"✏️ Editar":"💳 Pagar"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [], onAdd, onEdit, onDelete, onSaveExterno, onSavePagoProveedor, branding }) {
   const [q, setQ] = useState(""); const [cf, setCf] = useState("TODOS"); const [tab, setTab] = useState("lista");
   const [modalPago, setModalPago] = useState(null); // externo being paid (transportista)
@@ -6824,68 +6913,7 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
       )}
 
       {/* Tab: Cuentas por pagar transportistas */}
-      {tab==="transportistas" && (() => {
-        const pendientes = externos.filter(e=>e.pagoStatus!=="pagado"&&e.costoPagar>0);
-        const pagados    = externos.filter(e=>e.pagoStatus==="pagado");
-        const totalPend  = pendientes.reduce((s,e)=>s+(Number(e.costoPagar)||0),0);
-        const totalPag   = pagados.reduce((s,e)=>s+(Number(e.costoPagar)||0),0);
-        return (
-            <div>
-            <div className="stats" style={{marginBottom:14}}>
-              <div className="stat" style={{"--c":"var(--orange)"}}>
-                <div className="stat-icon">⏳</div><div className="stat-val sm">{pendientes.length}</div><div className="stat-lbl">Por liquidar</div>
-              </div>
-              <div className="stat" style={{"--c":"var(--red)"}}>
-                <div className="stat-icon">💸</div><div className="stat-val sm" style={{fontSize:16}}>{fmt$(totalPend)}</div><div className="stat-lbl">Total pendiente</div>
-              </div>
-              <div className="stat" style={{"--c":"var(--green)"}}>
-                <div className="stat-icon">✅</div><div className="stat-val sm">{pagados.length}</div><div className="stat-lbl">Pagados</div>
-              </div>
-              <div className="stat" style={{"--c":"var(--muted)"}}>
-                <div className="stat-icon">💰</div><div className="stat-val sm" style={{fontSize:16}}>{fmt$(totalPag)}</div><div className="stat-lbl">Total liquidado</div>
-              </div>
-            </div>
-            <div className="card">
-              <div className="card-body" style={{padding:0}}>
-                <table>
-                  <thead><tr><th>Empresa Transportista</th><th>Ruta</th><th>Fecha Viaje</th><th style={{textAlign:"right"}}>Costo</th><th>Estado Pago</th><th>Fecha Pago</th><th>Referencia</th><th>Acciones</th></tr></thead>
-                  <tbody>
-                    {externos.length===0
-                      ? <tr><td colSpan={8} style={{textAlign:"center",color:"var(--muted)",padding:24}}>Sin viajes externos registrados</td></tr>
-                      : [...externos].sort((a,b)=>{const ord={pendiente:0,parcial:1,pagado:2};return (ord[a.pagoStatus||"pendiente"]||0)-(ord[b.pagoStatus||"pendiente"]||0);}).map(e=>{
-                          const pv = proveedores.find(p=>p.id===e.proveedorId);
-                          const stColor = e.pagoStatus==="pagado"?"var(--green)":e.pagoStatus==="parcial"?"var(--cyan)":"var(--orange)";
-                          const stIcon  = e.pagoStatus==="pagado"?"✅":e.pagoStatus==="parcial"?"🔄":"⏳";
-                          return (
-                          
-                            <tr key={e.id} style={{background:e.pagoStatus==="pagado"?"rgba(0,200,100,.03)":"rgba(255,184,0,.03)"}}>
-                              <td>
-                                <div style={{fontWeight:700}}>{e.empresa}</div>
-                                {e.contacto&&<div style={{fontSize:10,color:"var(--muted)"}}>{e.contacto}{e.tel&&` · ${e.tel}`}</div>}
-                                {pv&&<Bdg c="bb" t="En catálogo"/>}
-                              </td>
-                              <td style={{fontSize:12}}>{e.origen} → {e.destino||"—"}</td>
-                              <td style={{fontSize:12}}>{e.fecha}</td>
-                              <td style={{textAlign:"right",fontWeight:700,color:"var(--orange)",fontSize:14}}>{fmt$(e.costoPagar||0)}</td>
-                              <td><span style={{fontWeight:700,color:stColor,fontSize:12}}>{stIcon} {e.pagoStatus==="pagado"?"Pagado":e.pagoStatus==="parcial"?"Parcial":"Pendiente"}</span></td>
-                              <td style={{fontSize:12,color:"var(--muted)"}}>{e.pagoFecha||"—"}</td>
-                              <td style={{fontSize:11,color:"var(--muted)",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.pagoReferencia||"—"}</td>
-                              <td>
-                                <button className="btn btn-cyan btn-xs" onClick={()=>setModalPago(e)}>
-                                  {e.pagoStatus==="pagado"?"👁️ Ver":"💳 Pagar"}
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })
-                    }
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )
-      })()}
+      {tab==="transportistas" && <TransportistasTab externos={externos} proveedores={proveedores} fmt$={fmt$} setModalPago={setModalPago} />}
 
       {/* ── Tab: Cuentas por Pagar — TODOS los proveedores ── */}
       {tab==="cxp" && (
@@ -10808,6 +10836,10 @@ const AYUDA_DATA = [
         a: "Viaje propio: genera ingreso para tu empresa, se asigna a una unidad de tu flota y afecta la nómina del operador. Logística externa: genera un costo (cuenta por pagar al transportista), no afecta tu flota ni nóminas. Ambos se pueden facturar al cliente desde el módulo de Facturación." },
       { q: "¿Qué es la Hoja de Instrucción y cómo la genero?",
         a: "La Hoja de Instrucción es un documento para el operador con los detalles del viaje: folio, unidad, ruta, hora de cita en origen y destino, datos del cliente, carga y notas. Se genera desde Viajes & Logística → botón '📋 Hoja de Instrucción'. Puedes seleccionar la hora de cita con un menú desplegable (intervalos de 30 minutos). Usa '🖨️ Imprimir / PDF' para abrir el diálogo de impresión y guardarla como PDF." },
+      { q: "¿Puedo filtrar los viajes por período?",
+        a: "Sí. En Viajes & Logística aparece una barra de período con botones: Esta semana, Mes, Trimestre y Año. Al seleccionar Mes o Trimestre aparecen selectores adicionales de mes y año. El contador de viajes se actualiza en tiempo real mostrando cuántos viajes hay en el período seleccionado. El botón Imprimir Reporte genera el PDF solo con los viajes filtrados." },
+      { q: "¿Cómo descargo las evidencias de un viaje?",
+        a: "En la tabla de viajes, haz clic en el ícono de cámara 📷 para ver las evidencias. Cada foto tiene un botón ⬇️ que descarga directamente como JPG a tu carpeta de Descargas. También puedes usar 'Descargar todas' para bajar todas las fotos del viaje de una vez. En celular, las fotos se guardan en el carrete de fotografías." },
     ]
   },
   {
@@ -10836,6 +10868,8 @@ const AYUDA_DATA = [
         a: "Permite llevar el control de inventario de refacciones, herramientas, lubricantes y cualquier artículo que uses en el taller. Puedes registrar stock actual, stock mínimo de alerta, foto, número de parte, proveedor habitual y ubicación física en el almacén." },
       { q: "¿Cómo agrego un artículo al almacén?",
         a: "Ve a Control → Almacén → '➕ Nuevo Artículo'. Llena el nombre, categoría, marca, número de parte, unidad de medida, stock actual y mínimo. En 'Proveedor habitual' puedes seleccionar directamente desde la lista de proveedores registrados (excluye talleres y mano de obra). Puedes agregar foto desde Cloudinary." },
+      { q: "¿Puedo agregar una unidad de medida personalizada (ej. cubeta)?",
+        a: "Sí. En el formulario de nuevo artículo, el campo Unidad tiene un selector con las unidades comunes. Al final aparece la opción '✏️ Otro...' — selecciónala y escribe la unidad que necesitas (cubeta, tambor, garrafa, etc.). Quedará guardada en ese artículo." },
       { q: "¿Cómo registro una entrada o salida de inventario?",
         a: "Haz clic en '📋 Mov.' en la tarjeta del artículo, o en el botón '📋 Registrar Movimiento' del encabezado. Selecciona el artículo, el tipo (Entrada = compra/recepción, Salida = uso en mantenimiento, Ajuste = corrección de inventario), la cantidad y el motivo. El stock se actualiza automáticamente." },
       { q: "¿Qué significan los colores en las tarjetas de artículos?",
@@ -10854,6 +10888,8 @@ const AYUDA_DATA = [
     id: "documentos", icono: "📄", titulo: "Documentos y Vigencias",
     color: "var(--purple)",
     preguntas: [
+      { q: "¿Cómo descargo la foto de un documento como imagen JPG?",
+        a: "En la tarjeta del documento, el botón ⬇️ descarga directamente como JPG las fotos adjuntas al documento. Si hay varias fotos, se descargan una por una. Para imprimir, el botón 🖨️ abre una vista de impresión donde la foto se muestra a tamaño completo para mejor legibilidad." },
       { q: "¿Qué documentos puedo rastrear?",
         a: "Cualquier documento con fecha de vencimiento: verificaciones, seguros, permisos SCT, licencias de conductores, tarjetas de circulación, etc. El sistema alerta 30 días antes del vencimiento." },
       { q: "¿Con cuántos días de anticipación me avisa el sistema?",
