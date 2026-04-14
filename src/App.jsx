@@ -1529,19 +1529,19 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
             <div className="field"><label>Destino</label><input value={f.destino} onChange={ch("destino")} /></div>
             <div className="field"><label>Cliente</label><input value={f.cliente} onChange={ch("cliente")} /></div>
             <div className="field"><label>Carga</label><input value={f.carga} onChange={ch("carga")} /></div>
-            <div className="field"><label>Status</label><select value={f.status} onChange={ch("status")}><option>EN RUTA</option><option>COMPLETADO</option><option>CANCELADO</option></select></div>
-            <div className="field s2"><label>Notas</label><textarea value={f.notas} onChange={ch("notas")} rows={2} /></div>
           </div>
           <div className="sec-lbl">🔒 Financiero</div>
           <div className="fg">
             <div className="field"><label>Costo a Pagar ($)</label><input value={f.costoPagar} onChange={ch("costoPagar")} type="number" /></div>
             <div className="field"><label>Precio al Cliente ($)</label><input value={f.precioCliente} onChange={ch("precioCliente")} type="number" /></div>
             <div className="field"><label>Costo Estadías ($)</label><input value={f.costoEstadias} onChange={ch("costoEstadias")} type="number" /></div>
+            <div className="field"><label>Gastos Extras ($)</label><input value={f.gastosExtrasExt||0} onChange={ch("gastosExtrasExt")} type="number" min="0" placeholder="0"/></div>
           </div>
           {utilidad !== 0 && <div style={{ marginTop: 10, padding: "12px 16px", background: utilidad >= 0 ? "#E8F9F3" : "#FFF0F2", borderRadius: 10, border: `1px solid ${utilidad >= 0 ? "#B8EDCA" : "#FFD0D5"}` }}>
             <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700 }}>UTILIDAD: </span>
             <span style={{ fontFamily: "var(--font-hd)", fontSize: 24, fontWeight: 700, color: utilidad >= 0 ? "#00864E" : "var(--red)" }}>{fmt$(utilidad)}</span>
           </div>}
+            <div className="field s2"><label>Notas</label><textarea value={f.notas} onChange={ch("notas")} rows={2} /></div>
           <MultiPhotoInput values={f.evidencias || []} onChange={v => setF(p => ({ ...p, evidencias: v }))} onUploading={setUploading} label="📸 Evidencias de Entrega" />
         </div>
         <div className="mftr"><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-cyan" onClick={ok} disabled={uploading} style={uploading?{opacity:.6,cursor:"not-allowed"}:{}}>{uploading?"⏳ Subiendo...":"💾 Guardar"}</button></div>
@@ -3824,12 +3824,17 @@ function EvidenciasModal({ trip, unit, ext, clientes, remitentes, onClose }) {
   return (
     <>
       {lightbox && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.88)", zIndex:9999,
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.92)", zIndex:9999,
           display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}
           onClick={() => setLightbox(null)}>
-          <div style={{ fontSize:11, color:"#aaa", marginBottom:8 }}>{lightbox.label} · clic para cerrar</div>
+          <button onClick={() => setLightbox(null)} style={{position:"fixed",top:0,left:0,right:0,background:"#0099CC",color:"#fff",border:"none",padding:"14px 20px",fontSize:17,fontWeight:700,cursor:"pointer",zIndex:10000,textAlign:"left"}}>✕ Cerrar foto</button>
+          <div style={{ marginTop:60, fontSize:11, color:"#aaa", marginBottom:8 }}>{lightbox.label} · toca en cualquier lugar para cerrar</div>
           <img src={lightbox.src} alt={lightbox.label}
-            style={{ maxWidth:"92vw", maxHeight:"82vh", borderRadius:10, border:"3px solid #0099CC", objectFit:"contain" }} />
+            style={{ maxWidth:"92vw", maxHeight:"75vh", borderRadius:10, border:"3px solid #0099CC", objectFit:"contain" }}/>
+          <div style={{marginTop:12,display:"flex",gap:12}}>
+            <a href={lightbox.src} download={`evidencia.jpg`} onClick={e=>e.stopPropagation()} style={{background:"#0099CC",color:"#fff",padding:"10px 18px",borderRadius:8,fontSize:14,fontWeight:700,textDecoration:"none"}}>⬇️ Descargar</a>
+            <button onClick={()=>setLightbox(null)} style={{background:"rgba(255,255,255,.2)",color:"#fff",border:"1px solid rgba(255,255,255,.4)",padding:"10px 18px",borderRadius:8,fontSize:14,fontWeight:700,cursor:"pointer"}}>✕ Cerrar</button>
+          </div>
         </div>
       )}
       <div className="modal-ov" onClick={onClose}>
@@ -5335,12 +5340,14 @@ function DocEnvioModal({ docs, clientes, remitentes, onClose }) {
     <>
       {/* Lightbox para ver foto completa */}
       {lightbox && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.88)", zIndex:9999,
-          display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}
-          onClick={() => setLightbox(null)}>
-          <div style={{ fontSize:11, color:"#aaa", marginBottom:8 }}>{lightbox.label} · clic para cerrar</div>
-          <img src={lightbox.src} alt={lightbox.label}
-            style={{ maxWidth:"92vw", maxHeight:"82vh", borderRadius:10, border:"3px solid #0099CC", objectFit:"contain" }} />
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.92)", zIndex:9999, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }} onClick={()=>setLightbox(null)}>
+          <button onClick={()=>setLightbox(null)} style={{position:"fixed",top:0,left:0,right:0,background:"#0099CC",color:"#fff",border:"none",padding:"14px 20px",fontSize:17,fontWeight:700,cursor:"pointer",zIndex:10000,textAlign:"left"}}>✕ Cerrar</button>
+          <div style={{marginTop:60,fontSize:11,color:"#aaa",marginBottom:8}}>{lightbox.label} · toca para cerrar</div>
+          <img src={lightbox.src} alt={lightbox.label} style={{maxWidth:"92vw",maxHeight:"75vh",borderRadius:10,border:"3px solid #0099CC",objectFit:"contain"}}/>
+          <div style={{marginTop:12,display:"flex",gap:12}}>
+            <a href={lightbox.src} download="foto.jpg" onClick={e=>e.stopPropagation()} style={{background:"#0099CC",color:"#fff",padding:"10px 18px",borderRadius:8,fontSize:14,fontWeight:700,textDecoration:"none"}}>⬇️ Descargar</a>
+            <button onClick={()=>setLightbox(null)} style={{background:"rgba(255,255,255,.2)",color:"#fff",border:"1px solid rgba(255,255,255,.4)",padding:"10px 18px",borderRadius:8,fontSize:14,fontWeight:700,cursor:"pointer"}}>✕ Cerrar</button>
+          </div>
         </div>
       )}
 
@@ -5777,6 +5784,8 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
   const [periodoF, setPeriodoF] = useState("todos"); // todos | semana | mes | trimestre | anio
   const [mesF, setMesF] = useState(new Date().getMonth());
   const [anioF, setAnioF] = useState(new Date().getFullYear());
+  const [customDe, setCustomDe] = useState(""); // yyyy-mm-dd
+  const [customA,  setCustomA]  = useState(""); // yyyy-mm-dd
   const [evidModal, setEvidModal] = useState(null); // { trip, unit, ext }
   const allTrips = [
     ...trips.filter(t => !t.esExterno).map(t => ({ ...t, tipo: "PROPIO" })),
@@ -5794,14 +5803,23 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
   ];
   const hoy = new Date();
   const enRangoTrip = (fechaStr) => {
-    if (periodoF === "todos" || !fechaStr) return true;
+    if (!fechaStr) return true;
     const parts = (fechaStr||"").split("/");
     let d;
     if (parts.length === 3) { d = new Date(parts[2], parts[1]-1, parts[0]); }
     else { d = new Date(fechaStr); }
     if (isNaN(d)) return true;
+    if (periodoF === "todos") return true;
+    if (periodoF === "custom") {
+      const de = customDe ? new Date(customDe) : null;
+      const a  = customA  ? new Date(customA)  : null;
+      if (de) de.setHours(0,0,0,0);
+      if (a)  a.setHours(23,59,59,999);
+      return (!de || d >= de) && (!a || d <= a);
+    }
+    const hoy = new Date();
     if (periodoF === "mes") return d.getMonth()===mesF && d.getFullYear()===anioF;
-    if (periodoF === "semana") { const start = new Date(hoy); start.setDate(hoy.getDate()-hoy.getDay()); const end = new Date(start); end.setDate(start.getDate()+6); return d>=start && d<=end; }
+    if (periodoF === "semana") { const start = new Date(hoy); start.setDate(hoy.getDate()-hoy.getDay()); start.setHours(0,0,0,0); const end = new Date(start); end.setDate(start.getDate()+6); end.setHours(23,59,59,999); return d>=start && d<=end; }
     if (periodoF === "trimestre") { const trim = Math.floor(mesF/3); const m = d.getMonth(); return Math.floor(m/3)===trim && d.getFullYear()===anioF; }
     if (periodoF === "anio") return d.getFullYear()===anioF;
     return true;
@@ -5827,12 +5845,13 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
           <button className="btn btn-cyan" onClick={onAdd}>+ Viaje Propio</button>
         </div>
       </div>
-      <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--border)", display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <div className="ftabs"><span style={{ fontSize: 10, color: "var(--muted)", marginRight: 4, fontWeight: 700 }}>TIPO:</span>{["TODOS", "PROPIO", "EXTERNO"].map(s => <button key={s} className={`ftab${tf === s ? " on" : ""}`} onClick={() => setTf(s)}>{s}</button>)}</div>
-        <div className="ftabs"><span style={{ fontSize: 10, color: "var(--muted)", marginRight: 4, fontWeight: 700 }}>STATUS:</span>{["TODOS", "EN RUTA", "COMPLETADO", "CANCELADO"].map(s => <button key={s} className={`ftab${sf === s ? " on" : ""}`} onClick={() => setSf(s)}>{s}</button>)}</div>
-      <div style={{padding:"6px 16px",borderBottom:"1px solid var(--border)",display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+      <div style={{padding:"5px 16px",borderBottom:"1px solid var(--border)",display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+        <span style={{fontSize:10,color:"var(--muted)",fontWeight:700}}>STATUS:</span>
+        {["TODOS","EN RUTA","COMPLETADO","CANCELADO"].map(s=><button key={s} className={`ftab${sf===s?" on":""}`} onClick={()=>setSf(s)} style={{fontSize:10}}>{s}</button>)}
+      </div>
+      <div style={{padding:"8px 16px",borderBottom:"1px solid var(--border)",display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
         <span style={{fontSize:11,color:"var(--muted)",fontWeight:700}}>📅 Período:</span>
-        {[["todos","Todos"],["semana","Esta semana"],["mes","Mes"],["trimestre","Trimestre"],["anio","Año"]].map(([v,l])=>(
+        {[["todos","Todos"],["semana","Esta semana"],["mes","Mes"],["trimestre","Trimestre"],["anio","Año"],["custom","📅 Personalizado"]].map(([v,l])=>(
           <button key={v} className={`ftab${periodoF===v?" on":""}`} onClick={()=>setPeriodoF(v)} style={{fontSize:11}}>{l}</button>
         ))}
         {(periodoF==="mes"||periodoF==="trimestre"||periodoF==="anio")&&(
@@ -5850,8 +5869,22 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
             {["T1 (Ene-Mar)","T2 (Abr-Jun)","T3 (Jul-Sep)","T4 (Oct-Dic)"].map((t,i)=><option key={i} value={i}>{t}</option>)}
           </select>
         )}
-        <span style={{fontSize:11,color:"var(--muted)",marginLeft:4}}>{fil.length} viajes filtrados</span>
-      </div>
+        {periodoF==="custom"&&(
+          <>
+            <CalPicker value={customDe} onChange={setCustomDe} placeholder="Desde"/>
+            <span style={{color:"var(--muted)",fontSize:12}}>→</span>
+            <CalPicker value={customA} onChange={setCustomA} placeholder="Hasta"/>
+          </>
+        )}
+        <span style={{fontSize:11,color:"var(--cyan)",fontWeight:700,marginLeft:4}}>
+          {periodoF==="custom"&&customDe&&customA ? `${customDe.split("-").reverse().join("/")} → ${customA.split("-").reverse().join("/")}` : ""}
+        </span>
+        <span style={{fontSize:11,color:"var(--muted)",marginLeft:4}}>{fil.length} viajes</span>
+        {/* Filtro tipo viaje */}
+        <span style={{borderLeft:"1px solid var(--border)",paddingLeft:8,marginLeft:4,fontSize:11,color:"var(--muted)",fontWeight:700}}>Tipo:</span>
+        {[["TODOS","Todos"],["PROPIO","Propios"],["EXTERNO","Externos"]].map(([v,l])=>(
+          <button key={v} className={`ftab${tf===v?" on":""}`} onClick={()=>setTf(v)} style={{fontSize:11}}>{l}</button>
+        ))}
       </div>
       <div className="sbar">
         <span>Registros: <strong>{fil.length}</strong></span>
@@ -6598,16 +6631,20 @@ _${branding?.nombre||"Fleet Pro"} — Comprobante_`;
         </div>
       {/* Lightbox */}
       {lightbox && (
-        <div onClick={()=>setLightbox(null)} style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <div onClick={e=>e.stopPropagation()} style={{position:"relative",maxWidth:"90vw",maxHeight:"90vh"}}>
-            <button onClick={()=>setLightbox(null)} style={{position:"absolute",top:-16,right:-16,width:32,height:32,borderRadius:"50%",background:"var(--red)",color:"#fff",border:"none",cursor:"pointer",fontSize:18,zIndex:1}}>×</button>
-            {lightbox.startsWith("data:image")||lightbox.startsWith("http")
-              ? <img src={lightbox} style={{maxWidth:"88vw",maxHeight:"88vh",borderRadius:12,boxShadow:"0 8px 40px rgba(0,0,0,.6)"}}/>
-              : <div style={{padding:40,background:"var(--bg1)",borderRadius:12,textAlign:"center"}}>
-                  <div style={{fontSize:64,marginBottom:16}}>📄</div>
-                  <a href={lightbox} target="_blank" rel="noreferrer" style={{color:"var(--cyan)",fontSize:16}}>Abrir PDF en nueva pestaña</a>
-                </div>}
-          </div>
+        <div onClick={()=>setLightbox(null)} style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.92)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+          <button onClick={()=>setLightbox(null)} style={{position:"fixed",top:0,left:0,right:0,background:"#0099CC",color:"#fff",border:"none",padding:"14px 20px",fontSize:17,fontWeight:700,cursor:"pointer",zIndex:10000,textAlign:"left"}}>✕ Cerrar</button>
+          <div style={{marginTop:60,marginBottom:8,fontSize:11,color:"#aaa"}}>Toca para cerrar</div>
+          {lightbox.startsWith("data:image")||lightbox.startsWith("http")
+            ? <><img src={lightbox} style={{maxWidth:"88vw",maxHeight:"72vh",borderRadius:12,objectFit:"contain"}}/>
+               <div style={{marginTop:12,display:"flex",gap:12}}>
+                 <a href={lightbox} download="archivo.jpg" onClick={e=>e.stopPropagation()} style={{background:"#0099CC",color:"#fff",padding:"10px 18px",borderRadius:8,fontSize:14,fontWeight:700,textDecoration:"none"}}>⬇️ Descargar</a>
+                 <button onClick={()=>setLightbox(null)} style={{background:"rgba(255,255,255,.2)",color:"#fff",border:"1px solid rgba(255,255,255,.4)",padding:"10px 18px",borderRadius:8,fontSize:14,fontWeight:700,cursor:"pointer"}}>✕ Cerrar</button>
+               </div></>
+            : <div style={{padding:40,background:"var(--bg1)",borderRadius:12,textAlign:"center",marginTop:60}}>
+                <div style={{fontSize:64,marginBottom:16}}>📄</div>
+                <a href={lightbox} target="_blank" rel="noreferrer" style={{color:"var(--cyan)",fontSize:16}}>Abrir en nueva pestaña</a>
+                <div style={{marginTop:12}}><button onClick={()=>setLightbox(null)} style={{background:"#0099CC",color:"#fff",border:"none",padding:"10px 20px",borderRadius:8,fontSize:14,fontWeight:700,cursor:"pointer"}}>✕ Cerrar</button></div>
+              </div>}
         </div>
       )}
       </div>
@@ -7013,16 +7050,16 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
         />
       )}
       {lightboxProv && (
-        <div onClick={()=>setLightboxProv(null)} style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <div onClick={e=>e.stopPropagation()} style={{position:"relative",maxWidth:"90vw",maxHeight:"90vh"}}>
-            <button onClick={()=>setLightboxProv(null)} style={{position:"absolute",top:-16,right:-16,width:32,height:32,borderRadius:"50%",background:"var(--red)",color:"#fff",border:"none",cursor:"pointer",fontSize:18,zIndex:1}}>×</button>
-            {lightboxProv.startsWith("data:image")||lightboxProv.startsWith("http")
-              ? <img src={lightboxProv} style={{maxWidth:"88vw",maxHeight:"88vh",borderRadius:12,boxShadow:"0 8px 40px rgba(0,0,0,.6)"}}/>
-              : <div style={{padding:40,background:"var(--bg1)",borderRadius:12,textAlign:"center"}}>
-                  <div style={{fontSize:64,marginBottom:16}}>📄</div>
-                  <a href={lightboxProv} target="_blank" rel="noreferrer" style={{color:"var(--cyan)",fontSize:16}}>Abrir en nueva pestaña</a>
-                </div>}
-          </div>
+        <div onClick={()=>setLightboxProv(null)} style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.92)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+          <button onClick={()=>setLightboxProv(null)} style={{position:"fixed",top:0,left:0,right:0,background:"#0099CC",color:"#fff",border:"none",padding:"14px 20px",fontSize:17,fontWeight:700,cursor:"pointer",zIndex:10000,textAlign:"left"}}>✕ Cerrar</button>
+          <div style={{marginTop:60,marginBottom:8,fontSize:11,color:"#aaa"}}>Toca para cerrar</div>
+          {lightboxProv.startsWith("data:image")||lightboxProv.startsWith("http")
+            ? <><img src={lightboxProv} style={{maxWidth:"88vw",maxHeight:"72vh",borderRadius:12,objectFit:"contain"}}/>
+               <div style={{marginTop:12,display:"flex",gap:12}}>
+                 <a href={lightboxProv} download="archivo.jpg" onClick={e=>e.stopPropagation()} style={{background:"#0099CC",color:"#fff",padding:"10px 18px",borderRadius:8,fontSize:14,fontWeight:700,textDecoration:"none"}}>⬇️ Descargar</a>
+                 <button onClick={()=>setLightboxProv(null)} style={{background:"rgba(255,255,255,.2)",color:"#fff",border:"1px solid rgba(255,255,255,.4)",padding:"10px 18px",borderRadius:8,fontSize:14,fontWeight:700,cursor:"pointer"}}>✕ Cerrar</button>
+               </div></>
+            : <div style={{padding:40,background:"#1a1a2e",borderRadius:12,textAlign:"center",marginTop:60}}><div style={{fontSize:64,marginBottom:16}}>📄</div><a href={lightboxProv} target="_blank" rel="noreferrer" style={{color:"#0099CC",fontSize:16}}>Abrir</a><div style={{marginTop:12}}><button onClick={()=>setLightboxProv(null)} style={{background:"#0099CC",color:"#fff",border:"none",padding:"10px 20px",borderRadius:8,fontSize:14,cursor:"pointer"}}>✕ Cerrar</button></div></div>}
         </div>
       )}
   </div>
@@ -7278,16 +7315,16 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
         </div>
       )}
       {compModal2 && (
-        <div onClick={()=>setCompModal2(null)} style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <div onClick={e=>e.stopPropagation()} style={{position:"relative",maxWidth:"90vw",maxHeight:"90vh"}}>
-            <button onClick={()=>setCompModal2(null)} style={{position:"absolute",top:-16,right:-16,width:32,height:32,borderRadius:"50%",background:"var(--red)",color:"#fff",border:"none",cursor:"pointer",fontSize:18,zIndex:1}}>×</button>
-            {compModal2.startsWith("data:image")||compModal2.startsWith("http")
-              ? <img src={compModal2} style={{maxWidth:"88vw",maxHeight:"88vh",borderRadius:12,boxShadow:"0 8px 40px rgba(0,0,0,.6)"}}/>
-              : <div style={{padding:40,background:"var(--bg1)",borderRadius:12,textAlign:"center"}}>
-                  <div style={{fontSize:64,marginBottom:16}}>📄</div>
-                  <a href={compModal2} target="_blank" rel="noreferrer" style={{color:"var(--cyan)",fontSize:16}}>Abrir en nueva pestaña</a>
-                </div>}
-          </div>
+        <div onClick={()=>setCompModal2(null)} style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.92)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+          <button onClick={()=>setCompModal2(null)} style={{position:"fixed",top:0,left:0,right:0,background:"#0099CC",color:"#fff",border:"none",padding:"14px 20px",fontSize:17,fontWeight:700,cursor:"pointer",zIndex:10000,textAlign:"left"}}>✕ Cerrar</button>
+          <div style={{marginTop:60,marginBottom:8,fontSize:11,color:"#aaa"}}>Toca para cerrar</div>
+          {compModal2.startsWith("data:image")||compModal2.startsWith("http")
+            ? <><img src={compModal2} style={{maxWidth:"88vw",maxHeight:"72vh",borderRadius:12,objectFit:"contain"}}/>
+               <div style={{marginTop:12,display:"flex",gap:12}}>
+                 <a href={compModal2} download="archivo.jpg" onClick={e=>e.stopPropagation()} style={{background:"#0099CC",color:"#fff",padding:"10px 18px",borderRadius:8,fontSize:14,fontWeight:700,textDecoration:"none"}}>⬇️ Descargar</a>
+                 <button onClick={()=>setCompModal2(null)} style={{background:"rgba(255,255,255,.2)",color:"#fff",border:"1px solid rgba(255,255,255,.4)",padding:"10px 18px",borderRadius:8,fontSize:14,fontWeight:700,cursor:"pointer"}}>✕ Cerrar</button>
+               </div></>
+            : <div style={{padding:40,background:"#1a1a2e",borderRadius:12,textAlign:"center",marginTop:60}}><div style={{fontSize:64}}>📄</div><div style={{marginTop:12}}><button onClick={()=>setCompModal2(null)} style={{background:"#0099CC",color:"#fff",border:"none",padding:"10px 20px",borderRadius:8,fontSize:14,cursor:"pointer"}}>✕ Cerrar</button></div></div>}
         </div>
       )}
       {modalProvPago && (
@@ -10964,7 +11001,7 @@ const AYUDA_DATA = [
       { q: "¿Qué es la Hoja de Instrucción y cómo la genero?",
         a: "La Hoja de Instrucción es un documento para el operador con los detalles del viaje: folio, unidad, ruta, hora de cita en origen y destino, datos del cliente, carga y notas. Se genera desde Viajes & Logística → botón '📋 Hoja de Instrucción'. Puedes seleccionar la hora de cita con un menú desplegable (intervalos de 30 minutos). Usa '🖨️ Imprimir / PDF' para abrir el diálogo de impresión y guardarla como PDF." },
       { q: "¿Puedo filtrar los viajes por período?",
-        a: "Sí. En Viajes & Logística aparece una barra de período con botones: Esta semana, Mes, Trimestre y Año. Al seleccionar Mes o Trimestre aparecen selectores adicionales de mes y año. El contador de viajes se actualiza en tiempo real mostrando cuántos viajes hay en el período seleccionado. El botón Imprimir Reporte genera el PDF solo con los viajes filtrados." },
+        a: "Sí. En Viajes & Logística hay una barra de filtros con dos secciones: (1) Período: Todos, Esta semana, Mes, Trimestre, Año y 📅 Personalizado — al seleccionar Personalizado aparecen dos calendarios para elegir fecha De y Hasta exactas. (2) Tipo: Todos, Propios o Externos — para ver solo un tipo de viaje. Ambos filtros se combinan y el botón Imprimir Reporte genera el PDF únicamente con los viajes filtrados." },
       { q: "¿Cómo descargo las evidencias de un viaje?",
         a: "En la tabla de viajes, haz clic en el ícono de cámara 📷 para ver las evidencias. Cada foto tiene un botón ⬇️ que descarga directamente como JPG a tu carpeta de Descargas. También puedes usar 'Descargar todas' para bajar todas las fotos del viaje de una vez. En celular, las fotos se guardan en el carrete de fotografías." },
     ]
