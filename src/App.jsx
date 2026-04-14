@@ -1383,6 +1383,7 @@ function MaintModal({ maint, units, proveedores, onSave, onClose }) {
 }
 function TripModal({ trip, units, onSave, onClose }) {
   const [f, setF] = useState(trip || { unidadId: "", esExterno: false, origen: "", destino: "", fecha: "", fechaReg: "", kmSalida: "", kmLlegada: "", carga: "", cliente: "", status: "EN RUTA", notas: "", costoOfrecido: 0, gastosExtras: 0, costoEstadias: 0, viaticos: 0, combustibleExtra: 0, casetas: 0, evidencias: [] });
+  const [uploading, setUploading] = useState(false);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const dist = f.kmLlegada && f.kmSalida ? Number(f.kmLlegada) - Number(f.kmSalida) : null;
   const ok = (_e) => { if (!f.unidadId || !f.origen) return alert("Unidad y origen requeridos"); onSave({ ...f, id: f.id || uid() }) };
@@ -10925,7 +10926,9 @@ const AYUDA_DATA = [
     color: "var(--blue)",
     preguntas: [
       { q: "¿Cómo registro un viaje propio?",
-        a: "Ve a Flota → Viajes & Logística → '➕ Nuevo Viaje'. Selecciona la unidad, operador, origen, destino, fecha, cliente, tipo de carga y el ingreso ofrecido. Puedes agregar gastos del viaje (extras, estadías, peajes). El viaje aparecerá en el Dashboard y en Gráficas una vez marcado como COMPLETADO." },
+        a: "Ve a Flota → Viajes & Logística → '➕ Nuevo Viaje'. Selecciona la unidad, origen, destino, fechas, cliente y tipo de carga. En Datos Financieros puedes capturar: Precio al Cliente, Gastos Extras, Costo Estadías, Viáticos del Operador (comidas, peajes), Combustible Extra y Casetas. Al capturar algún costo aparece un resumen automático del total de costos del viaje." },
+      { q: "¿Qué son los Viáticos, Combustible Extra y Casetas en un viaje?",
+        a: "Son costos operativos del viaje que puedes registrar en la sección Datos Financieros al crear o editar un viaje propio. Viáticos: dinero para comidas y gastos personales del operador en ruta. Combustible Extra: recargas adicionales de gasolina/diésel durante el viaje. Casetas: peaje de autopista en ruta. Todos estos costos se suman automáticamente en el resumen de costos del viaje y se incluyen en los reportes de Gráficas & Reportes." },
       { q: "¿Qué es la Logística Externa y cómo funciona?",
         a: "Son viajes que subcontratas a un transportista externo (no tu propia flota). Activa el switch 'Es logística externa', selecciona el transportista proveedor (registrado en Proveedores con categoría 'Viajes') y captura el costo a pagar. Genera automáticamente una cuenta por pagar en Proveedores → CxP. El costo también se refleja en Gastos Generales y en Gráficas & Reportes dentro del costo operacional total." },
       { q: "¿Cómo marco un viaje como completado?",
