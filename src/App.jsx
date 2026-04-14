@@ -6809,7 +6809,7 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
 
   // KPIs de crédito
   const conCredito = proveedores.filter(p => p.diasCredito > 0);
-  const saldoTotal = proveedores.reduce((s,p) => s + (p.saldoPendiente||0), 0);
+  const saldoTotal = allCxpPayments.filter(p=>p.status!=="pagado").reduce((s,p)=>s+(Number(p.monto)||0),0);
   const vencidos   = proveedores.filter(p => { const st = creditStatus(p); return st && st.icon==="🚨"; });
   const porVencer  = proveedores.filter(p => { const st = creditStatus(p); return st && st.icon==="⚠️"; });
 
@@ -6824,7 +6824,7 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
           <div className="stat-icon">💳</div><div className="stat-val sm">{conCredito.length}</div><div className="stat-lbl">Con crédito</div>
         </div>
         <div className="stat" style={{"--c":"var(--yellow)"}}>
-          <div className="stat-icon">💰</div><div className="stat-val sm">{fmt$(saldoTotal)}</div><div className="stat-lbl">Saldo pendiente total</div>
+          <div className="stat-icon">💰</div><div className="stat-val sm">{fmt$(saldoTotal)}</div><div className="stat-lbl">CxP Total pendiente</div>
         </div>
         <div className="stat" style={{"--c":"var(--red)"}}>
           <div className="stat-icon">🚨</div><div className="stat-val sm">{vencidos.length}</div><div className="stat-lbl">Créditos vencidos</div>
@@ -7004,18 +7004,20 @@ function GastosPage({ gastos, proveedores, externos = [], maints = [], units = [
 
   const customTiposGasto = [...new Set(gastos.map(g=>g.tipo).filter(t=>t&&!GASTO_TIPOS.includes(t)))];
   // Computed vars — fuera del return para evitar crashes
-  const fil = gastos.filter(g =>
-    ((g.descripcion||"") + (g.responsable||"")).toLowerCase().includes(q.toLowerCase()) &&
-    (tf === "TODOS" || g.tipo === tf)
-  );
+  const fil = gastos.filter(g => {
+    const prov = (proveedores||[]).find(p=>p.id===g.proveedorId);
+    const search = ((g.descripcion||"")+(g.responsable||"")+(prov?.nombre||"")).toLowerCase();
+    return search.includes(q.toLowerCase()) && (tf === "TODOS" || g.tipo === tf);
+  });
   const tot = fil.reduce((a, g) => a + (Number(g.monto) || 0), 0);
 
   // Vista unificada "Gastos a Proveedores": agrupa todos los orígenes
   const showUnificado = tf === "Gastos a Proveedores";
   const showProvSection = tf === "Gastos a Proveedores" || tf === "TODOS";
-  const gastosConProv = gastos.filter(g => g.proveedorId);
-  const maintsConProv = maints.filter(m => m.proveedorId || m.proveedorRefId);
-  const extConProv    = externos;
+  const qLow = q.toLowerCase();
+  const gastosConProv = gastos.filter(g => g.proveedorId && (qLow===""||((g.descripcion||"")+(g.responsable||"")).toLowerCase().includes(qLow)||(proveedores.find(p=>p.id===g.proveedorId)?.nombre||"").toLowerCase().includes(qLow)));
+  const maintsConProv = maints.filter(m => (m.proveedorId||m.proveedorRefId) && (qLow===""||((m.desc||m.tipo||"")).toLowerCase().includes(qLow)||(proveedores.find(p=>p.id===(m.proveedorId||m.proveedorRefId))?.nombre||"").toLowerCase().includes(qLow)));
+  const extConProv = externos.filter(e => qLow===""||((e.empresa||"")+(e.origen||"")+(e.destino||"")).toLowerCase().includes(qLow)||(proveedores.find(p=>p.id===e.proveedorId)?.nombre||"").toLowerCase().includes(qLow));
 
   return (
     <div className="card">
@@ -7898,9 +7900,9 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
         )}
         {filtroPer==="custom"&&(
           <>
-            <input type="text" placeholder="De dd/mm/aaaa" value={customDe} onChange={e=>setCustomDe(e.target.value)} style={{padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",fontSize:13,width:130}}/>
+            <input type="date" value={customDe} onChange={e=>setCustomDe(e.target.value)} style={{padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",fontSize:13}}/>
             <span style={{color:"var(--muted)"}}>→</span>
-            <input type="text" placeholder="A dd/mm/aaaa" value={customA} onChange={e=>setCustomA(e.target.value)} style={{padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",fontSize:13,width:130}}/>
+            <input type="date" value={customA} onChange={e=>setCustomA(e.target.value)} style={{padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",fontSize:13}}/>
           </>
         )}
         <span style={{fontSize:12,color:"var(--cyan)",fontWeight:700,marginLeft:4}}>📅 {lblPeriodo()}</span>
