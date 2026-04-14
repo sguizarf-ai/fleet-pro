@@ -1382,7 +1382,7 @@ function MaintModal({ maint, units, proveedores, onSave, onClose }) {
   );
 }
 function TripModal({ trip, units, onSave, onClose }) {
-  const [f, setF] = useState(trip || { unidadId: "", esExterno: false, origen: "", destino: "", fecha: "", fechaReg: "", kmSalida: "", kmLlegada: "", carga: "", cliente: "", status: "EN RUTA", notas: "", costoOfrecido: 0, gastosExtras: 0, costoEstadias: 0, viaticos: 0, combustibleExtra: 0, casetas: 0, evidencias: [] });
+  const [f, setF] = useState(trip || { unidadId: "", esExterno: false, tipoViaje: "local", origen: "", destino: "", fecha: "", fechaReg: "", kmSalida: "", kmLlegada: "", carga: "", cliente: "", status: "EN RUTA", notas: "", costoOfrecido: 0, gastosExtras: 0, costoEstadias: 0, viaticos: 0, combustibleExtra: 0, casetas: 0, evidencias: [] });
   const [uploading, setUploading] = useState(false);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const dist = f.kmLlegada && f.kmSalida ? Number(f.kmLlegada) - Number(f.kmSalida) : null;
@@ -1392,42 +1392,60 @@ function TripModal({ trip, units, onSave, onClose }) {
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="mhdr"><h3>{f.id ? "✏️ Editar Viaje" : "🗺️ Nuevo Viaje"}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
         <div className="mbody">
-          <div className="fg">
-            <div className="field s2"><label>Unidad *</label><select value={f.unidadId} onChange={ch("unidadId")}><option value="">— Seleccionar —</option>{units.map(u => <option key={u.id} value={u.id}>{u.num} — {u.placas}</option>)}</select></div>
-            <div className="field"><label>Origen *</label><input value={f.origen} onChange={ch("origen")} placeholder="Ciudad, Estado" /></div>
-            <div className="field"><label>Destino</label><input value={f.destino} onChange={ch("destino")} placeholder="Ciudad, Estado" /></div>
-            <div className="field"><label>F. Salida</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))} /></div>
-            <div className="field"><label>F. Regreso</label><DatePicker value={f.fechaReg} onChange={v=>setF(p=>({...p,fechaReg:v}))} /></div>
-            <div className="field"><label>KM Salida</label><input value={f.kmSalida} onChange={ch("kmSalida")} type="number" /></div>
-            <div className="field"><label>KM Llegada</label><input value={f.kmLlegada} onChange={ch("kmLlegada")} type="number" /></div>
-            <div className="field"><label>Carga / Mercancía</label><input value={f.carga} onChange={ch("carga")} /></div>
-            <div className="field"><label>Cliente</label><input value={f.cliente} onChange={ch("cliente")} /></div>
-            <div className="field"><label>Status</label><select value={f.status} onChange={ch("status")}><option>EN RUTA</option><option>COMPLETADO</option><option>CANCELADO</option></select></div>
-            <div className="field s2"><label>Notas</label><textarea value={f.notas} onChange={ch("notas")} rows={2} /></div>
+          {/* Tipo de Viaje */}
+          <div style={{display:"flex",gap:10,marginBottom:12}}>
+            {[["local","🏙️ Viaje Local"],["foraneo","🛣️ Viaje Foráneo"]].map(([v,l])=>(
+              <button key={v} type="button"
+                onClick={()=>setF(p=>({...p,tipoViaje:v}))}
+                style={{flex:1,padding:"10px 8px",borderRadius:10,border:`2px solid ${f.tipoViaje===v?"var(--cyan)":"var(--border)"}`,background:f.tipoViaje===v?"rgba(0,153,204,.1)":"var(--bg2)",color:f.tipoViaje===v?"var(--cyan)":"var(--text)",fontWeight:700,cursor:"pointer",fontSize:13}}>
+                {l}
+              </button>
+            ))}
           </div>
-          {dist && <div style={{ marginTop: 10, padding: "10px 16px", background: "var(--bg2)", borderRadius: 8 }}>
-            <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700 }}>DISTANCIA: </span>
-            <span style={{ fontFamily: "var(--font-hd)", fontSize: 22, fontWeight: 700, color: "var(--cyan)" }}>{fmtN(dist)} km</span>
+
+          <div className="fg">
+            <div className="field s2"><label>Unidad *</label><select value={f.unidadId} onChange={ch("unidadId")} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}><option value="">— Seleccionar unidad —</option>{units.map(u=><option key={u.id} value={u.id}>{u.num} — {u.placas}</option>)}</select></div>
+            <div className="field"><label>Origen *</label><input value={f.origen} onChange={ch("origen")} placeholder="Ciudad, Estado"/></div>
+            <div className="field"><label>Destino</label><input value={f.destino} onChange={ch("destino")} placeholder="Ciudad, Estado"/></div>
+            <div className="field"><label>F. Salida</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))}/></div>
+            <div className="field"><label>F. Regreso</label><DatePicker value={f.fechaReg} onChange={v=>setF(p=>({...p,fechaReg:v}))}/></div>
+            <div className="field"><label>KM Salida</label><input value={f.kmSalida} onChange={ch("kmSalida")} type="number"/></div>
+            <div className="field"><label>KM Llegada</label><input value={f.kmLlegada} onChange={ch("kmLlegada")} type="number"/></div>
+            <div className="field"><label>Carga / Mercancía</label><input value={f.carga} onChange={ch("carga")}/></div>
+            <div className="field"><label>Cliente</label><input value={f.cliente} onChange={ch("cliente")}/></div>
+          </div>
+
+          {dist && <div style={{marginTop:6,marginBottom:10,padding:"10px 16px",background:"var(--bg2)",borderRadius:10,display:"flex",gap:8,alignItems:"center"}}>
+            <span style={{fontSize:11,color:"var(--muted)",fontWeight:700}}>DISTANCIA: </span>
+            <span style={{fontFamily:"var(--font-hd)",fontSize:22,fontWeight:700,color:"var(--cyan)"}}>{fmtN(dist)} km</span>
           </div>}
+
           <div className="sec-lbl">🔒 Datos Financieros</div>
           <div className="fg">
-            <div className="field"><label>Precio al Cliente ($)</label><input value={f.costoOfrecido} onChange={ch("costoOfrecido")} type="number" /></div>
-            <div className="field"><label>Gastos Extras ($)</label><input value={f.gastosExtras} onChange={ch("gastosExtras")} type="number" /></div>
-            <div className="field"><label>Costo Estadías ($)</label><input value={f.costoEstadias} onChange={ch("costoEstadias")} type="number" /></div>
-            <div className="field"><label>Viáticos Operador ($) <span style={{fontSize:10,color:"var(--muted)"}}>comidas, peajes</span></label><input value={f.viaticos} onChange={ch("viaticos")} type="number" min="0" placeholder="0"/></div>
-            <div className="field"><label>Combustible Extra ($) <span style={{fontSize:10,color:"var(--muted)"}}>gasto en ruta</span></label><input value={f.combustibleExtra} onChange={ch("combustibleExtra")} type="number" min="0" placeholder="0"/></div>
-            <div className="field"><label>Casetas ($) <span style={{fontSize:10,color:"var(--muted)"}}>peaje en ruta</span></label><input value={f.casetas} onChange={ch("casetas")} type="number" min="0" placeholder="0"/></div>
+            <div className="field"><label>Precio al Cliente ($)</label><input value={f.costoOfrecido} onChange={ch("costoOfrecido")} type="number" min="0"/></div>
+            <div className="field"><label>Gastos Extras ($)</label><input value={f.gastosExtras} onChange={ch("gastosExtras")} type="number" min="0"/></div>
+            {f.tipoViaje==="foraneo" && <>
+              <div className="field"><label>Costo Estadías ($)</label><input value={f.costoEstadias} onChange={ch("costoEstadias")} type="number" min="0"/></div>
+              <div className="field"><label>Viáticos Operador ($) <span style={{fontSize:10,color:"var(--muted)"}}>comidas</span></label><input value={f.viaticos} onChange={ch("viaticos")} type="number" min="0" placeholder="0"/></div>
+              <div className="field"><label>Combustible Extra ($) <span style={{fontSize:10,color:"var(--muted)"}}>en ruta</span></label><input value={f.combustibleExtra} onChange={ch("combustibleExtra")} type="number" min="0" placeholder="0"/></div>
+              <div className="field"><label>Casetas ($) <span style={{fontSize:10,color:"var(--muted)"}}>peaje</span></label><input value={f.casetas} onChange={ch("casetas")} type="number" min="0" placeholder="0"/></div>
+            </>}
           </div>
+
           {(Number(f.viaticos)||0)+(Number(f.combustibleExtra)||0)+(Number(f.casetas)||0)+(Number(f.gastosExtras)||0)+(Number(f.costoEstadias)||0) > 0 && (
-            <div style={{marginBottom:10,padding:"8px 14px",background:"var(--bg2)",borderRadius:8,display:"flex",gap:16,flexWrap:"wrap",fontSize:12}}>
-              <span style={{color:"var(--muted)",fontWeight:700}}>💰 Costos del viaje:</span>
-              {Number(f.viaticos)>0&&<span>Viáticos: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.viaticos).toLocaleString("es-MX")}</strong></span>}
-              {Number(f.combustibleExtra)>0&&<span>Combustible: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.combustibleExtra).toLocaleString("es-MX")}</strong></span>}{Number(f.casetas)>0&&<span>Casetas: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.casetas).toLocaleString("es-MX")}</strong></span>}
-              {Number(f.gastosExtras)>0&&<span>Gastos extra: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.gastosExtras).toLocaleString("es-MX")}</strong></span>}
+            <div style={{marginBottom:10,padding:"8px 14px",background:"var(--bg2)",borderRadius:8,display:"flex",gap:12,flexWrap:"wrap",fontSize:12}}>
+              <span style={{color:"var(--muted)",fontWeight:700}}>💰 Costos:</span>
+              {Number(f.gastosExtras)>0&&<span>Extras: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.gastosExtras).toLocaleString("es-MX")}</strong></span>}
               {Number(f.costoEstadias)>0&&<span>Estadías: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.costoEstadias).toLocaleString("es-MX")}</strong></span>}
-              <span style={{marginLeft:"auto",fontWeight:700}}>Total costos: <strong style={{color:"var(--red)"}}>{"$"+((Number(f.viaticos)||0)+(Number(f.combustibleExtra)||0)+(Number(f.gastosExtras)||0)+(Number(f.costoEstadias)||0)).toLocaleString("es-MX")}</strong></span>
+              {Number(f.viaticos)>0&&<span>Viáticos: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.viaticos).toLocaleString("es-MX")}</strong></span>}
+              {Number(f.combustibleExtra)>0&&<span>Combustible: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.combustibleExtra).toLocaleString("es-MX")}</strong></span>}
+              {Number(f.casetas)>0&&<span>Casetas: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.casetas).toLocaleString("es-MX")}</strong></span>}
+              <span style={{marginLeft:"auto",fontWeight:700}}>Total: <strong style={{color:"var(--red)"}}>{"$"+((Number(f.viaticos)||0)+(Number(f.combustibleExtra)||0)+(Number(f.casetas)||0)+(Number(f.gastosExtras)||0)+(Number(f.costoEstadias)||0)).toLocaleString("es-MX")}</strong></span>
             </div>
           )}
+
+          <div className="field s2" style={{marginBottom:12}}><label>Notas</label><textarea value={f.notas} onChange={ch("notas")} rows={3} style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",resize:"vertical"}}/></div>
+
           <MultiPhotoInput values={f.evidencias || []} onChange={v => setF(p => ({ ...p, evidencias: v }))} onUploading={setUploading} label="📸 Evidencias de Entrega" />
         </div>
         <div className="mftr"><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-cyan" onClick={ok} disabled={uploading} style={uploading?{opacity:.6,cursor:"not-allowed"}:{}}>{uploading?"⏳ Subiendo...":"💾 Guardar"}</button></div>
@@ -2891,7 +2909,7 @@ function HojaViajeModal({ units, drivers, remitentes, onClose, companyLogo, comp
     .firma{border-top:2px solid #000;padding-top:8px;text-align:center;font-size:11px;color:#666}
     .no-print{background:#0099CC;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px;margin:16px 8px 0 0}
     @media print{.no-print{display:none}@page{size:A4;margin:10mm}}
-    </style></head><body>
+    </style></head><body><style>.mobile-back{display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#0099CC;color:#fff;padding:12px 20px;font-size:16px;font-weight:700;border:none;cursor:pointer;width:100%;text-align:left}@media(max-width:768px){.mobile-back{display:block;top:0}}@media print{.mobile-back{display:none}}</style><button class='mobile-back' onclick='window.close();history.back()'>← Volver a Fleet Pro</button>
     <div style="margin-bottom:12px" class="no-print">
       <button class="no-print" onclick="window.print()">🖨️ Imprimir</button>
     </div>
@@ -3722,7 +3740,7 @@ function buildEvidenciasHtml({ trip, unit, ext }) {
   .photo-item img{width:100%;height:auto;border:2px solid #0099CC;border-radius:8px}
   .photo-caption{text-align:center;margin-top:8px;font-size:11px;color:#666;font-weight:600}
   @media print{@page{size:A4;margin:15mm}.photos{grid-template-columns:1fr}}
-  </style></head><body>
+  </style></head><body><style>.mobile-back{display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#0099CC;color:#fff;padding:12px 20px;font-size:16px;font-weight:700;border:none;cursor:pointer;width:100%;text-align:left}@media(max-width:768px){.mobile-back{display:block;top:0}}@media print{.mobile-back{display:none}}</style><button class='mobile-back' onclick='window.close();history.back()'>← Volver a Fleet Pro</button>
   <h1>📸 EVIDENCIAS DE ENTREGA DE MERCANCÍA</h1>
   <div class="info">
     <div class="field"><label>${isExt ? "Empresa Transportista" : "Unidad"}</label>${isExt ? ext?.empresa : `${unit?.num} — ${unit?.placas}`}</div>
@@ -4921,6 +4939,9 @@ function printAndDownloadDoc(doc, unit, driver) {
   .field label{font-size:9px;font-weight:700;display:block;color:#666;text-transform:uppercase}
   .status{display:inline-block;padding:6px 18px;border-radius:20px;font-weight:700;font-size:14px;color:#fff;background:${statusColor};margin-bottom:16px}
   .photo{width:100%;border-radius:8px;border:2px solid #0099CC;margin-top:10px;display:block;page-break-inside:avoid}
+  .mobile-back{display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#0099CC;color:#fff;padding:12px 20px;font-size:16px;font-weight:700;border:none;cursor:pointer;width:100%;text-align:left}
+  @media(max-width:768px){.mobile-back{display:block}.btn-row{display:none}}
+  @media print{.mobile-back{display:none}}
   .btn-row{display:flex;gap:12px;margin-top:20px}
   button{padding:8px 20px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:700}
   .print-btn{background:#0099CC;color:#fff}
@@ -4941,6 +4962,7 @@ function printAndDownloadDoc(doc, unit, driver) {
     const fotos = doc.fotos?.length ? doc.fotos : doc.foto ? [doc.foto] : [];
     return fotos.map((src,i) => `<div style="margin-bottom:20px;page-break-inside:avoid"><p style="font-size:11px;color:#666;margin:4px 0">Foto ${i+1} de ${fotos.length}</p><img src="${src}" class="photo" alt="Foto ${i+1}"/><div style="margin-top:4px;text-align:right"><a href="${src}" download="documento-foto-${i+1}.jpg" style="font-size:11px;color:#0099CC;text-decoration:none">⬇️ Descargar foto ${i+1}</a></div></div>`).join('\n');
   })()}
+  <button class="mobile-back" onclick="window.close();history.back()">← Cerrar / Volver a Fleet Pro</button>
   <div class="btn-row"><button class="print-btn" onclick="window.print()">🖨️ Imprimir</button><button class="close-btn" onclick="window.close()">✕ Cerrar</button></div>
   <p style="margin-top:16px;font-size:10px;color:#999">Generado: ${new Date().toLocaleDateString("es-MX",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p>
   </body></html>`;
@@ -10926,9 +10948,9 @@ const AYUDA_DATA = [
     color: "var(--blue)",
     preguntas: [
       { q: "¿Cómo registro un viaje propio?",
-        a: "Ve a Flota → Viajes & Logística → '➕ Nuevo Viaje'. Selecciona la unidad, origen, destino, fechas, cliente y tipo de carga. En Datos Financieros puedes capturar: Precio al Cliente, Gastos Extras, Costo Estadías, Viáticos del Operador (comidas, peajes), Combustible Extra y Casetas. Al capturar algún costo aparece un resumen automático del total de costos del viaje." },
+        a: "Ve a Flota → Viajes & Logística → '➕ Nuevo Viaje'. Primero elige el tipo: Viaje Local (campos básicos: precio y gastos extra) o Viaje Foráneo (todos los campos incluyendo Viáticos, Combustible Extra, Casetas y Estadías). Selecciona unidad, origen, destino, fechas, cliente y carga. Al terminar, agrega evidencias de entrega y guarda." },
       { q: "¿Qué son los Viáticos, Combustible Extra y Casetas en un viaje?",
-        a: "Son costos operativos del viaje que puedes registrar en la sección Datos Financieros al crear o editar un viaje propio. Viáticos: dinero para comidas y gastos personales del operador en ruta. Combustible Extra: recargas adicionales de gasolina/diésel durante el viaje. Casetas: peaje de autopista en ruta. Todos estos costos se suman automáticamente en el resumen de costos del viaje y se incluyen en los reportes de Gráficas & Reportes." },
+        a: "Son costos operativos disponibles en Viaje Foráneo. Viáticos: dinero para comidas y gastos del operador. Combustible Extra: recargas adicionales en ruta. Casetas: peaje de autopista. En Viaje Local solo aparecen Precio al Cliente y Gastos Extras. Todos los costos foráneos se suman en el resumen automático y en los reportes de Gráficas & Reportes." },
       { q: "¿Qué es la Logística Externa y cómo funciona?",
         a: "Son viajes que subcontratas a un transportista externo (no tu propia flota). Activa el switch 'Es logística externa', selecciona el transportista proveedor (registrado en Proveedores con categoría 'Viajes') y captura el costo a pagar. Genera automáticamente una cuenta por pagar en Proveedores → CxP. El costo también se refleja en Gastos Generales y en Gráficas & Reportes dentro del costo operacional total." },
       { q: "¿Cómo marco un viaje como completado?",
