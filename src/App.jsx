@@ -1382,8 +1382,7 @@ function MaintModal({ maint, units, proveedores, onSave, onClose }) {
   );
 }
 function TripModal({ trip, units, onSave, onClose }) {
-  const [f, setF] = useState(trip || { unidadId: "", esExterno: false, origen: "", destino: "", fecha: "", fechaReg: "", kmSalida: "", kmLlegada: "", carga: "", cliente: "", status: "EN RUTA", notas: "", costoOfrecido: 0, gastosExtras: 0, costoEstadias: 0, evidencias: [] });
-  const [uploading, setUploading] = useState(false);
+  const [f, setF] = useState(trip || { unidadId: "", esExterno: false, origen: "", destino: "", fecha: "", fechaReg: "", kmSalida: "", kmLlegada: "", carga: "", cliente: "", status: "EN RUTA", notas: "", costoOfrecido: 0, gastosExtras: 0, costoEstadias: 0, viaticos: 0, combustibleExtra: 0, casetas: 0, evidencias: [] });
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const dist = f.kmLlegada && f.kmSalida ? Number(f.kmLlegada) - Number(f.kmSalida) : null;
   const ok = (_e) => { if (!f.unidadId || !f.origen) return alert("Unidad y origen requeridos"); onSave({ ...f, id: f.id || uid() }) };
@@ -1414,7 +1413,20 @@ function TripModal({ trip, units, onSave, onClose }) {
             <div className="field"><label>Precio al Cliente ($)</label><input value={f.costoOfrecido} onChange={ch("costoOfrecido")} type="number" /></div>
             <div className="field"><label>Gastos Extras ($)</label><input value={f.gastosExtras} onChange={ch("gastosExtras")} type="number" /></div>
             <div className="field"><label>Costo Estadías ($)</label><input value={f.costoEstadias} onChange={ch("costoEstadias")} type="number" /></div>
+            <div className="field"><label>Viáticos Operador ($) <span style={{fontSize:10,color:"var(--muted)"}}>comidas, peajes</span></label><input value={f.viaticos} onChange={ch("viaticos")} type="number" min="0" placeholder="0"/></div>
+            <div className="field"><label>Combustible Extra ($) <span style={{fontSize:10,color:"var(--muted)"}}>gasto en ruta</span></label><input value={f.combustibleExtra} onChange={ch("combustibleExtra")} type="number" min="0" placeholder="0"/></div>
+            <div className="field"><label>Casetas ($) <span style={{fontSize:10,color:"var(--muted)"}}>peaje en ruta</span></label><input value={f.casetas} onChange={ch("casetas")} type="number" min="0" placeholder="0"/></div>
           </div>
+          {(Number(f.viaticos)||0)+(Number(f.combustibleExtra)||0)+(Number(f.casetas)||0)+(Number(f.gastosExtras)||0)+(Number(f.costoEstadias)||0) > 0 && (
+            <div style={{marginBottom:10,padding:"8px 14px",background:"var(--bg2)",borderRadius:8,display:"flex",gap:16,flexWrap:"wrap",fontSize:12}}>
+              <span style={{color:"var(--muted)",fontWeight:700}}>💰 Costos del viaje:</span>
+              {Number(f.viaticos)>0&&<span>Viáticos: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.viaticos).toLocaleString("es-MX")}</strong></span>}
+              {Number(f.combustibleExtra)>0&&<span>Combustible: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.combustibleExtra).toLocaleString("es-MX")}</strong></span>}{Number(f.casetas)>0&&<span>Casetas: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.casetas).toLocaleString("es-MX")}</strong></span>}
+              {Number(f.gastosExtras)>0&&<span>Gastos extra: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.gastosExtras).toLocaleString("es-MX")}</strong></span>}
+              {Number(f.costoEstadias)>0&&<span>Estadías: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.costoEstadias).toLocaleString("es-MX")}</strong></span>}
+              <span style={{marginLeft:"auto",fontWeight:700}}>Total costos: <strong style={{color:"var(--red)"}}>{"$"+((Number(f.viaticos)||0)+(Number(f.combustibleExtra)||0)+(Number(f.gastosExtras)||0)+(Number(f.costoEstadias)||0)).toLocaleString("es-MX")}</strong></span>
+            </div>
+          )}
           <MultiPhotoInput values={f.evidencias || []} onChange={v => setF(p => ({ ...p, evidencias: v }))} onUploading={setUploading} label="📸 Evidencias de Entrega" />
         </div>
         <div className="mftr"><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-cyan" onClick={ok} disabled={uploading} style={uploading?{opacity:.6,cursor:"not-allowed"}:{}}>{uploading?"⏳ Subiendo...":"💾 Guardar"}</button></div>
@@ -4225,7 +4237,7 @@ function Dashboard({
   // Viajes propios
   const viajesPropios = trips.filter(t => !t.esExterno && t.status === "COMPLETADO");
   const ingresosPropios = viajesPropios.reduce((a, t) => a + (Number(t.costoOfrecido) || 0), 0);
-  const gastosPropios = viajesPropios.reduce((a, t) => a + (Number(t.gastosExtras) || 0) + (Number(t.costoEstadias) || 0), 0);
+  const gastosPropios = viajesPropios.reduce((a, t) => a + (Number(t.gastosExtras) || 0) + (Number(t.costoEstadias) || 0) + (Number(t.viaticos) || 0) + (Number(t.combustibleExtra) || 0), 0);
   
   // Depreciación
   const deprecPropios = viajesPropios.length * 7 * (
@@ -7873,7 +7885,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
   const totLitros    = fFuels.reduce((a,f)=>a+(Number(f.litros)||0),0);
   const totMant      = fMaints.reduce((a,m)=>a+(Number(m.costoRef)||0)+(Number(m.costoMO)||0),0);
   const totIngresos  = fTrips.reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0);
-  const totCostoViaj = fTrips.reduce((a,t)=>a+(Number(t.gastosExtras)||0)+(Number(t.costoEstadias)||0)+(Number(t.costoPagar)||0),0);
+  const totCostoViaj = fTrips.reduce((a,t)=>a+(Number(t.gastosExtras)||0)+(Number(t.costoEstadias)||0)+(Number(t.costoPropio)||0)+(Number(t.viaticos)||0)+(Number(t.combustibleExtra)||0)+(Number(t.casetas)||0),0);
   const totExternos  = fExternos.reduce((a,e)=>a+(Number(e.costoPagar)||0),0);
   // Utilidad real (sin IVA)
   const ingresoNeto      = subtotalFacturado;
