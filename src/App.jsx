@@ -7701,6 +7701,94 @@ function AlmacenPage({ almacen, isAdmin, onAdd, onEdit, onDelete }) {
   );
 }
 
+// ── CalPicker — calendario personalizado que no se cierra con las flechas ──────
+function CalPicker({ value, onChange, placeholder = "Seleccionar fecha" }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+
+  // Parse value (yyyy-mm-dd or dd/mm/yyyy)
+  const parseVal = (v) => {
+    if (!v) return null;
+    if (v.includes("-") && v.length === 10) {
+      const [y,m,d] = v.split("-");
+      return { y: Number(y), m: Number(m)-1, d: Number(d) };
+    }
+    if (v.includes("/")) {
+      const [d,m,y] = v.split("/");
+      return { y: Number(y), m: Number(m)-1, d: Number(d) };
+    }
+    return null;
+  };
+
+  const parsed = parseVal(value);
+  const today = new Date();
+  const [viewY, setViewY] = useState(parsed?.y || today.getFullYear());
+  const [viewM, setViewM] = useState(parsed?.m ?? today.getMonth());
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    if (open) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const daysInMonth = (y, m) => new Date(y, m+1, 0).getDate();
+  const firstDow = (y, m) => new Date(y, m, 1).getDay(); // 0=Sun
+
+  const selectDay = (d) => {
+    const mm = String(viewM+1).padStart(2,"0");
+    const dd = String(d).padStart(2,"0");
+    onChange(`${viewY}-${mm}-${dd}`);
+    setOpen(false);
+  };
+
+  const prevMonth = (e) => { e.stopPropagation(); setViewM(m => { if(m===0){setViewY(y=>y-1);return 11;} return m-1; }); };
+  const nextMonth = (e) => { e.stopPropagation(); setViewM(m => { if(m===11){setViewY(y=>y+1);return 0;} return m+1; }); };
+
+  const MESES_C = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  const DIAS_C  = ["D","L","M","M","J","V","S"];
+
+  const display = parsed ? `${String(parsed.d).padStart(2,"0")}/${String(parsed.m+1).padStart(2,"0")}/${parsed.y}` : "";
+
+  return (
+    <div ref={ref} style={{position:"relative",display:"inline-block"}}>
+      <div onClick={()=>setOpen(o=>!o)} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:display?"var(--text)":"var(--muted)",fontSize:13,cursor:"pointer",minWidth:130,userSelect:"none"}}>
+        <span style={{flex:1}}>{display||placeholder}</span>
+        <span>📅</span>
+      </div>
+      {open && (
+        <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,zIndex:999,background:"var(--bg1)",border:"1px solid var(--border)",borderRadius:10,boxShadow:"0 4px 20px rgba(0,0,0,.18)",padding:12,minWidth:220}} onMouseDown={e=>e.stopPropagation()}>
+          {/* Header */}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+            <button onMouseDown={prevMonth} style={{background:"none",border:"none",cursor:"pointer",color:"var(--cyan)",fontSize:18,padding:"0 6px",borderRadius:4}}>‹</button>
+            <span style={{fontWeight:700,fontSize:13,color:"var(--text)"}}>{MESES_C[viewM]} {viewY}</span>
+            <button onMouseDown={nextMonth} style={{background:"none",border:"none",cursor:"pointer",color:"var(--cyan)",fontSize:18,padding:"0 6px",borderRadius:4}}>›</button>
+          </div>
+          {/* Day headers */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:4}}>
+            {DIAS_C.map((d,i)=><div key={i} style={{textAlign:"center",fontSize:10,fontWeight:700,color:"var(--muted)",padding:"2px 0"}}>{d}</div>)}
+          </div>
+          {/* Days grid */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
+            {Array(firstDow(viewY,viewM)).fill(null).map((_,i)=><div key={"e"+i}/>)}
+            {Array.from({length:daysInMonth(viewY,viewM)},(_,i)=>i+1).map(d => {
+              const isSelected = parsed?.d===d && parsed?.m===viewM && parsed?.y===viewY;
+              const isToday = today.getDate()===d && today.getMonth()===viewM && today.getFullYear()===viewY;
+              return (
+                <div key={d} onMouseDown={()=>selectDay(d)} style={{textAlign:"center",padding:"4px 2px",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:isSelected||isToday?700:400,background:isSelected?"var(--cyan)":isToday?"var(--bg2)":"transparent",color:isSelected?"#fff":isToday?"var(--cyan)":"var(--text)"}}>
+                  {d}
+                </div>
+              );
+            })}
+          </div>
+          {/* Clear button */}
+          {value && <div onMouseDown={()=>{onChange("");setOpen(false);}} style={{marginTop:8,textAlign:"center",fontSize:11,color:"var(--muted)",cursor:"pointer"}}>✕ Limpiar</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, drivers = [], proveedores = [], externos = [], nominasAdmin = [] }) {
 
   const hoy        = new Date();
@@ -7896,13 +7984,13 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
           </select>
         )}
         {filtroPer==="semana"&&(
-          <input type="date" value={filtroSemana} onChange={e=>setFiltroSemana(e.target.value)} style={{padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",fontSize:13}}/>
+          <CalPicker value={filtroSemana} onChange={v=>setFiltroSemana(v)} placeholder="Seleccionar semana"/>
         )}
         {filtroPer==="custom"&&(
           <>
-            <input type="date" value={customDe} onChange={e=>setCustomDe(e.target.value)} style={{padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",fontSize:13}}/>
+            <CalPicker value={customDe} onChange={v=>setCustomDe(v)} placeholder="Fecha inicio"/>
             <span style={{color:"var(--muted)"}}>→</span>
-            <input type="date" value={customA} onChange={e=>setCustomA(e.target.value)} style={{padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",fontSize:13}}/>
+            <CalPicker value={customA} onChange={v=>setCustomA(v)} placeholder="Fecha fin"/>
           </>
         )}
         <span style={{fontSize:12,color:"var(--cyan)",fontWeight:700,marginLeft:4}}>📅 {lblPeriodo()}</span>
