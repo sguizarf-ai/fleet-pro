@@ -1489,7 +1489,7 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
                   </select>
               </div>
             </div>
-            <div className="field s2"><label>Nombre de empresa {f.proveedorId?"(del catálogo, editable)":"*"}</label><input value={f.empresa} onChange={ch("empresa")} placeholder="Ej: Transportes del Norte SA" style={{background: f.proveedorId?"var(--bg2)":"var(--bg0)"}}/></div>
+            {!f.proveedorId && <div className="field s2"><label>Nombre de empresa *</label><input value={f.empresa} onChange={ch("empresa")} placeholder="Ej: Transportes García"/></div>}
             <div className="field"><label>Contacto</label><input value={f.contacto} onChange={ch("contacto")} /></div>
             <div className="field"><label>Teléfono</label><input value={f.tel} onChange={ch("tel")} /></div>
           </div>
@@ -1525,9 +1525,9 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
           </div>
           <div className="sec-lbl">Datos del Viaje</div>
           <div className="fg">
+            <div className="field"><label>Cliente</label><input value={f.cliente} onChange={ch("cliente")} /></div>
             <div className="field"><label>Origen *</label><input value={f.origen} onChange={ch("origen")} /></div>
             <div className="field"><label>Destino</label><input value={f.destino} onChange={ch("destino")} /></div>
-            <div className="field"><label>Cliente</label><input value={f.cliente} onChange={ch("cliente")} /></div>
             <div className="field"><label>Carga</label><input value={f.carga} onChange={ch("carga")} /></div>
           </div>
           <div className="sec-lbl">🔒 Financiero</div>
@@ -3429,6 +3429,7 @@ function ClienteModal({ cliente, onSave, onClose }) {
 
 function FacturaModal({ factura, clientes, viajes, onSave, onClose }) {
   const [f, setF] = useState(factura || {
+    tipoDoc: "factura",
     serie: "A",
     numeroFactura: "",
     clienteId: "",
@@ -3445,7 +3446,8 @@ function FacturaModal({ factura, clientes, viajes, onSave, onClose }) {
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
 
   const cliente = clientes.find(c => c.id === f.clienteId);
-  const iva = f.subtotal * 0.16;
+  const esRemision = f.tipoDoc === "remision";
+  const iva = esRemision ? 0 : f.subtotal * 0.16;
   const retIVA = cliente?.tipo === "MORAL" ? f.subtotal * 0.04 : 0;
   const total = f.subtotal + iva - retIVA;
 
@@ -3465,7 +3467,7 @@ function FacturaModal({ factura, clientes, viajes, onSave, onClose }) {
   }, [f.viajeId, viajes, f.subtotal]);
 
   const ok = (_e) => {
-    if (!f.clienteId || !f.numeroFactura || !f.subtotal) {
+    if (!f.clienteId || (!f.numeroFactura && f.tipoDoc !== "remision") || !f.subtotal) {
       return alert("Cliente, número de factura y subtotal son requeridos");
     }
 
@@ -3492,6 +3494,15 @@ function FacturaModal({ factura, clientes, viajes, onSave, onClose }) {
           <h3>{f.id ? "✏️ Editar Factura" : "🧾 Nueva Factura"}</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
         </div>
+          {/* TIPO DOCUMENTO */}
+          <div style={{display:"flex",gap:10,marginBottom:14}}>
+            {[["factura","🧾 Factura (con IVA)"],["remision","📋 Remisión (sin IVA)"]].map(([v,l])=>(
+              <button key={v} type="button" onClick={()=>setF(p=>({...p,tipoDoc:v}))}
+                style={{flex:1,padding:"10px 8px",borderRadius:10,border:`2px solid ${f.tipoDoc===v?"var(--cyan)":"var(--border)"}`,background:f.tipoDoc===v?"rgba(0,153,204,.1)":"var(--bg2)",color:f.tipoDoc===v?"var(--cyan)":"var(--text)",fontWeight:700,cursor:"pointer",fontSize:13}}>
+                {l}
+              </button>
+            ))}
+          </div>
         <div className="mbody">
           {/* CLIENTE */}
           <div className="sec-lbl">Cliente</div>
@@ -3545,7 +3556,7 @@ function FacturaModal({ factura, clientes, viajes, onSave, onClose }) {
           )}
 
           {/* DATOS FACTURA */}
-          <div className="sec-lbl">Datos de la Factura</div>
+          <div className="sec-lbl">{f.tipoDoc==="remision"?"📋 Datos de la Remisión":"🧾 Datos de la Factura"}</div>
           <div className="fg">
             <div className="field">
               <label>Serie</label>
@@ -7912,7 +7923,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
   const fTrips     = trips.filter(t=>t.status==="COMPLETADO"&&enRango(t.fechaReg||t.fecha));
   const fTripsProp = fTrips.filter(t=>!t.esExterno);
   const fTripsExt  = fTrips.filter(t=>t.esExterno);
-  const fExternos  = externos.filter(e=>{ const d=toISO(e.fecha); return !d||(d>=rango.de&&d<=rango.a); });
+  const fExternos  = externos.filter(e=>enRango(e.fecha));
 
   // totales
   const totFacturado = fFacturas.reduce((a,f)=>a+(Number(f.total)||0),0);
@@ -8899,7 +8910,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
         <div className="stats">
           <KR icon="🚛" lbl="Viajes propios" val={fTripsProp.length} sub={fmt$(fTripsProp.reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0))} c="var(--cyan)"/>
-          <KR icon="🔄" lbl="Logística externa" val={fTripsExt.length} sub={fmt$(fTripsExt.reduce((a,t)=>a+(Number(t.costoPagar)||0),0))} c="var(--purple)"/>
+          <KR icon="🔄" lbl="Logística externa" val={fExternos.length} sub={fmt$(fExternos.reduce((a,e)=>a+(Number(e.costoPagar)||0),0))} c="var(--purple)"/>
           <KR icon="📦" lbl="Total viajes" val={fTrips.length} sub={fmt$(totIngresos)} c="var(--green)"/>
           <KR icon="📍" lbl="Destinos únicos" val={[...new Set(fTrips.map(t=>t.destino).filter(Boolean))].length} c="var(--orange)"/>
           <KR icon="📈" lbl="Ingreso promedio" val={fTrips.length>0?fmt$(totIngresos/fTrips.length):"—"} c="var(--yellow)"/>
@@ -11077,6 +11088,8 @@ const AYUDA_DATA = [
     id: "facturacion", icono: "🧾", titulo: "Facturación y Clientes",
     color: "var(--green)",
     preguntas: [
+      { q: "¿Qué es una Remisión y en qué se diferencia de una Factura?",
+        a: "La Remisión es un documento de cobro sin IVA — útil para clientes que pagan sin factura fiscal. Al crear un documento en Facturación, elige entre '🧾 Factura (con IVA)' y '📋 Remisión (sin IVA)'. Las remisiones sí se incluyen en los totales de cobrado/pendiente del módulo, se pueden filtrar por separado en la tabla, y se muestran con la etiqueta REM en la lista." },
       { q: "¿Cómo creo una factura?",
         a: "Ve a Finanzas → Facturación → '➕ Nueva Factura'. Selecciona el cliente, agrega los conceptos y el monto. La factura queda en status PENDIENTE hasta que la marques como cobrada con el botón '✓ Pagar'." },
       { q: "¿Cómo timbro una factura (CFDI)?",
@@ -11328,6 +11341,7 @@ function ClientesPage({ clientes, facturas, onAdd, onEdit, onDelete }) {
 function FacturacionPage({ facturas, clientes, viajes, onAdd, onEdit, onDelete, onMarcarPagada }) {
   const [q, setQ] = useState("");
   const [sf, setSf] = useState("TODOS");
+  const [tfDoc, setTfDoc] = useState("TODOS"); // tipoDoc: TODOS/factura/remision
   const [cf, setCf] = useState("TODOS");
   const [periodoFac, setPeriodoFac] = useState("todos");
   const [mesFac, setMesFac] = useState(new Date().getMonth());
@@ -11346,7 +11360,8 @@ function FacturacionPage({ facturas, clientes, viajes, onAdd, onEdit, onDelete, 
     const matchQ = (f.folio || f.serie + "-" + f.numeroFactura + (f.cliente||"") + (f.rfcCliente||"")).toLowerCase().includes(q.toLowerCase());
     const matchS = sf === "TODOS" || f.status === sf;
     const matchC = cf === "TODOS" || f.clienteId === cf;
-    return matchQ && matchS && matchC && enRangoFac(f.fechaEmision);
+    const matchT = tfDoc === "TODOS" || (f.tipoDoc||"factura") === tfDoc;
+    return matchQ && matchS && matchC && matchT && enRangoFac(f.fechaEmision);
   });
 
   const pendientes = facturas.filter(f => f.status === "PENDIENTE");
@@ -11414,6 +11429,12 @@ function FacturacionPage({ facturas, clientes, viajes, onAdd, onEdit, onDelete, 
               <button key={c.id} className={`ftab${cf === c.id ? " on" : ""}`} onClick={() => setCf(c.id)}>{c.nombreCorto || c.nombre}</button>
             ))}
           </div>
+          <div className="ftabs">
+            <span style={{ fontSize: 10, color: "var(--muted)", marginRight: 4, fontWeight: 700 }}>DOC:</span>
+            {[["TODOS","Todos"],["factura","🧾 Facturas"],["remision","📋 Remisiones"]].map(([v,l])=>(
+              <button key={v} className={`ftab${tfDoc===v?" on":""}`} onClick={()=>setTfDoc(v)} style={{fontSize:10}}>{l}</button>
+            ))}
+          </div>
         </div>
         <div className="sbar">
           <span>Total: <strong>{fil.length}</strong></span>
@@ -11436,7 +11457,10 @@ function FacturacionPage({ facturas, clientes, viajes, onAdd, onEdit, onDelete, 
                   const statusColor = f.status === "PAGADA" ? "var(--green)" : f.status === "VENCIDA" ? "var(--red)" : (days !== null && days <= 5) ? "var(--orange)" : "var(--yellow)";
                   return (
                     <tr key={f.id}>
-                      <td style={{ fontFamily: "var(--font-hd)", fontSize: 14, fontWeight: 700 }}>{f.serie}-{f.numeroFactura}</td>
+                      <td style={{ fontFamily: "var(--font-hd)", fontSize: 14, fontWeight: 700 }}>
+                        {f.tipoDoc==="remision"?<Bdg c="bm" t="REM"/>:<Bdg c="bb" t="FAC"/>}
+                        {" "}{f.serie}-{f.numeroFactura||"—"}
+                      </td>
                       <td>
                         <div style={{ fontWeight: 600, fontSize: 12 }}>{f.cliente}</div>
                         <div style={{ fontSize: 10, color: "var(--muted)", fontFamily: "monospace" }}>{f.rfcCliente}</div>
