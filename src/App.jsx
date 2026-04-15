@@ -1474,26 +1474,40 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
       <div className="modal xwide" onClick={e => e.stopPropagation()}>
         <div className="mhdr"><h3>{f.id ? "✏️ Editar" : "🚚 Nuevo Viaje Externo"}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
         <div className="mbody">
-          <div className="sec-lbl">Empresa Transportista</div>
+        <div className="mbody">
+
+          {/* 1. DATOS DEL VIAJE — primero */}
+          <div className="sec-lbl">📍 Datos del Viaje</div>
           <div className="fg">
-            <div className="field"><label>Fecha</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))} /></div>
+            <div className="field"><label>Cliente</label><input value={f.cliente} onChange={ch("cliente")} placeholder="Nombre del cliente"/></div>
+            <div className="field"><label>Fecha</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))}/></div>
+            <div className="field"><label>Origen *</label><input value={f.origen} onChange={ch("origen")} placeholder="Ciudad, Estado"/></div>
+            <div className="field"><label>Destino</label><input value={f.destino} onChange={ch("destino")} placeholder="Ciudad, Estado"/></div>
+            <div className="field s2"><label>Carga / Mercancía</label><input value={f.carga} onChange={ch("carga")} placeholder="Descripción de la carga"/></div>
+          </div>
+
+          {/* 2. EMPRESA TRANSPORTISTA */}
+          <div className="sec-lbl">🚚 Empresa Transportista</div>
+          <div className="fg">
             <div className="field s2">
-              <label>Empresa Transportista *</label>
-              <div style={{ display:"flex", gap:8 }}>
-                <select value={f.proveedorId||""} onChange={e => {
-                  const pv = (proveedores||[]).find(p=>p.id===e.target.value);
-                  setF(prev => ({...prev, proveedorId:e.target.value, empresa:pv?pv.nombre:prev.empresa, contacto:pv?pv.contacto:prev.contacto, tel:pv?pv.tel:prev.tel}));
-                }} style={{ flex:1, padding:"9px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--bg0)", color:"var(--text)" }}>
-                  <option value="">— Seleccionar del catálogo —</option>
-                  {(proveedores||[]).filter(p=>p.tipoProv==="Transportista Externo"||!p.tipoProv).map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
-                  </select>
-              </div>
+              <label>Seleccionar del catálogo</label>
+              <select value={f.proveedorId||""} onChange={e => {
+                const pv = (proveedores||[]).find(p=>p.id===e.target.value);
+                setF(prev => ({...prev, proveedorId:e.target.value, empresa:pv?pv.nombre:prev.empresa, contacto:pv?.tel?prev.contacto:prev.contacto}));
+              }} style={{ width:"100%", padding:"9px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--bg0)", color:"var(--text)" }}>
+                <option value="">— Sin proveedor registrado —</option>
+                {(proveedores||[]).filter(p=>p.tipoProv==="Transportista Externo"||!p.tipoProv).map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+              </select>
             </div>
-            {!f.proveedorId && <div className="field s2"><label>Nombre de empresa *</label><input value={f.empresa} onChange={ch("empresa")} placeholder="Ej: Transportes García"/></div>}
+            {!f.proveedorId && (
+              <div className="field s2"><label>Nombre de empresa *</label><input value={f.empresa} onChange={ch("empresa")} placeholder="Ej: Transportes García"/></div>
+            )}
             <div className="field"><label>Contacto</label><input value={f.contacto} onChange={ch("contacto")} /></div>
             <div className="field"><label>Teléfono</label><input value={f.tel} onChange={ch("tel")} /></div>
           </div>
-          <div className="sec-lbl">Datos de la Unidad</div>
+
+          {/* 3. DATOS DE LA UNIDAD */}
+          <div className="sec-lbl">🚛 Datos de la Unidad</div>
           <div className="fg">
             <div className="field s2">
               <label>Tipo de Unidad</label>
@@ -1523,25 +1537,25 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
               ))}
             </div>
           </div>
-          <div className="sec-lbl">Datos del Viaje</div>
-          <div className="fg">
-            <div className="field"><label>Cliente</label><input value={f.cliente} onChange={ch("cliente")} /></div>
-            <div className="field"><label>Origen *</label><input value={f.origen} onChange={ch("origen")} /></div>
-            <div className="field"><label>Destino</label><input value={f.destino} onChange={ch("destino")} /></div>
-            <div className="field"><label>Carga</label><input value={f.carga} onChange={ch("carga")} /></div>
-          </div>
+
+          {/* 4. FINANCIERO */}
           <div className="sec-lbl">🔒 Financiero</div>
           <div className="fg">
-            <div className="field"><label>Costo a Pagar ($)</label><input value={f.costoPagar} onChange={ch("costoPagar")} type="number" /></div>
-            <div className="field"><label>Precio al Cliente ($)</label><input value={f.precioCliente} onChange={ch("precioCliente")} type="number" /></div>
-            <div className="field"><label>Costo Estadías ($)</label><input value={f.costoEstadias} onChange={ch("costoEstadias")} type="number" /></div>
-            <div className="field"><label>Gastos Extras ($)</label><input value={f.gastosExtrasExt||0} onChange={ch("gastosExtrasExt")} type="number" min="0" placeholder="0"/></div>
+            <div className="field"><label>Costo a Pagar ($)</label><input value={f.costoPagar} onChange={ch("costoPagar")} type="number" min="0"/></div>
+            <div className="field"><label>Precio al Cliente ($)</label><input value={f.precioCliente} onChange={ch("precioCliente")} type="number" min="0"/></div>
+            <div className="field"><label>Costo Estadías ($)</label><input value={f.costoEstadias} onChange={ch("costoEstadias")} type="number" min="0"/></div>
+            <div className="field"><label>Gastos Extras ($)</label><input value={f.gastosExtrasExt||0} onChange={ch("gastosExtrasExt")} type="number" min="0"/></div>
           </div>
-          {utilidad !== 0 && <div style={{ marginTop: 10, padding: "12px 16px", background: utilidad >= 0 ? "#E8F9F3" : "#FFF0F2", borderRadius: 10, border: `1px solid ${utilidad >= 0 ? "#B8EDCA" : "#FFD0D5"}` }}>
+          {utilidad !== 0 && <div style={{ marginTop:6, marginBottom:10, padding:"12px 16px", background: utilidad >= 0 ? "#e8f8ee" : "#fdecea", borderRadius:10, border:`1px solid ${utilidad>=0?"var(--green)":"var(--red)"}` }}>
             <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700 }}>UTILIDAD: </span>
-            <span style={{ fontFamily: "var(--font-hd)", fontSize: 24, fontWeight: 700, color: utilidad >= 0 ? "#00864E" : "var(--red)" }}>{fmt$(utilidad)}</span>
+            <span style={{ fontFamily: "var(--font-hd)", fontSize: 24, fontWeight: 700, color: utilidad >= 0 ? "var(--green)" : "var(--red)" }}>{fmt$(utilidad)}</span>
           </div>}
-            <div className="field s2"><label>Notas</label><textarea value={f.notas} onChange={ch("notas")} rows={2} /></div>
+
+          {/* 5. NOTAS */}
+          <div className="field s2" style={{marginBottom:12}}><label>Notas</label><textarea value={f.notas} onChange={ch("notas")} rows={2} style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",resize:"vertical"}}/></div>
+
+
+          </div>
           <MultiPhotoInput values={f.evidencias || []} onChange={v => setF(p => ({ ...p, evidencias: v }))} onUploading={setUploading} label="📸 Evidencias de Entrega" />
         </div>
         <div className="mftr"><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-cyan" onClick={ok} disabled={uploading} style={uploading?{opacity:.6,cursor:"not-allowed"}:{}}>{uploading?"⏳ Subiendo...":"💾 Guardar"}</button></div>
@@ -5852,10 +5866,6 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
           <button className="btn btn-cyan" onClick={onAdd}>+ Viaje Propio</button>
         </div>
       </div>
-      <div style={{padding:"5px 16px",borderBottom:"1px solid var(--border)",display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-        <span style={{fontSize:10,color:"var(--muted)",fontWeight:700}}>STATUS:</span>
-        {["TODOS","EN RUTA","COMPLETADO","CANCELADO"].map(s=><button key={s} className={`ftab${sf===s?" on":""}`} onClick={()=>setSf(s)} style={{fontSize:10}}>{s}</button>)}
-      </div>
       <div style={{padding:"8px 16px",borderBottom:"1px solid var(--border)",display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
         <span style={{fontSize:11,color:"var(--muted)",fontWeight:700}}>📅 Período:</span>
         {[["todos","Todos"],["semana","Esta semana"],["mes","Mes"],["trimestre","Trimestre"],["anio","Año"],["custom","📅 Personalizado"]].map(([v,l])=>(
@@ -5895,7 +5905,6 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
       </div>
       <div className="sbar">
         <span>Registros: <strong>{fil.length}</strong></span>
-        <span>En Ruta: <strong style={{ color: "var(--cyan)" }}>{fil.filter(t => t.status === "EN RUTA").length}</strong></span>
         <span>KM totales: <strong style={{ color: "var(--green)" }}>{fmtN(totKm)} km</strong></span>
         {isAdmin && <span>Ingresos: <strong style={{ color: "var(--green)" }}>{fmt$(totIng)}</strong> 🔒</span>}
       </div>
