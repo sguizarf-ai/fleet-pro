@@ -1381,12 +1381,20 @@ function MaintModal({ maint, units, proveedores, onSave, onClose }) {
     </div>
   );
 }
-function TripModal({ trip, units, onSave, onClose }) {
+function TripModal({ trip, units, clientes = [], rutasCatalogo = [], onSaveRuta, onSave, onClose }) {
   const [f, setF] = useState(trip || { unidadId: "", esExterno: false, tipoViaje: "local", origen: "", destino: "", fecha: "", fechaReg: "", kmSalida: "", kmLlegada: "", carga: "", cliente: "", status: "EN RUTA", notas: "", costoOfrecido: 0, gastosExtras: 0, costoEstadias: 0, viaticos: 0, combustibleExtra: 0, casetas: 0, evidencias: [] });
   const [uploading, setUploading] = useState(false);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const dist = f.kmLlegada && f.kmSalida ? Number(f.kmLlegada) - Number(f.kmSalida) : null;
-  const ok = (_e) => { if (!f.unidadId || !f.origen) return alert("Unidad y origen requeridos"); onSave({ ...f, id: f.id || uid() }) };
+  const ok = (_e) => {
+    if (!f.unidadId || !f.origen) return alert("Unidad y origen requeridos");
+    // Save ruta to catalog if not already present
+    if (onSaveRuta && f.origen && f.destino) {
+      const exists = (rutasCatalogo||[]).some(r=>r.origen===f.origen&&r.destino===f.destino);
+      if (!exists) onSaveRuta({origen:f.origen, destino:f.destino});
+    }
+    onSave({ ...f, id: f.id || uid() });
+  };
   return (
     <div className="modal-ov" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
@@ -1404,15 +1412,46 @@ function TripModal({ trip, units, onSave, onClose }) {
           </div>
 
           <div className="fg">
+            {/* Cliente con selector */}
+            <div className="field s2">
+              <label>Cliente</label>
+              <select value={f.cliente||""} onChange={e=>setF(p=>({...p,cliente:e.target.value}))} style={{background:"var(--bg0)",color:e=>e?"var(--text)":"var(--muted)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}>
+                <option value="">— Seleccionar cliente —</option>
+                {(clientes||[]).filter(c=>c.status==="ACTIVO"||!c.status).map(c=><option key={c.id} value={c.nombreCorto||c.nombre}>{c.nombreCorto||c.nombre}</option>)}
+              </select>
+            </div>
+            {/* Origen con catálogo */}
+            <div className="field" style={{position:"relative"}}>
+              <label>Origen *</label>
+              <input value={f.origen} onChange={ch("origen")} placeholder="Ciudad, Estado" list="origenes-list"/>
+              <datalist id="origenes-list">
+                {[...new Set((rutasCatalogo||[]).map(r=>r.origen).filter(Boolean))].map((o,i)=><option key={i} value={o}/>)}
+              </datalist>
+            </div>
+            {/* Destino con catálogo */}
+            <div className="field" style={{position:"relative"}}>
+              <label>Destino</label>
+              <input value={f.destino} onChange={ch("destino")} placeholder="Ciudad, Estado" list="destinos-list"/>
+              <datalist id="destinos-list">
+                {[...new Set((rutasCatalogo||[]).map(r=>r.destino).filter(Boolean))].map((d,i)=><option key={i} value={d}/>)}
+              </datalist>
+              {/* Rutas frecuentes */}
+              {f.origen && (rutasCatalogo||[]).filter(r=>r.origen===f.origen&&r.destino&&r.destino!==f.destino).length>0 && (
+                <div style={{position:"absolute",top:"100%",left:0,right:0,background:"var(--bg1)",border:"1px solid var(--border)",borderRadius:8,zIndex:100,boxShadow:"0 4px 12px rgba(0,0,0,.15)",maxHeight:140,overflowY:"auto"}}>
+                  {(rutasCatalogo||[]).filter(r=>r.origen===f.origen&&r.destino).slice(0,5).map((r,i)=>(
+                    <div key={i} onClick={()=>setF(p=>({...p,destino:r.destino}))} style={{padding:"8px 12px",cursor:"pointer",fontSize:12,borderBottom:"1px solid var(--border)"}}>
+                      ↗ {r.destino}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="field s2"><label>Unidad *</label><select value={f.unidadId} onChange={ch("unidadId")} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}><option value="">— Seleccionar unidad —</option>{units.map(u=><option key={u.id} value={u.id}>{u.num} — {u.placas}</option>)}</select></div>
-            <div className="field"><label>Origen *</label><input value={f.origen} onChange={ch("origen")} placeholder="Ciudad, Estado"/></div>
-            <div className="field"><label>Destino</label><input value={f.destino} onChange={ch("destino")} placeholder="Ciudad, Estado"/></div>
             <div className="field"><label>F. Salida</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))}/></div>
             <div className="field"><label>F. Regreso</label><DatePicker value={f.fechaReg} onChange={v=>setF(p=>({...p,fechaReg:v}))}/></div>
             <div className="field"><label>KM Salida</label><input value={f.kmSalida} onChange={ch("kmSalida")} type="number"/></div>
             <div className="field"><label>KM Llegada</label><input value={f.kmLlegada} onChange={ch("kmLlegada")} type="number"/></div>
-            <div className="field"><label>Carga / Mercancía</label><input value={f.carga} onChange={ch("carga")}/></div>
-            <div className="field"><label>Cliente</label><input value={f.cliente} onChange={ch("cliente")}/></div>
+            <div className="field s2"><label>Carga / Mercancía</label><input value={f.carga} onChange={ch("carga")}/></div>
           </div>
 
           {dist && <div style={{marginTop:6,marginBottom:10,padding:"10px 16px",background:"var(--bg2)",borderRadius:10,display:"flex",gap:8,alignItems:"center"}}>
@@ -1454,7 +1493,7 @@ function TripModal({ trip, units, onSave, onClose }) {
   );
 }
 
-function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], proveedores = [], onNuevoProveedor }) {
+function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], proveedores = [], clientes = [], rutasCatalogo = [], onSaveRuta, onNuevoProveedor }) {
   const [f, setF] = useState(externo || { fecha: "", empresa: "", contacto: "", tel: "", tipoUnidad: "", placas: "", color: "", eco: "", operador: "", seguroOp: "", seguroVeh: "", herramientas: [], origen: "", destino: "", cliente: "", carga: "", costoPagar: 0, precioCliente: 0, costoEstadias: 0, status: "EN RUTA", notas: "", evidencias: [] });
   const [uploading, setUploading] = useState(false);
   const [nuevoTipo, setNuevoTipo] = useState("");
@@ -1479,10 +1518,10 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
           {/* 1. DATOS DEL VIAJE — primero */}
           <div className="sec-lbl">📍 Datos del Viaje</div>
           <div className="fg">
-            <div className="field"><label>Cliente</label><input value={f.cliente} onChange={ch("cliente")} placeholder="Nombre del cliente"/></div>
+            <div className="field"><label>Cliente</label><select value={f.cliente||""} onChange={e=>setF(p=>({...p,cliente:e.target.value}))} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}><option value="">— Seleccionar cliente —</option>{(clientes||[]).filter(c=>c.status==="ACTIVO"||!c.status).map(c=><option key={c.id} value={c.nombreCorto||c.nombre}>{c.nombreCorto||c.nombre}</option>)}</select></div>
             <div className="field"><label>Fecha</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))}/></div>
-            <div className="field"><label>Origen *</label><input value={f.origen} onChange={ch("origen")} placeholder="Ciudad, Estado"/></div>
-            <div className="field"><label>Destino</label><input value={f.destino} onChange={ch("destino")} placeholder="Ciudad, Estado"/></div>
+            <div className="field"><label>Origen *</label><input value={f.origen} onChange={ch("origen")} placeholder="Ciudad, Estado" list="ext-origenes-list"/><datalist id="ext-origenes-list">{[...new Set((rutasCatalogo||[]).map(r=>r.origen).filter(Boolean))].map((o,i)=><option key={i} value={o}/>)}</datalist></div>
+            <div className="field"><label>Destino</label><input value={f.destino} onChange={ch("destino")} placeholder="Ciudad, Estado" list="ext-destinos-list"/><datalist id="ext-destinos-list">{[...new Set((rutasCatalogo||[]).map(r=>r.destino).filter(Boolean))].map((d,i)=><option key={i} value={d}/>)}</datalist></div>
             <div className="field s2"><label>Carga / Mercancía</label><input value={f.carga} onChange={ch("carga")} placeholder="Descripción de la carga"/></div>
           </div>
 
@@ -11659,6 +11698,8 @@ function HelpPage({ currentUser }) {
 
 
 export default function App() {
+  const [rutasCatalogo, setRutasCatalogo] = useState([]); // [{origen, destino}]
+  useEffect(() => { if (rutasCatalogo.length>0) sv("fp6:rutasCatalogo", rutasCatalogo); }, [rutasCatalogo]);
   const [tab, setTab] = useState("dashboard");
   const [units, setUnits] = useState([]);
   const [branding, setBranding] = useState({ nombre: "Mi Empresa", slogan: "Sistema de Flota", logo: "" });
@@ -11734,6 +11775,7 @@ export default function App() {
         [setExtrasTabulador,     "fp6:extrasTabulador", D_EXTRAS_TABULADOR],
         [setCotizaciones,        "fp6:cotizaciones",    []],
         [setRemitentes,          "fp6:remitentes",      []]
+        [setRutasCatalogo,       "fp6:rutasCatalogo",   []],
       ];
       // Cargar tema
       try {
@@ -12302,7 +12344,7 @@ export default function App() {
       {modal?.type === "almacen" && <AlmacenModal item={modal.data} proveedores={proveedores} onSave={d=>ALC.save({...d,id:d.id||uid()})} onClose={()=>setModal(null)}/>}
       {modal?.type === "maint" && <MaintModal key={modal.data?.id || modal._ts || "new-maint"} maint={modal.data} units={units} proveedores={proveedores} onSave={m => MC.save({ ...m, id: m.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "fuel" && <FuelModal key={modal.data?.id || modal._ts || "new-fuel"} fuel={modal.data} units={units} onSave={f => FC.save({ ...f, id: f.id || uid() })} onClose={() => setModal(null)} onUpdateUnit={UC.save} />}
-      {modal?.type === "trip" && <TripModal key={modal.data?.id || modal._ts || "new-trip"} trip={modal.data} units={units} onSave={t => TC.save({ ...t, id: t.id || uid(), esExterno: false })} onClose={() => setModal(null)} />}
+      {modal?.type === "trip" && <TripModal key={modal.data?.id || modal._ts || "new-trip"} trip={modal.data} units={units} clientes={clientes} rutasCatalogo={rutasCatalogo} onSaveRuta={r=>setRutasCatalogo(p=>[...p,r])} onSave={t => TC.save({ ...t, id: t.id || uid(), esExterno: false })} onClose={() => setModal(null)} />}
       {modal?.type === "gasto" && <GastoModal key={modal.data?.id || modal._ts || "new-gasto"} gasto={modal.data} proveedores={proveedores} onSave={g => GC.save({ ...g, id: g.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "pagoTransp" && (
         <PagoTransportistaModal
@@ -12315,7 +12357,7 @@ export default function App() {
           onClose={() => setModal(null)}
         />
       )}
-      {modal?.type === "externo" && <ExternoModal key={modal.data?.id || "new-ext"} externo={modal.data} tiposPersonalizados={tiposPersonalizados} proveedores={proveedores} onNuevoProveedor={p=>{PVC.save(p);}} onSave={e => saveExternoWithTipo({ ...e, id: e.id || uid() })} onClose={() => setModal(null)} />}
+      {modal?.type === "externo" && <ExternoModal key={modal.data?.id || "new-ext"} externo={modal.data} tiposPersonalizados={tiposPersonalizados} proveedores={proveedores} clientes={clientes} rutasCatalogo={rutasCatalogo} onSaveRuta={r=>setRutasCatalogo(p=>[...p,r])} onNuevoProveedor={p=>{PVC.save(p);}} onSave={e => saveExternoWithTipo({ ...e, id: e.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "changeDriver" && <ChangeDriverModal unit={modal.data} drivers={drivers} onSave={u => UC.save(u)} onClose={() => setModal(null)} />}
       {modal?.type === "cliente" && <ClienteModal key={modal.data?.id || modal._ts || "new-cliente"} cliente={modal.data} onSave={c => CliC.save({ ...c, id: c.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "factura" && <FacturaModal key={modal.data?.id || "new-fact"} factura={modal.data} clientes={clientes} viajes={trips} onSave={f => FacC.save(f)} onClose={() => setModal(null)} />}
