@@ -312,12 +312,7 @@ const can = (rol, perm) => !!(PERMS_BASE[rol] && PERMS_BASE[rol][perm]);
 
 const GASTO_TIPOS = ["Telefonía e Internet", "Renta de Instalaciones", "Servicios Públicos", "Papelería", "Mantenimiento Oficina", "Seguros Generales", "Software y Licencias", "Publicidad", "Honorarios", "Impuestos", "Gastos a Proveedores", "Otro"];
 
-// ── Print Preview Context — allows any component to open in-app print modal ──
-const PrintCtx = React.createContext(null);
-function usePrint() { return React.useContext(PrintCtx); }
-
 const HERRAMIENTAS = ["Torreta Mata Chispas", "Extintor", "Cadenas", "Gata", "Bandas", "Tacones", "Llave de Cruz", "Triángulos Seguridad", "Botiquín", "Conos", "Cables Pasa Corriente", "Señalamientos", "Otro"];
-
 const FORMAS_PAGO_SAT = {
   "01": "Efectivo",
   "02": "Cheque nominativo",
@@ -3771,17 +3766,16 @@ function buildEvidenciasHtml({ trip, unit, ext }) {
 function printEvidencias({ trip, unit, externos = [] }) {
   const isExt = trip.esExterno;
   const ext = isExt ? externos.find(e => e.id === trip.unidadId) : null;
-  const _buf = []; const w = { document: { write: s => _buf.push(s), close: ()=>{} }, focus: ()=>{}, addEventListener: ()=>{} };
+  const w = window.open("", "_blank");
   if (!w) { alert("El navegador bloqueó la ventana. Permite pop-ups para este sitio."); return; }
   w.document.write(buildEvidenciasHtml({ trip, unit, ext }));
   w.document.close();
-  const _html = _buf.join(""); if (setPrintHtml) { setPrintHtml(_html); } else { const _w = window.open("","_blank"); if(_w){_w.document.write(_html);_w.document.close();_w.focus();setTimeout(()=>_w.print(),500);} }
+  w.document.close(); w.focus(); setTimeout(() => w.print(), 500);
 }
 
 // ── EvidenciasModal — modal in-app para ver, descargar y enviar evidencias ────
 function EvidenciasModal({ trip, unit, ext, clientes, remitentes, onClose }) {
   const evidencias = trip.evidencias || [];
-  const setPrintHtml = usePrint();
   const [lightbox, setLightbox] = useState(null);
 
   const descargarHTML = () => {
@@ -3921,7 +3915,7 @@ function EvidenciasModal({ trip, unit, ext, clientes, remitentes, onClose }) {
                   <button className="btn btn-ghost btn-sm" onClick={descargarFotos}>
                     ⬇️ Descargar todas ({evidencias.length})
                   </button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => printEvidencias({ trip, unit, externos:[], setPrintHtml })}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => printEvidencias({ trip, unit, externos:[] })}>
                     🖨️ Imprimir / PDF
                   </button>
                 </div>
@@ -3950,7 +3944,7 @@ function EvidenciasModal({ trip, unit, ext, clientes, remitentes, onClose }) {
 }
 
 function printUnitSheet({ unit, driver, docs, maints, fuels, trips, showFinancial = true, companyLogo = "", companyName = "" }) {
-  const _buf = []; const w = { document: { write: s => _buf.push(s), close: ()=>{} }, focus: ()=>{}, addEventListener: ()=>{} };
+  const w = window.open("", "_blank");
   const totalM = maints.filter(m => m.unidadId === unit.id).reduce((a, m) => a + (Number(m.costoRef) || 0) + (Number(m.costoMO) || 0), 0);
   const totalF = fuels.filter(f => f.unidadId === unit.id).reduce((a, f) => a + (Number(f.litros) || 0) * (Number(f.precio) || 0), 0);
   const op = driver || {};
@@ -4031,11 +4025,11 @@ function printUnitSheet({ unit, driver, docs, maints, fuels, trips, showFinancia
     `);
   }
   w.document.write(`<p style="margin-top:16px;font-size:10px;color:#999">Generado: ${new Date().toLocaleDateString("es-MX", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p></body></html>`);
-  const _html = _buf.join(""); if (setPrintHtml) { setPrintHtml(_html); } else { const _w = window.open("","_blank"); if(_w){_w.document.write(_html);_w.document.close();_w.focus();setTimeout(()=>_w.print(),500);} }
+  w.document.close(); w.focus(); setTimeout(() => w.print(), 500);
 }
 
 function printDriverSheet({ driver, unit, companyLogo = "", companyName = "" }) {
-  const _buf = []; const w = { document: { write: s => _buf.push(s), close: ()=>{} }, focus: ()=>{}, addEventListener: ()=>{} };
+  const w = window.open("", "_blank");
   const logoHtml = companyLogo ? `<img src="${companyLogo}" style="height:40px;object-fit:contain" alt="Logo"/>` : `<div style="font-size:14px;font-weight:700;color:#0099CC">${companyName || "FLEET PRO"}</div>`;
   w.document.write(`<!DOCTYPE html><html><head><title>Hoja Conductor ${driver.nombre}</title><style>
   body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:20px;max-width:750px;margin:0 auto}
@@ -4075,11 +4069,11 @@ function printDriverSheet({ driver, unit, companyLogo = "", companyName = "" }) 
     <div class="field" style="margin-top:12px"><label>Notas</label>${driver.notas || "Sin notas"}</div>
     <p style="margin-top:16px;font-size:10px;color:#999">Generado: ${new Date().toLocaleDateString("es-MX", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
   </body></html>`);
-  const _html = _buf.join(""); if (setPrintHtml) { setPrintHtml(_html); } else { const _w = window.open("","_blank"); if(_w){_w.document.write(_html);_w.document.close();_w.focus();setTimeout(()=>_w.print(),500);} }
+  w.document.close(); w.focus(); setTimeout(() => w.print(), 500);
 }
 
 function printNominaOperador({ driver, weeks = 4 }) {
-  const _buf = []; const w = { document: { write: s => _buf.push(s), close: ()=>{} }, focus: ()=>{}, addEventListener: ()=>{} };
+  const w = window.open("", "_blank");
   const total = weeks * (Number(driver.salarioSemanal) || 0);
   w.document.write(`<!DOCTYPE html><html><head><title>Nómina ${driver.nombre}</title><style>
   body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:20px;max-width:700px;margin:0 auto}
@@ -4102,11 +4096,11 @@ function printNominaOperador({ driver, weeks = 4 }) {
     </table>
     <p style="margin-top:16px;font-size:10px;color:#999">Generado: ${new Date().toLocaleDateString("es-MX", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
   </body></html>`);
-  const _html = _buf.join(""); if (setPrintHtml) { setPrintHtml(_html); } else { const _w = window.open("","_blank"); if(_w){_w.document.write(_html);_w.document.close();_w.focus();setTimeout(()=>_w.print(),500);} }
+  w.document.close(); w.focus(); setTimeout(() => w.print(), 500);
 }
 
 function printTripsReport({ trips, units, externos = [], companyLogo = "", companyName = "" }) {
-  const _buf = []; const w = { document: { write: s => _buf.push(s), close: ()=>{} }, focus: ()=>{}, addEventListener: ()=>{} };
+  const w = window.open("", "_blank");
   const logoHtml = companyLogo ? `<img src="${companyLogo}" style="height:36px;object-fit:contain" alt=""/>` : `<strong style="color:#0099CC">${companyName||"FLEET PRO"}</strong>`;
   w.document.write(`<!DOCTYPE html><html><head><title>Reporte de Viajes</title><style>
   body{font-family:Arial,sans-serif;font-size:11px;color:#000;padding:20px}
@@ -4126,11 +4120,11 @@ function printTripsReport({ trips, units, externos = [], companyLogo = "", compa
     w.document.write(`<tr><td>${isExt ? "EXT" : "INT"}</td><td>${isExt ? ext?.empresa : `${u?.num} ${u?.placas}`}</td><td>${t.origen}</td><td>${t.destino || "—"}</td><td>${t.fecha}</td><td>${t.fechaReg || "Pendiente"}</td><td>${dist ? fmtN(dist) + " km" : "—"}</td><td>${t.cliente || "—"}</td><td>${t.status}</td></tr>`);
   });
   w.document.write(`</tbody></table><p style="margin-top:16px;font-size:10px;color:#999">Total viajes: ${trips.length} | Generado: ${new Date().toLocaleDateString("es-MX", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p></body></html>`);
-  const _html = _buf.join(""); if (setPrintHtml) { setPrintHtml(_html); } else { const _w = window.open("","_blank"); if(_w){_w.document.write(_html);_w.document.close();_w.focus();setTimeout(()=>_w.print(),500);} }
+  w.document.close(); w.focus(); setTimeout(() => w.print(), 500);
 }
 
 function printTripProfit({ trip, unit, fuels, maints, externos = [] }) {
-  const _buf = []; const w = { document: { write: s => _buf.push(s), close: ()=>{} }, focus: ()=>{}, addEventListener: ()=>{} };
+  const w = window.open("", "_blank");
   const isExt = trip.esExterno;
   const ext = isExt ? externos.find(e => e.id === trip.unidadId) : null;
   
@@ -4195,7 +4189,7 @@ function printTripProfit({ trip, unit, fuels, maints, externos = [] }) {
       <p style="margin-top:16px;font-size:10px;color:#999">Generado: ${new Date().toLocaleDateString("es-MX")}</p>
     </body></html>`);
   }
-  const _html = _buf.join(""); if (setPrintHtml) { setPrintHtml(_html); } else { const _w = window.open("","_blank"); if(_w){_w.document.write(_html);_w.document.close();_w.focus();setTimeout(()=>_w.print(),500);} }
+  w.document.close(); w.focus(); setTimeout(() => w.print(), 500);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -4844,7 +4838,6 @@ function Dashboard({
   );
 }
 function UnitsPage({ units, drivers, docs, maints, fuels, trips, onAdd, onEdit, onDelete, onChangeDriver, isAdmin, branding = {} }) {
-  const setPrintHtml = usePrint();
   const [q, setQ] = useState(""); const [ef, setEf] = useState("TODOS");
   const fil = units.filter(u => { const d = drivers.find(d => d.id === u.operador); return (u.num + u.placas + u.eco + (d?.nombre || "")).toLowerCase().includes(q.toLowerCase()) && (ef === "TODOS" || u.estado === ef) });
   return (
@@ -4880,7 +4873,7 @@ function UnitsPage({ units, drivers, docs, maints, fuels, trips, onAdd, onEdit, 
                   <td><Bdg c="bp" t={`${u.rendEsperado || 0} km/L`} /></td>
                   <td><div className="acts">
                     <button className="btn btn-purple btn-xs" onClick={() => onChangeDriver(u)} title="Cambiar operador">🔄</button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => printUnitSheet({ setPrintHtml, unit: u, driver: drv, docs, maints, fuels, trips, showFinancial: isAdmin, companyLogo: branding.logo, companyName: branding.nombre })} title="Imprimir ficha">🖨️</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => printUnitSheet({ unit: u, driver: drv, docs, maints, fuels, trips, showFinancial: isAdmin, companyLogo: branding.logo, companyName: branding.nombre })} title="Imprimir ficha">🖨️</button>
                     <button className="btn btn-ghost btn-sm" onClick={() => onEdit(u)}>✏️</button>
                     <button className="btn btn-red btn-sm" onClick={() => onDelete(u.id)}>🗑</button>
                   </div></td>
@@ -4894,7 +4887,6 @@ function UnitsPage({ units, drivers, docs, maints, fuels, trips, onAdd, onEdit, 
 }
 
 function DriversPage({ drivers, units, trips, onAdd, onEdit, onDelete, onHojaViaje, onNomina, branding = {} }) {
-  const setPrintHtml = usePrint();
   const [q, setQ] = useState("");
   const fil = drivers.filter(d => (d.nombre + d.licencia).toLowerCase().includes(q.toLowerCase()));
   return (
@@ -4924,7 +4916,7 @@ function DriversPage({ drivers, units, trips, onAdd, onEdit, onDelete, onHojaVia
                   <td><Bdg c="bp" t={`${d.porcentajeViaje || 0}%`} /></td>
                   <td><Bdg c={d.status === "ACTIVO" ? "bg" : "bm"} t={d.status} /></td>
                   <td><div className="acts">
-                    <button className="btn btn-ghost btn-xs" onClick={() => printDriverSheet({ setPrintHtml, driver: d, unit, companyLogo: branding.logo, companyName: branding.nombre })} title="Imprimir hoja">🖨️</button>
+                    <button className="btn btn-ghost btn-xs" onClick={() => printDriverSheet({ driver: d, unit, companyLogo: branding.logo, companyName: branding.nombre })} title="Imprimir hoja">🖨️</button>
                     <button className="btn btn-green btn-xs" onClick={() => onNomina(d)} title="Nómina">💵</button>
                     <button className="btn btn-purple btn-xs" onClick={() => onHojaViaje(d)} title="Hoja de Viaje">📋</button>
                     <button className="btn btn-ghost btn-sm" onClick={() => onEdit(d)}>✏️</button>
@@ -5018,15 +5010,14 @@ function downloadDocAsHtml(doc, unit, driver) {
   }
 }
 
-function openDocPrint(doc, unit, driver, setPrintHtml = null) {
+function openDocPrint(doc, unit, driver) {
   const html = printAndDownloadDoc(doc, unit, driver);
-  if (setPrintHtml) { setPrintHtml(html); return; }
-  const _w = window.open("","_blank"); if(_w){_w.document.write(html);_w.document.close();_w.focus();setTimeout(()=>_w.print(),500);}
+  const w = window.open("", "_blank");
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 500);
 }
-
-
-
-// ── DescargarEnviarWA — componente reutilizable de descarga + abrir WhatsApp ──
 // Props:
 //   onDescargar: fn() → dispara la descarga del archivo
 //   descargarLabel: string (ej: "⬇️ Descargar PDF")
@@ -5535,7 +5526,6 @@ function DocEnvioModal({ docs, clientes, remitentes, onClose }) {
 function DocCard({ d, entity, isUnit, selected, onToggle, onEdit, onDelete }) {
   const dy    = daysUntil(d.vence);
   const dc    = dy === null ? "var(--muted)" : dy < 0 ? "var(--red)" : dy <= 30 ? "var(--yellow)" : "var(--green)";
-  const setPrintHtml = usePrint();
   const fotos = d.fotos?.length ? d.fotos : d.foto ? [d.foto] : [];
   return (
     <div className="doc-card"
@@ -5591,7 +5581,7 @@ function DocCard({ d, entity, isUnit, selected, onToggle, onEdit, onDelete }) {
       {/* Acciones — stopPropagation para no activar toggle */}
       <div className="acts" style={{ marginTop:8 }} onClick={e => e.stopPropagation()}>
         <button className="btn btn-ghost btn-xs" title="Imprimir"
-          onClick={() => isUnit ? openDocPrint(d, entity, null, setPrintHtml) : openDocPrint(d, null, entity, setPrintHtml)}>🖨️</button>
+          onClick={() => isUnit ? openDocPrint(d, entity, null) : openDocPrint(d, null, entity)}>🖨️</button>
         <button className="btn btn-ghost btn-xs" title="Descargar"
           onClick={() => isUnit ? downloadDocAsHtml(d, entity, null) : downloadDocAsHtml(d, null, entity)}>⬇️</button>
         <button className="btn btn-ghost btn-xs" onClick={() => onEdit(d)}>✏️</button>
@@ -5786,7 +5776,6 @@ function DocsPage({ units, drivers, docs, clientes, remitentes, onAdd, onEdit, o
 }
 
 function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes, onAdd, onEdit, onDelete, onAddExt, onEditExt, onDeleteExt, isAdmin, branding = {} }) {
-  const setPrintHtml = usePrint();
   const [q, setQ] = useState(""); const [sf, setSf] = useState("TODOS"); const [tf, setTf] = useState("TODOS");
   const [periodoF, setPeriodoF] = useState("todos"); // todos | semana | mes | trimestre | anio
   const [mesF, setMesF] = useState(new Date().getMonth());
@@ -5847,7 +5836,7 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
       <div className="card-hdr"><h3>🗺️ Viajes ({allTrips.length})</h3>
         <div className="row-gap">
           <div className="sw"><span style={{ color: "var(--muted)" }}>🔍</span><input placeholder="Buscar..." value={q} onChange={e => setQ(e.target.value)} /></div>
-          <button className="btn btn-ghost btn-sm" onClick={() => printTripsReport({ trips: fil, setPrintHtml, units, externos, companyLogo: branding.logo, companyName: branding.nombre })}>📊 Imprimir Reporte</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => printTripsReport({ trips: fil, units, externos, companyLogo: branding.logo, companyName: branding.nombre })}>📊 Imprimir Reporte</button>
           <button className="btn btn-purple" onClick={onAddExt}>+ Viaje Externo</button>
           <button className="btn btn-cyan" onClick={onAdd}>+ Viaje Propio</button>
         </div>
@@ -5923,7 +5912,7 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
                   <td>{hasEvid ? <button className="btn btn-ghost btn-xs"
   onClick={() => setEvidModal({ trip: t, unit: u, ext: externos.find(e => e.id === t.unidadId) })}
   title="Ver y enviar evidencias">📸 {t.evidencias.length}</button> : <span style={{ color: "var(--muted)" }}>—</span>}</td>
-                  {isAdmin && <td>{t.status === "COMPLETADO" ? <button className="btn btn-purple btn-xs" onClick={() => printTripProfit({ setPrintHtml, trip: t, unit: u, fuels, maints, externos })} title="Ver utilidad">💰</button> : <span style={{ color: "var(--muted)" }}>—</span>}</td>}
+                  {isAdmin && <td>{t.status === "COMPLETADO" ? <button className="btn btn-purple btn-xs" onClick={() => printTripProfit({ trip: t, unit: u, fuels, maints, externos })} title="Ver utilidad">💰</button> : <span style={{ color: "var(--muted)" }}>—</span>}</td>}
                   <td><div className="acts">
                     <button className="btn btn-ghost btn-sm" onClick={() => t.tipo === "PROPIO" ? onEdit(t) : onEditExt(t)}>✏️</button>
                     {(t.tipo === "PROPIO" || t._esExternoRec) && <button className="btn btn-red btn-sm" onClick={() => t.tipo === "PROPIO" ? onDelete(t.id) : onDeleteExt(t.id)}>🗑</button>}
@@ -11627,40 +11616,7 @@ function HelpPage({ currentUser }) {
 }
 
 
-// ── PrintPreviewModal ─────────────────────────────────────────────────────────
-// Shows printed HTML inside the app as a full-screen overlay.
-// Solves iOS Safari "can't close new tab" — content never leaves the app.
-function PrintPreviewModal({ html, onClose }) {
-  const iRef = useRef();
-  useEffect(() => {
-    // On desktop, auto-trigger print dialog after iframe loads
-    const t = setTimeout(() => {
-      try { iRef.current?.contentWindow?.print(); } catch(e){}
-    }, 700);
-    return () => clearTimeout(t);
-  }, []);
-  return (
-    <div style={{position:"fixed",inset:0,zIndex:10000,display:"flex",flexDirection:"column",background:"#000"}}>
-      <div style={{background:"#0099CC",color:"#fff",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px",flexShrink:0}}>
-        <span style={{fontWeight:700,fontSize:15}}>📄 Vista previa</span>
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={()=>{try{iRef.current?.contentWindow?.print();}catch(e){}}}
-            style={{background:"rgba(255,255,255,.2)",color:"#fff",border:"1px solid rgba(255,255,255,.5)",padding:"8px 14px",borderRadius:8,fontWeight:700,fontSize:13,cursor:"pointer"}}>
-            🖨️ Imprimir
-          </button>
-          <button onClick={onClose}
-            style={{background:"#fff",color:"#0099CC",border:"none",padding:"8px 18px",borderRadius:8,fontWeight:800,fontSize:16,cursor:"pointer"}}>
-            ✕ Cerrar
-          </button>
-        </div>
-      </div>
-      <iframe ref={iRef} srcDoc={html} style={{flex:1,border:"none",background:"#fff"}} title="preview"/>
-    </div>
-  );
-}
-
 export default function App() {
-  const [printHtml, setPrintHtml] = useState(null);
   const [tab, setTab] = useState("dashboard");
   const [units, setUnits] = useState([]);
   const [branding, setBranding] = useState({ nombre: "Mi Empresa", slogan: "Sistema de Flota", logo: "" });
@@ -11999,8 +11955,7 @@ export default function App() {
   }
 
   return (
-    <PrintCtx.Provider value={setPrintHtml}>
-    <>
+        <>
       <style>{CSS}</style>
       <div className="app">
         <button className="sb-toggle" onClick={() => setSidebarOpen(o => !o)}>☰</button>
@@ -12327,8 +12282,6 @@ export default function App() {
       {modal?.type === "nomina" && <NominaModal driver={modal.data} trips={trips} units={units} onClose={() => setModal(null)} companyLogo={branding.logo} companyName={branding.nombre} />}
       {confirm && <Confirm msg={confirm.msg} onOk={confirm.onOk} onCancel={() => setConfirm(null)} />}
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
-      {printHtml && <PrintPreviewModal html={printHtml} onClose={()=>setPrintHtml(null)}/>}
     </>
-    </PrintCtx.Provider>
   );
 }
