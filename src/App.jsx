@@ -3968,7 +3968,7 @@ function EvidenciasModal({ trip, unit, ext, clientes, remitentes, onClose }) {
   );
 }
 
-function printUnitSheet({ unit, driver, docs, maints, fuels, trips, showFinancial = true, companyLogo = "", companyName = "" }) {
+function printUnitSheet({ unit, driver, docs, maints, fuels, trips, proveedores = [], showFinancial = true, companyLogo = "", companyName = "" }) {
   const w = window.open("", "_blank");
   const totalM = maints.filter(m => m.unidadId === unit.id).reduce((a, m) => a + (Number(m.costoRef) || 0) + (Number(m.costoMO) || 0), 0);
   const totalF = fuels.filter(f => f.unidadId === unit.id).reduce((a, f) => a + (Number(f.litros) || 0) * (Number(f.precio) || 0), 0);
@@ -4035,8 +4035,17 @@ function printUnitSheet({ unit, driver, docs, maints, fuels, trips, showFinancia
   if (showFinancial) {
     w.document.write(`
       <h2>🔧 Mantenimientos</h2>
-      <table><thead><tr><th>Tipo</th><th>Descripción</th><th>F.Programada</th><th>Realizado</th><th>Taller</th><th>Costo</th></tr></thead><tbody>
-      ${maints.filter(m => m.unidadId === unit.id).map(m => `<tr><td>${m.tipo}</td><td>${m.desc}</td><td>${m.fechaProg}</td><td>${m.realizado}</td><td>${m.taller || "—"}</td><td>$${((Number(m.costoRef) || 0) + (Number(m.costoMO) || 0)).toLocaleString("es-MX")}</td></tr>`).join("")}
+      <table><thead><tr><th>Tipo</th><th>Descripción</th><th>F.Programada</th><th>Realizado</th><th>Proveedor Refac.</th><th>Costo Refac.</th><th>Taller / M.O.</th><th>Costo M.O.</th><th>Total</th></tr></thead><tbody>
+      ${maints.filter(m => m.unidadId === unit.id).map(m => {
+        const provRef = (proveedores||[]).find(p=>p.id===m.proveedorRefId);
+        const provMO  = (proveedores||[]).find(p=>p.id===m.proveedorId);
+        const tallerNombre = provMO ? provMO.nombre : (m.taller||"—");
+        const refNombre = provRef ? provRef.nombre : (m.proveedorRefId ? "—" : "—");
+        const cRef = Number(m.costoRef)||0;
+        const cMO  = Number(m.costoMO)||0;
+        const total = cRef + cMO;
+        return `<tr><td>${m.tipo}</td><td>${m.desc}</td><td>${m.fechaProg||"—"}</td><td>${m.realizado||"—"}</td><td style="font-size:10px">${refNombre}</td><td style="color:#0099CC;font-weight:700">$${cRef.toLocaleString("es-MX")}</td><td style="font-size:10px">${tallerNombre}</td><td style="color:#E67E22;font-weight:700">$${cMO.toLocaleString("es-MX")}</td><td style="font-weight:700">$${total.toLocaleString("es-MX")}</td></tr>`;
+      }).join("")}
       </tbody></table>
       <h2>⛽ Combustible</h2>
       <table><thead><tr><th>Fecha</th><th>Litros</th><th>Precio/L</th><th>Costo</th><th>KM Rec.</th><th>Rendimiento</th></tr></thead><tbody>
@@ -4898,7 +4907,7 @@ function UnitsPage({ units, drivers, docs, maints, fuels, trips, onAdd, onEdit, 
                   <td><Bdg c="bp" t={`${u.rendEsperado || 0} km/L`} /></td>
                   <td><div className="acts">
                     <button className="btn btn-purple btn-xs" onClick={() => onChangeDriver(u)} title="Cambiar operador">🔄</button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => printUnitSheet({ unit: u, driver: drv, docs, maints, fuels, trips, showFinancial: isAdmin, companyLogo: branding.logo, companyName: branding.nombre })} title="Imprimir ficha">🖨️</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => printUnitSheet({ unit: u, driver: drv, docs, maints, fuels, trips, proveedores, showFinancial: isAdmin, companyLogo: branding.logo, companyName: branding.nombre })} title="Imprimir ficha">🖨️</button>
                     <button className="btn btn-ghost btn-sm" onClick={() => onEdit(u)}>✏️</button>
                     <button className="btn btn-red btn-sm" onClick={() => onDelete(u.id)}>🗑</button>
                   </div></td>
