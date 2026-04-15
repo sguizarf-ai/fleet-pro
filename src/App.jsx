@@ -4871,7 +4871,7 @@ function Dashboard({
     </div>
   );
 }
-function UnitsPage({ units, drivers, docs, maints, fuels, trips, onAdd, onEdit, onDelete, onChangeDriver, isAdmin, branding = {} }) {
+function UnitsPage({ units, drivers, docs, maints, fuels, trips, proveedores = [], onAdd, onEdit, onDelete, onChangeDriver, isAdmin, branding = {} }) {
   const [q, setQ] = useState(""); const [ef, setEf] = useState("TODOS");
   const fil = units.filter(u => { const d = drivers.find(d => d.id === u.operador); return (u.num + u.placas + u.eco + (d?.nombre || "")).toLowerCase().includes(q.toLowerCase()) && (ef === "TODOS" || u.estado === ef) });
   return (
@@ -12110,7 +12110,7 @@ export default function App() {
 
           {tab === "dashboard" && <Dashboard units={units} drivers={drivers} docs={docs} maints={maints} fuels={fuels} trips={trips} gastos={gastos} externos={externos} facturas={facturas} clientes={clientes} proveedores={proveedores} isAdmin={isAdmin} />}
           {tab === "alerts" && <AlertsPage units={units} docs={docs} maints={maints} />}
-          {tab === "units" && <UnitsPage units={units} drivers={drivers} docs={docs} maints={maints} fuels={fuels} trips={trips}
+          {tab === "units" && <UnitsPage units={units} drivers={drivers} docs={docs} maints={maints} proveedores={proveedores} fuels={fuels} trips={trips}
             onAdd={isAdmin ? () => setModal({ type: "unit", data: null, _ts: Date.now() }) : null}
             onEdit={isAdmin ? u => setModal({ type: "unit", data: u }) : null}
             onDelete={isAdmin ? UC.del : null}
