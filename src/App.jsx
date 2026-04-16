@@ -1415,7 +1415,7 @@ function TripModal({ trip, units, clientes = [], rutasCatalogo = [], onSaveRuta,
             {/* Cliente con selector */}
             <div className="field s2">
               <label>Cliente</label>
-              <select value={f.cliente||""} onChange={e=>setF(p=>({...p,cliente:e.target.value}))} style={{background:"var(--bg0)",color:e=>e?"var(--text)":"var(--muted)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}>
+              <select value={f.cliente||""} onChange={e=>setF(p=>({...p,cliente:e.target.value}))} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}>
                 <option value="">— Seleccionar cliente —</option>
                 {(clientes||[]).filter(c=>c.status==="ACTIVO"||!c.status).map(c=><option key={c.id} value={c.nombreCorto||c.nombre}>{c.nombreCorto||c.nombre}</option>)}
               </select>
