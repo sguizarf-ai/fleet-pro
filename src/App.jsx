@@ -11699,7 +11699,6 @@ function HelpPage({ currentUser }) {
 
 export default function App() {
   const [rutasCatalogo, setRutasCatalogo] = useState([]); // [{origen, destino}]
-  useEffect(() => { if (rutasCatalogo.length>0) sv("fp6:rutasCatalogo", rutasCatalogo); }, [rutasCatalogo]);
   const [tab, setTab] = useState("dashboard");
   const [units, setUnits] = useState([]);
   const [branding, setBranding] = useState({ nombre: "Mi Empresa", slogan: "Sistema de Flota", logo: "" });
@@ -11823,6 +11822,7 @@ export default function App() {
   }, []);
 
   const sv = useCallback(async (k, v) => { await fsSet(k, v); }, []);
+  useEffect(() => { if (rutasCatalogo.length>0) sv("fp6:rutasCatalogo", rutasCatalogo); }, [rutasCatalogo, sv]);
   const notify = (msg, type = "success") => setToast({ msg, type });
 
   const uRef = useRef(units); uRef.current = units;
