@@ -1505,6 +1505,7 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
     let finalForm = { ...f, id: f.id || uid(), pagoStatus: f.pagoStatus||"pendiente", pagoEvidencias: f.pagoEvidencias||[] };
     // Auto-create proveedor if new name entered
 
+    if(onSaveRuta&&finalForm.origen&&finalForm.destino){const ex=(rutasCatalogo||[]).some(r=>r.origen===finalForm.origen&&r.destino===finalForm.destino);if(!ex)onSaveRuta({origen:finalForm.origen,destino:finalForm.destino});}
     onSave(finalForm);
   };
   const utilidad = (Number(f.precioCliente) || 0) - (Number(f.costoPagar) || 0) - (Number(f.costoEstadias) || 0);
@@ -1512,7 +1513,6 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
     <div className="modal-ov" onClick={onClose}>
       <div className="modal xwide" onClick={e => e.stopPropagation()}>
         <div className="mhdr"><h3>{f.id ? "✏️ Editar" : "🚚 Nuevo Viaje Externo"}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
-        <div className="mbody">
         <div className="mbody">
 
           {/* 1. DATOS DEL VIAJE — primero */}
@@ -1599,7 +1599,6 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
         </div>
         <div className="mftr"><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-cyan" onClick={ok} disabled={uploading} style={uploading?{opacity:.6,cursor:"not-allowed"}:{}}>{uploading?"⏳ Subiendo...":"💾 Guardar"}</button></div>
       </div>
-    </div>
   );
 }
 
@@ -11773,7 +11772,7 @@ export default function App() {
         [setTabulador,           "fp6:tabulador",       D_TABULADOR],
         [setExtrasTabulador,     "fp6:extrasTabulador", D_EXTRAS_TABULADOR],
         [setCotizaciones,        "fp6:cotizaciones",    []],
-        [setRemitentes,          "fp6:remitentes",      []]
+        [setRemitentes,          "fp6:remitentes",      []],
         [setRutasCatalogo,       "fp6:rutasCatalogo",   []],
       ];
       // Cargar tema
