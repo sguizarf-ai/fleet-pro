@@ -3479,6 +3479,267 @@ function ClienteModal({ cliente, onSave, onClose }) {
   );
 }
 
+// ── RemisionModal ─────────────────────────────────────────────────────────────
+function RemisionModal({ remision, clientes = [], branding = {}, remitentes = [], onSave, onClose }) {
+  const [f, setF] = useState(remision || {
+    clienteId: "", fecha: "", folio: "", descripcion: "", monto: 0, notas: "", viajeId: ""
+  });
+  const [showWA, setShowWA] = useState(false);
+  const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
+  const cliente = (clientes||[]).find(c => c.id === f.clienteId);
+
+  const buildHtml = () => {
+    const co = branding.nombre || "MI EMPRESA";
+    const logo = branding.logo ? `<img src="${branding.logo}" style="height:50px;object-fit:contain;margin-bottom:8px"/>` : `<div style="font-size:22px;font-weight:800;color:#0099CC">${co}</div>`;
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Remisión ${f.folio||""}</title>
+<style>
+body{font-family:Arial,sans-serif;font-size:13px;color:#222;padding:30px 40px;max-width:700px;margin:0 auto}
+.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #0099CC;padding-bottom:12px;margin-bottom:20px}
+.doc-title{font-size:28px;font-weight:800;color:#0099CC;letter-spacing:1px}
+.doc-sub{font-size:13px;color:#666;margin-top:4px}
+.folio{background:#0099CC;color:#fff;padding:6px 18px;border-radius:20px;font-weight:700;font-size:15px}
+.section{margin-bottom:16px}
+.section label{font-size:10px;font-weight:700;color:#999;text-transform:uppercase;display:block;margin-bottom:3px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field{border:1px solid #e0e0e0;padding:9px 13px;border-radius:6px;background:#fafbfc}
+.desc-box{border:1px solid #e0e0e0;padding:12px;border-radius:6px;min-height:80px;background:#fafbfc;margin-bottom:16px}
+.total-box{background:#0099CC;color:#fff;padding:14px 20px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;margin:20px 0}
+.total-label{font-size:13px;opacity:.9}
+.total-val{font-size:24px;font-weight:800}
+.nota-sin-iva{background:#FFF8E1;border:1px solid #FFD54F;padding:8px 14px;border-radius:6px;font-size:11px;color:#795548;margin-bottom:16px}
+.footer{margin-top:30px;border-top:1px solid #eee;padding-top:12px;font-size:10px;color:#aaa;display:flex;justify-content:space-between}
+.firma{margin-top:40px;text-align:center}
+.firma-line{border-top:1px solid #333;width:220px;margin:0 auto 6px;padding-top:6px;font-size:12px;color:#555}
+@media print{@page{size:Letter;margin:15mm} .no-print{display:none}}
+.btn-row{display:flex;gap:10px;margin-top:20px}
+button{padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:700}
+.print-btn{background:#0099CC;color:#fff} .close-btn{background:#eee;color:#333}
+</style></head><body>
+<div class="no-print btn-row"><button class="print-btn" onclick="window.print()">🖨️ Imprimir</button><button class="close-btn" onclick="window.close()">✕ Cerrar</button></div>
+<div class="header">
+  <div>${logo}<div style="font-size:11px;color:#888;margin-top:4px">${branding.slogan||""}</div></div>
+  <div style="text-align:right">
+    <div class="doc-title">REMISIÓN</div>
+    <div class="doc-sub">Documento sin IVA</div>
+    ${f.folio ? `<div class="folio" style="margin-top:8px">${f.folio}</div>` : ""}
+  </div>
+</div>
+<div class="grid2" style="margin-bottom:16px">
+  <div class="field"><label>Cliente</label>${cliente?.nombre||f.clienteId||"—"}</div>
+  <div class="field"><label>Fecha</label>${f.fecha||"—"}</div>
+  ${cliente?.rfc ? `<div class="field"><label>RFC</label>${cliente.rfc}</div>` : ""}
+  ${cliente?.domicilio ? `<div class="field"><label>Domicilio</label>${cliente.domicilio}</div>` : ""}
+</div>
+<div class="section"><label>Descripción del Servicio</label>
+  <div class=\"desc-box\">${(f.descripcion||"").split(String.fromCharCode(10)).join("<br>")}</div>
+</div>
+<div class="nota-sin-iva">⚠️ Esta remisión <strong>no genera IVA</strong>. No es un comprobante fiscal (CFDI). Para factura timbrada, solicite factura.</div>
+<div class="total-box">
+  <div class="total-label">TOTAL A COBRAR</div>
+  <div class="total-val">$${Number(f.monto||0).toLocaleString("es-MX",{minimumFractionDigits:2})}</div>
+</div>
+${f.notas ? `<div class="section"><label>Notas</label><div class="field">${f.notas}</div></div>` : ""}
+<div class="firma"><div class="firma-line">Firma y sello de recibido</div></div>
+<div class="footer">
+  <span>${co}</span>
+  <span>Generado: ${new Date().toLocaleDateString("es-MX",{year:"numeric",month:"long",day:"numeric"})}</span>
+</div>
+</body></html>`;
+  };
+
+  const handlePrint = () => {
+    const html = buildHtml();
+    const w = window.open("", "_blank");
+    if (w) { w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>w.print(),500); }
+  };
+
+  const ok = () => {
+    if (!f.clienteId || !f.monto) return alert("Cliente y monto son requeridos");
+    onSave({ ...f, id: f.id || uid(), tipoDoc: "remision", status: "PENDIENTE", iva: 0, total: Number(f.monto) });
+  };
+
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="mhdr"><h3>{f.id ? "✏️ Editar Remisión" : "📋 Nueva Remisión"}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
+        <div className="mbody">
+          <div style={{background:"#FFF8E1",border:"1px solid #FFD54F",borderRadius:8,padding:"8px 14px",marginBottom:12,fontSize:12,color:"#795548"}}>
+            📋 <strong>Remisión:</strong> Documento de cobro <strong>sin IVA</strong>. No es CFDI. Útil para clientes que pagan sin factura fiscal.
+          </div>
+          <div className="fg">
+            <div className="field s2">
+              <label>Cliente *</label>
+              <select value={f.clienteId} onChange={ch("clienteId")} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}>
+                <option value="">— Seleccionar cliente —</option>
+                {(clientes||[]).filter(c=>c.status==="ACTIVO"||!c.status).map(c=><option key={c.id} value={c.id}>{c.nombreCorto||c.nombre}</option>)}
+              </select>
+            </div>
+            <div className="field"><label>Fecha *</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))}/></div>
+            <div className="field"><label>Folio / No. Remisión</label><input value={f.folio} onChange={ch("folio")} placeholder="REM-001"/></div>
+            <div className="field s2"><label>Descripción del servicio *</label><textarea value={f.descripcion} onChange={ch("descripcion")} rows={4} placeholder="Ej: Servicio de flete Monterrey → CDMX, 1 viaje, carga general..." style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",resize:"vertical"}}/></div>
+            <div className="field"><label>Monto Total ($) — sin IVA</label><input value={f.monto} onChange={ch("monto")} type="number" min="0" placeholder="0.00"/></div>
+            <div className="field s2"><label>Notas</label><input value={f.notas||""} onChange={ch("notas")} placeholder="Condiciones de pago, observaciones..."/></div>
+          </div>
+          {Number(f.monto)>0 && (
+            <div style={{background:"var(--bg2)",borderRadius:8,padding:"12px 16px",marginTop:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:13,color:"var(--muted)"}}>Total a cobrar (sin IVA):</span>
+              <span style={{fontSize:22,fontWeight:800,color:"var(--cyan)"}}>${Number(f.monto).toLocaleString("es-MX",{minimumFractionDigits:2})}</span>
+            </div>
+          )}
+        </div>
+        <div className="mftr">
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-ghost btn-sm" onClick={handlePrint}>🖨️ Imprimir</button>
+          <button className="btn btn-cyan" onClick={ok}>💾 Guardar Remisión</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── CartaPorteModal ────────────────────────────────────────────────────────────
+function CartaPorteModal({ cartaporte, clientes = [], units = [], drivers = [], branding = {}, onSave, onClose }) {
+  const [f, setF] = useState(cartaporte || {
+    clienteId: "", fecha: "", folio: "", origen: "", destino: "",
+    unidadId: "", operador: "", mercancia: "", peso: "", unidadPeso: "kg",
+    monto: 0, notas: ""
+  });
+  const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
+  const cliente = (clientes||[]).find(c => c.id === f.clienteId);
+  const unidad = (units||[]).find(u => u.id === f.unidadId);
+
+  const buildHtml = () => {
+    const co = branding.nombre || "MI EMPRESA";
+    const logo = branding.logo ? `<img src="${branding.logo}" style="height:50px;object-fit:contain;margin-bottom:8px"/>` : `<div style="font-size:22px;font-weight:800;color:#0099CC">${co}</div>`;
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Carta Porte ${f.folio||""}</title>
+<style>
+body{font-family:Arial,sans-serif;font-size:12px;color:#222;padding:28px 36px;max-width:720px;margin:0 auto}
+.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #0099CC;padding-bottom:12px;margin-bottom:18px}
+.doc-title{font-size:26px;font-weight:800;color:#0099CC;letter-spacing:1px}
+.folio{background:#0099CC;color:#fff;padding:5px 16px;border-radius:20px;font-weight:700}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+.field{border:1px solid #e0e0e0;padding:8px 12px;border-radius:6px;background:#fafbfc}
+.field label{font-size:9px;font-weight:700;color:#999;text-transform:uppercase;display:block;margin-bottom:2px}
+.section-title{font-size:11px;font-weight:700;color:#0099CC;text-transform:uppercase;border-bottom:1px solid #0099CC;padding-bottom:3px;margin:14px 0 8px}
+.merch-box{border:2px solid #0099CC;padding:12px;border-radius:8px;background:#f0f8ff;margin-bottom:14px}
+.total-box{background:#0099CC;color:#fff;padding:12px 18px;border-radius:8px;display:flex;justify-content:space-between;align-items:center}
+.ruta-bar{background:#E8F5FA;border:1px solid #0099CC;border-radius:8px;padding:10px 16px;display:flex;align-items:center;gap:12px;margin-bottom:14px;font-size:13px}
+.firma-row{display:flex;gap:30px;margin-top:35px}
+.firma{flex:1;text-align:center}
+.firma-line{border-top:1px solid #333;padding-top:6px;font-size:11px;color:#555;margin-top:35px}
+.footer{margin-top:20px;border-top:1px solid #eee;padding-top:10px;font-size:10px;color:#aaa;display:flex;justify-content:space-between}
+@media print{@page{size:Letter;margin:12mm} .no-print{display:none}}
+.btn-row{display:flex;gap:10px;margin-bottom:20px}
+button{padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:700}
+.print-btn{background:#0099CC;color:#fff} .close-btn{background:#eee;color:#333}
+</style></head><body>
+<div class="no-print btn-row"><button class="print-btn" onclick="window.print()">🖨️ Imprimir</button><button class="close-btn" onclick="window.close()">✕ Cerrar</button></div>
+<div class="header">
+  <div>${logo}</div>
+  <div style="text-align:right">
+    <div class="doc-title">CARTA PORTE</div>
+    <div style="font-size:11px;color:#888">Documento de transporte</div>
+    ${f.folio ? `<div class="folio" style="margin-top:8px">${f.folio}</div>` : ""}
+  </div>
+</div>
+<div class="grid2">
+  <div class="field"><label>Cliente / Remitente</label>${cliente?.nombre||"—"}</div>
+  <div class="field"><label>Fecha</label>${f.fecha||"—"}</div>
+  ${cliente?.rfc ? `<div class="field"><label>RFC</label>${cliente.rfc}</div>` : ""}
+  ${cliente?.domicilio ? `<div class="field"><label>Domicilio</label>${cliente.domicilio}</div>` : ""}
+</div>
+<div class="ruta-bar">
+  <span style="font-weight:700;color:#0099CC">📍 ORIGEN:</span><span>${f.origen||"—"}</span>
+  <span style="color:#0099CC;font-size:18px;margin:0 4px">→</span>
+  <span style="font-weight:700;color:#0099CC">🏁 DESTINO:</span><span>${f.destino||"—"}</span>
+</div>
+<div class="section-title">🚛 Datos del Vehículo y Operador</div>
+<div class="grid3">
+  <div class="field"><label>Unidad / No. Econ.</label>${unidad ? `${unidad.num} — ${unidad.placas}` : "—"}</div>
+  <div class="field"><label>Tipo</label>${unidad?.tipo||"—"}</div>
+  <div class="field"><label>Operador</label>${f.operador||"—"}</div>
+</div>
+<div class="section-title">📦 Descripción de Mercancía</div>
+<div class="merch-box">
+  <div style="font-size:13px;margin-bottom:8px">${(f.mercancia||"—").split(String.fromCharCode(10)).join("<br>")}</div>
+  ${f.peso ? `<div style="font-size:12px;color:#555"><strong>Peso:</strong> ${f.peso} ${f.unidadPeso||"kg"}</div>` : ""}
+</div>
+${f.notas ? `<div class="field" style="margin-bottom:14px"><label>Instrucciones especiales / Notas</label>${f.notas}</div>` : ""}
+<div class="total-box">
+  <div><span style="font-size:12px;opacity:.9">FLETE / MONTO DEL SERVICIO</span></div>
+  <div style="font-size:22px;font-weight:800">$${Number(f.monto||0).toLocaleString("es-MX",{minimumFractionDigits:2})}</div>
+</div>
+<div class="firma-row">
+  <div class="firma"><div class="firma-line">Firma del operador</div></div>
+  <div class="firma"><div class="firma-line">Firma de recibido (destino)</div></div>
+  <div class="firma"><div class="firma-line">Sello del cliente</div></div>
+</div>
+<div class="footer">
+  <span>${co}</span>
+  <span>Generado: ${new Date().toLocaleDateString("es-MX",{year:"numeric",month:"long",day:"numeric"})}</span>
+</div>
+</body></html>`;
+  };
+
+  const handlePrint = () => {
+    const html = buildHtml();
+    const w = window.open("", "_blank");
+    if (w) { w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>w.print(),500); }
+  };
+
+  const ok = () => {
+    if (!f.clienteId || !f.origen) return alert("Cliente y origen son requeridos");
+    onSave({ ...f, id: f.id || uid(), tipoDoc: "cartaporte", status: "PENDIENTE", total: Number(f.monto) });
+  };
+
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal wide" onClick={e => e.stopPropagation()}>
+        <div className="mhdr"><h3>{f.id ? "✏️ Editar Carta Porte" : "🗺️ Nueva Carta Porte"}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
+        <div className="mbody">
+          <div className="fg">
+            <div className="field s2">
+              <label>Cliente *</label>
+              <select value={f.clienteId} onChange={ch("clienteId")} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}>
+                <option value="">— Seleccionar cliente —</option>
+                {(clientes||[]).filter(c=>c.status==="ACTIVO"||!c.status).map(c=><option key={c.id} value={c.id}>{c.nombreCorto||c.nombre}</option>)}
+              </select>
+            </div>
+            <div className="field"><label>Fecha *</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))}/></div>
+            <div className="field"><label>Folio / No. Carta Porte</label><input value={f.folio} onChange={ch("folio")} placeholder="CP-001"/></div>
+            <div className="field"><label>Origen *</label><input value={f.origen} onChange={ch("origen")} placeholder="Ciudad, Estado"/></div>
+            <div className="field"><label>Destino</label><input value={f.destino} onChange={ch("destino")} placeholder="Ciudad, Estado"/></div>
+            <div className="field s2">
+              <label>Unidad</label>
+              <select value={f.unidadId} onChange={e=>{const u=(units||[]).find(u=>u.id===e.target.value);setF(p=>({...p,unidadId:e.target.value,operador:u?.operador||p.operador}));}} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}>
+                <option value="">— Seleccionar unidad —</option>
+                {(units||[]).map(u=><option key={u.id} value={u.id}>{u.num} — {u.placas} ({u.tipo})</option>)}
+              </select>
+            </div>
+            <div className="field s2"><label>Operador</label><input value={f.operador} onChange={ch("operador")} placeholder="Nombre del operador"/></div>
+            <div className="field s2"><label>Descripción de Mercancía *</label><textarea value={f.mercancia} onChange={ch("mercancia")} rows={3} placeholder="Ej: Cajas de autopartes, embalaje de cartón..." style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",resize:"vertical"}}/></div>
+            <div className="field"><label>Peso</label><input value={f.peso} onChange={ch("peso")} placeholder="0" type="number" min="0"/></div>
+            <div className="field">
+              <label>Unidad de peso</label>
+              <select value={f.unidadPeso||"kg"} onChange={ch("unidadPeso")} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}>
+                {["kg","ton","lb","pzas","cajas","pallets"].map(u=><option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+            <div className="field"><label>Flete / Monto ($)</label><input value={f.monto} onChange={ch("monto")} type="number" min="0" placeholder="0.00"/></div>
+            <div className="field s2"><label>Instrucciones / Notas</label><input value={f.notas||""} onChange={ch("notas")} placeholder="Instrucciones especiales, temperatura, cuidados..."/></div>
+          </div>
+        </div>
+        <div className="mftr">
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-ghost btn-sm" onClick={handlePrint}>🖨️ Imprimir</button>
+          <button className="btn btn-cyan" onClick={ok}>💾 Guardar Carta Porte</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FacturaModal({ factura, clientes, viajes, onSave, onClose }) {
   const [f, setF] = useState(factura || {
     tipoDoc: "factura",
@@ -11144,6 +11405,10 @@ const AYUDA_DATA = [
     id: "facturacion", icono: "🧾", titulo: "Facturación y Clientes",
     color: "var(--green)",
     preguntas: [
+      { q: "¿Cómo creo una Remisión?",
+        a: "Ve a Finanzas → Facturación → '📋 Remisión'. Llena: cliente, fecha, folio (ej. REM-001), descripción del servicio y monto. La remisión NO genera IVA y NO es un CFDI. Usa el botón '🖨️ Imprimir' para generar el documento en tamaño carta. Ideal para clientes que pagan sin factura fiscal." },
+      { q: "¿Cómo creo una Carta Porte?",
+        a: "Ve a Finanzas → Facturación → '🗺️ Carta Porte'. Llena: cliente, fecha, folio (ej. CP-001), origen, destino, unidad, operador, descripción de mercancía, peso y monto del flete. Al imprimir genera un documento profesional tamaño carta con espacios de firma para operador y destinatario. Útil para documentar el traslado de mercancía." },
       { q: "¿Qué es una Remisión y en qué se diferencia de una Factura?",
         a: "La Remisión es un documento de cobro sin IVA — útil para clientes que pagan sin factura fiscal. Al crear un documento en Facturación, elige entre '🧾 Factura (con IVA)' y '📋 Remisión (sin IVA)'. Las remisiones sí se incluyen en los totales de cobrado/pendiente del módulo, se pueden filtrar por separado en la tabla, y se muestran con la etiqueta REM en la lista." },
       { q: "¿Cómo creo una factura?",
@@ -11394,7 +11659,7 @@ function ClientesPage({ clientes, facturas, onAdd, onEdit, onDelete }) {
   );
 }
 
-function FacturacionPage({ facturas, clientes, viajes, onAdd, onEdit, onDelete, onMarcarPagada }) {
+function FacturacionPage({ facturas, clientes, viajes, onAdd, onAddRemision, onAddCartaPorte, onEdit, onDelete, onMarcarPagada }) {
   const [q, setQ] = useState("");
   const [sf, setSf] = useState("TODOS");
   const [tfDoc, setTfDoc] = useState("TODOS"); // tipoDoc: TODOS/factura/remision
@@ -11446,6 +11711,8 @@ function FacturacionPage({ facturas, clientes, viajes, onAdd, onEdit, onDelete, 
           <h3>🧾 Facturación ({facturas.length})</h3>
           <div className="row-gap">
             <div className="sw"><span style={{ color: "var(--muted)" }}>🔍</span><input placeholder="Buscar factura..." value={q} onChange={e => setQ(e.target.value)} /></div>
+            <button className="btn btn-ghost btn-sm" onClick={onAddCartaPorte}>🗺️ Carta Porte</button>
+            <button className="btn btn-ghost btn-sm" onClick={onAddRemision}>📋 Remisión</button>
             <button className="btn btn-cyan" onClick={onAdd}>+ Nueva Factura</button>
           </div>
         </div>
@@ -12216,6 +12483,8 @@ export default function App() {
             clientes={clientes}
             viajes={trips}
             onAdd={() => setModal({ type: "factura", data: null, _ts: Date.now() })}
+            onAddRemision={() => setModal({ type: "remision", data: null, _ts: Date.now() })}
+            onAddCartaPorte={() => setModal({ type: "cartaporte", data: null, _ts: Date.now() })}
             onEdit={f => setModal({ type: "factura", data: f })}
             onDelete={FacC.del}
             onMarcarPagada={marcarPagada}
@@ -12360,6 +12629,8 @@ export default function App() {
       {modal?.type === "changeDriver" && <ChangeDriverModal unit={modal.data} drivers={drivers} onSave={u => UC.save(u)} onClose={() => setModal(null)} />}
       {modal?.type === "cliente" && <ClienteModal key={modal.data?.id || modal._ts || "new-cliente"} cliente={modal.data} onSave={c => CliC.save({ ...c, id: c.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "factura" && <FacturaModal key={modal.data?.id || "new-fact"} factura={modal.data} clientes={clientes} viajes={trips} onSave={f => FacC.save(f)} onClose={() => setModal(null)} />}
+      {modal?.type === "remision" && <RemisionModal key={modal.data?.id||modal._ts||"new-rem"} remision={modal.data} clientes={clientes} branding={branding} remitentes={remitentes} onSave={f=>{FacC.save({...f,id:f.id||uid()});setModal(null);}} onClose={()=>setModal(null)}/>}
+      {modal?.type === "cartaporte" && <CartaPorteModal key={modal.data?.id||modal._ts||"new-cp"} cartaporte={modal.data} clientes={clientes} units={units} drivers={drivers} branding={branding} onSave={f=>{FacC.save({...f,id:f.id||uid()});setModal(null);}} onClose={()=>setModal(null)}/>}
       {modal?.type === "proveedor" && <ProveedorModal key={modal.data?.id || "new-prov"} proveedor={modal.data} onSave={p => PVC.save({ ...p, id: p.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "hojaViaje" && <HojaViajeModal units={units} drivers={drivers} remitentes={remitentes} onClose={() => setModal(null)} companyLogo={branding.logo} companyName={branding.nombre} />}
       {modal?.type === "nomina" && <NominaModal driver={modal.data} trips={trips} units={units} onClose={() => setModal(null)} companyLogo={branding.logo} companyName={branding.nombre} />}
