@@ -3717,7 +3717,13 @@ ${f.notas ? `<div class="field" style="margin-bottom:14px"><label>Instrucciones 
                 {(units||[]).map(u=><option key={u.id} value={u.id}>{u.num} — {u.placas} ({u.tipo})</option>)}
               </select>
             </div>
-            <div className="field s2"><label>Operador</label><input value={f.operador} onChange={ch("operador")} placeholder="Nombre del operador"/></div>
+            <div className="field s2">
+              <label>Operador {f.operador && <span style={{fontSize:10,color:"var(--green)",marginLeft:4}}>✓ {f.operador}</span>}</label>
+              <select value={f.operador||""} onChange={ch("operador")} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}>
+                <option value="">— Seleccionar operador —</option>
+                {(drivers||[]).filter(d=>d.activo!==false).map(d=><option key={d.id} value={d.nombre}>{d.nombre}{d.licencia?" · "+d.licencia:""}</option>)}
+              </select>
+            </div>
             <div className="field s2"><label>Descripción de Mercancía *</label><textarea value={f.mercancia} onChange={ch("mercancia")} rows={3} placeholder="Ej: Cajas de autopartes, embalaje de cartón..." style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",resize:"vertical"}}/></div>
             <div className="field"><label>Peso</label><input value={f.peso} onChange={ch("peso")} placeholder="0" type="number" min="0"/></div>
             <div className="field">
