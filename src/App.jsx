@@ -3480,9 +3480,9 @@ function ClienteModal({ cliente, onSave, onClose }) {
 }
 
 // ── RemisionModal ─────────────────────────────────────────────────────────────
-function RemisionModal({ remision, clientes = [], branding = {}, remitentes = [], onSave, onClose }) {
+function RemisionModal({ remision, clientes = [], viajes = [], branding = {}, remitentes = [], onSave, onClose }) {
   const [f, setF] = useState(remision || {
-    clienteId: "", fecha: "", folio: "", descripcion: "", monto: 0, notas: "", viajeId: ""
+    clienteId: "", clienteNombre: "", viajeId: "",
   });
   const [showWA, setShowWA] = useState(false);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
@@ -3525,7 +3525,7 @@ button{padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-size:1
   </div>
 </div>
 <div class="grid2" style="margin-bottom:16px">
-  <div class="field"><label>Cliente</label>${cliente?.nombre||f.clienteId||"—"}</div>
+  <div class="field"><label>Cliente</label>${cliente?.nombre||f.clienteNombre||"—"}</div>
   <div class="field"><label>Fecha</label>${f.fecha||"—"}</div>
   ${cliente?.rfc ? `<div class="field"><label>RFC</label>${cliente.rfc}</div>` : ""}
   ${cliente?.domicilio ? `<div class="field"><label>Domicilio</label>${cliente.domicilio}</div>` : ""}
@@ -3807,15 +3807,6 @@ function FacturaModal({ factura, clientes, viajes, onSave, onClose }) {
           <h3>{f.id ? "✏️ Editar Factura" : "🧾 Nueva Factura"}</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
         </div>
-          {/* TIPO DOCUMENTO */}
-          <div style={{display:"flex",gap:10,marginBottom:14}}>
-            {[["factura","🧾 Factura (con IVA)"],["remision","📋 Remisión (sin IVA)"]].map(([v,l])=>(
-              <button key={v} type="button" onClick={()=>setF(p=>({...p,tipoDoc:v}))}
-                style={{flex:1,padding:"10px 8px",borderRadius:10,border:`2px solid ${f.tipoDoc===v?"var(--cyan)":"var(--border)"}`,background:f.tipoDoc===v?"rgba(0,153,204,.1)":"var(--bg2)",color:f.tipoDoc===v?"var(--cyan)":"var(--text)",fontWeight:700,cursor:"pointer",fontSize:13}}>
-                {l}
-              </button>
-            ))}
-          </div>
         <div className="mbody">
           {/* CLIENTE */}
           <div className="sec-lbl">Cliente</div>
@@ -11659,7 +11650,7 @@ function ClientesPage({ clientes, facturas, onAdd, onEdit, onDelete }) {
   );
 }
 
-function FacturacionPage({ facturas, clientes, viajes, onAdd, onAddRemision, onAddCartaPorte, onEdit, onDelete, onMarcarPagada }) {
+function FacturacionPage({ facturas, clientes, viajes, onAdd, onAddRemision, onAddCartaPorte, onEdit, onDelete, onMarcarPagada, onRevertirPendiente, onPrintFactura }) {
   const [q, setQ] = useState("");
   const [sf, setSf] = useState("TODOS");
   const [tfDoc, setTfDoc] = useState("TODOS"); // tipoDoc: TODOS/factura/remision
@@ -11711,8 +11702,8 @@ function FacturacionPage({ facturas, clientes, viajes, onAdd, onAddRemision, onA
           <h3>🧾 Facturación ({facturas.length})</h3>
           <div className="row-gap">
             <div className="sw"><span style={{ color: "var(--muted)" }}>🔍</span><input placeholder="Buscar factura..." value={q} onChange={e => setQ(e.target.value)} /></div>
-            <button className="btn btn-ghost btn-sm" onClick={onAddCartaPorte}>🗺️ Carta Porte</button>
-            <button className="btn btn-ghost btn-sm" onClick={onAddRemision}>📋 Remisión</button>
+            <button className="btn btn-cyan" onClick={onAddCartaPorte}>🗺️ Carta Porte</button>
+            <button className="btn btn-cyan" onClick={onAddRemision}>📋 Remisión</button>
             <button className="btn btn-cyan" onClick={onAdd}>+ Nueva Factura</button>
           </div>
         </div>
@@ -11799,6 +11790,9 @@ function FacturacionPage({ facturas, clientes, viajes, onAdd, onAddRemision, onA
                       <td>
                         <div className="acts">
                           {f.status === "PENDIENTE" && <button className="btn btn-green btn-xs" onClick={() => onMarcarPagada(f)}>✓ Pagar</button>}
+                          {f.status === "PAGADA" && <button className="btn btn-ghost btn-xs" style={{fontSize:10}} onClick={() => onRevertirPendiente(f)} title="Revertir a pendiente">↩️ Pdte</button>}
+                          {f.status === "VENCIDA" && <button className="btn btn-ghost btn-xs" style={{fontSize:10}} onClick={() => onMarcarPagada(f)}>✓ Cobrar</button>}
+                          <button className="btn btn-ghost btn-xs" onClick={() => onPrintFactura && onPrintFactura(f)} title="Ver/Imprimir">🖨️</button>
                           <button className="btn btn-ghost btn-sm" onClick={() => onEdit(f)}>✏️</button>
                           <button className="btn btn-red btn-sm" onClick={() => onDelete(f.id)}>🗑</button>
                         </div>
@@ -12183,6 +12177,51 @@ export default function App() {
     const updated = { ...fac, status: "PAGADA", fechaPago: hoy };
     FacC.save(updated);
   };
+  const revertirPendiente = (fac) => { FacC.save({ ...fac, status: "PENDIENTE", fechaPago: "", pagoForma: "" }); };
+  const printFactura = (fac) => {
+    const cli = clientes.find(c => c.id === fac.clienteId);
+    const co = branding.nombre || "MI EMPRESA";
+    const logo = branding.logo ? `<img src="${branding.logo}" style="height:50px;object-fit:contain;margin-bottom:6px"/>` : `<div style="font-size:20px;font-weight:800;color:#0099CC">${co}</div>`;
+    const iva = Number(fac.iva)||0; const ret = Number(fac.retIva)||0; const sub = Number(fac.subtotal)||0; const tot = Number(fac.total)||(sub+iva-ret);
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Factura ${fac.serie||"A"}-${fac.numeroFactura||"---"}</title>
+<style>body{font-family:Arial,sans-serif;font-size:12px;color:#222;padding:28px 36px;max-width:720px;margin:0 auto}
+.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #0099CC;padding-bottom:12px;margin-bottom:18px}
+.doc-title{font-size:26px;font-weight:800;color:#0099CC} .folio{background:#0099CC;color:#fff;padding:5px 16px;border-radius:20px;font-weight:700;margin-top:8px;display:inline-block}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.field{border:1px solid #e0e0e0;padding:8px 12px;border-radius:6px;background:#fafbfc}
+.field label{font-size:9px;font-weight:700;color:#999;text-transform:uppercase;display:block;margin-bottom:2px}
+.totals{width:100%;border-collapse:collapse;margin-top:14px}
+.totals td{padding:7px 12px;border-bottom:1px solid #eee}
+.totals tr:last-child{background:#0099CC;color:#fff;font-weight:700}
+.status{display:inline-block;padding:4px 14px;border-radius:20px;font-weight:700;font-size:12px;background:${fac.status==="PAGADA"?"#D4F4DD":`#FFF8E1`};color:${fac.status==="PAGADA"?"#00864E":"#795548"}}
+.footer{margin-top:20px;border-top:1px solid #eee;padding-top:10px;font-size:10px;color:#aaa;display:flex;justify-content:space-between}
+@media print{@page{size:Letter;margin:12mm}.no-print{display:none}}
+.btn-row{display:flex;gap:10px;margin-bottom:18px}button{padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:700}
+.print-btn{background:#0099CC;color:#fff}.close-btn{background:#eee;color:#333}</style></head><body>
+<div class="no-print btn-row"><button class="print-btn" onclick="window.print()">🖨️ Imprimir</button><button class="close-btn" onclick="window.close()">✕ Cerrar</button></div>
+<div class="header"><div>${logo}</div>
+<div style="text-align:right"><div class="doc-title">FACTURA</div><div class="folio">${fac.serie||"A"}-${fac.numeroFactura||"---"}</div><div style="margin-top:6px" class="status">${fac.status||"PENDIENTE"}</div></div></div>
+<div class="grid2">
+<div class="field"><label>Cliente</label>${cli?.nombre||fac.clienteId||"—"}</div>
+<div class="field"><label>RFC</label>${cli?.rfc||"—"}</div>
+<div class="field"><label>Fecha de Emisión</label>${fac.fechaEmision||"—"}</div>
+<div class="field"><label>Fecha de Vencimiento</label>${fac.fechaVencimiento||"—"}</div>
+${fac.formaPago ? `<div class="field"><label>Forma de Pago</label>${fac.formaPago}</div>` : ""}
+${fac.metodoPago ? `<div class="field"><label>Método de Pago</label>${fac.metodoPago}</div>` : ""}
+</div>
+${fac.notas ? `<div class="field" style="margin-bottom:14px"><label>Notas / Concepto</label>${fac.notas}</div>` : ""}
+<table class="totals">
+<tr><td>Subtotal</td><td style="text-align:right">$${sub.toLocaleString("es-MX",{minimumFractionDigits:2})}</td></tr>
+${iva > 0 ? `<tr><td>IVA (16%)</td><td style="text-align:right">$${iva.toLocaleString("es-MX",{minimumFractionDigits:2})}</td></tr>` : ""}
+${ret > 0 ? `<tr><td>Ret. IVA</td><td style="text-align:right">-$${ret.toLocaleString("es-MX",{minimumFractionDigits:2})}</td></tr>` : ""}
+<tr><td style="font-size:14px">TOTAL</td><td style="text-align:right;font-size:18px">$${tot.toLocaleString("es-MX",{minimumFractionDigits:2})}</td></tr>
+</table>
+${fac.fechaPago ? `<div style="margin-top:14px;background:#D4F4DD;border-radius:8px;padding:10px 16px;font-size:12px;color:#00864E">✅ Pagada el ${fac.fechaPago}${fac.pagoForma?` — ${fac.pagoForma}`:""}</div>` : ""}
+<div class="footer"><span>${co}</span><span>Generado: ${new Date().toLocaleDateString("es-MX",{year:"numeric",month:"long",day:"numeric"})}</span></div>
+</body></html>`;
+    const w = window.open("", "_blank");
+    if (w) { w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>w.print(),500); }
+  };
 
   const resetAll = () => setConfirm({
     msg: "¿Restaurar datos de ejemplo? Se perderán los cambios actuales.", onOk: async () => {
@@ -12488,6 +12527,8 @@ export default function App() {
             onEdit={f => setModal({ type: "factura", data: f })}
             onDelete={FacC.del}
             onMarcarPagada={marcarPagada}
+            onRevertirPendiente={revertirPendiente}
+            onPrintFactura={printFactura}
           />}
           {tab === "gastos" && isSupervisor && <GastosPage
             gastos={gastos} proveedores={proveedores} externos={externos} maints={maints} units={units} trips={trips} branding={branding}
@@ -12629,7 +12670,7 @@ export default function App() {
       {modal?.type === "changeDriver" && <ChangeDriverModal unit={modal.data} drivers={drivers} onSave={u => UC.save(u)} onClose={() => setModal(null)} />}
       {modal?.type === "cliente" && <ClienteModal key={modal.data?.id || modal._ts || "new-cliente"} cliente={modal.data} onSave={c => CliC.save({ ...c, id: c.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "factura" && <FacturaModal key={modal.data?.id || "new-fact"} factura={modal.data} clientes={clientes} viajes={trips} onSave={f => FacC.save(f)} onClose={() => setModal(null)} />}
-      {modal?.type === "remision" && <RemisionModal key={modal.data?.id||modal._ts||"new-rem"} remision={modal.data} clientes={clientes} branding={branding} remitentes={remitentes} onSave={f=>{FacC.save({...f,id:f.id||uid()});setModal(null);}} onClose={()=>setModal(null)}/>}
+      {modal?.type === "remision" && <RemisionModal key={modal.data?.id||modal._ts||"new-rem"} remision={modal.data} clientes={clientes} viajes={trips} branding={branding} remitentes={remitentes} onSave={f=>{FacC.save({...f,id:f.id||uid()});setModal(null);}} onClose={()=>setModal(null)}/>}
       {modal?.type === "cartaporte" && <CartaPorteModal key={modal.data?.id||modal._ts||"new-cp"} cartaporte={modal.data} clientes={clientes} units={units} drivers={drivers} branding={branding} onSave={f=>{FacC.save({...f,id:f.id||uid()});setModal(null);}} onClose={()=>setModal(null)}/>}
       {modal?.type === "proveedor" && <ProveedorModal key={modal.data?.id || "new-prov"} proveedor={modal.data} onSave={p => PVC.save({ ...p, id: p.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "hojaViaje" && <HojaViajeModal units={units} drivers={drivers} remitentes={remitentes} onClose={() => setModal(null)} companyLogo={branding.logo} companyName={branding.nombre} />}
