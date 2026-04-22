@@ -4014,7 +4014,7 @@ ${f.notas?`<div class="field" style="margin-bottom:12px"><label>Instrucciones Es
 }
 
 
-function FacturaModal({ factura, clientes, viajes, onSave, onClose }) {
+function FacturaModal({ factura, clientes, viajes, branding = {}, onSave, onClose }) {
   const [f, setF] = useState(factura ? {
     ...factura,
     conceptos: factura.conceptos || [{ descripcion: factura.notas||"", cantidad: 1, unidad: "E48", precioUnitario: factura.subtotal||0, claveProducto: "78101803" }]
@@ -4078,6 +4078,121 @@ function FacturaModal({ factura, clientes, viajes, onSave, onClose }) {
       fechaVencimiento: fechaVenc,
       status: f.status || "PENDIENTE", fechaPago: f.fechaPago || "",
     });
+  };
+
+
+  const buildHtml = () => {
+    const co = branding?.nombre || "MI EMPRESA";
+    const logo = branding?.logo
+      ? `<img src="${branding.logo}" style="height:50px;object-fit:contain;margin-bottom:8px"/>`
+      : `<div style="font-size:22px;font-weight:800;color:#0099CC">${co}</div>`;
+    const nombreCli = cliente?.nombre || "—";
+    const rfcCli   = cliente?.rfc    || "—";
+    const cpCli    = cliente?.codigoPostal || "—";
+    const rows = f.conceptos.map(c => {
+      const imp = (Number(c.cantidad)||0) * (Number(c.precioUnitario)||0);
+      return `<tr>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee">${c.claveProducto||""}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee">${c.descripcion||"—"}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:center">${c.cantidad}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee">${c.unidad||"E48"}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right">$${Number(c.precioUnitario||0).toLocaleString("es-MX",{minimumFractionDigits:2})}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:700;color:#0099CC">$${imp.toLocaleString("es-MX",{minimumFractionDigits:2})}</td>
+      </tr>`;
+    }).join("");
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Factura ${f.serie||"A"}-${f.numeroFactura||"---"}</title>
+<style>
+body{font-family:Arial,sans-serif;font-size:12px;color:#222;padding:28px 36px;max-width:750px;margin:0 auto}
+.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #0099CC;padding-bottom:12px;margin-bottom:18px}
+.doc-title{font-size:26px;font-weight:800;color:#0099CC;letter-spacing:1px}
+.folio{background:#0099CC;color:#fff;padding:5px 16px;border-radius:20px;font-weight:700;font-size:14px;margin-top:8px;display:inline-block}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.field{border:1px solid #e0e0e0;padding:8px 12px;border-radius:6px;background:#fafbfc}
+.field label{font-size:9px;font-weight:700;color:#999;text-transform:uppercase;display:block;margin-bottom:2px}
+table.conceptos{width:100%;border-collapse:collapse;margin-bottom:16px}
+table.conceptos thead th{background:#0099CC;color:#fff;padding:8px 10px;text-align:left;font-size:11px}
+.totals{width:100%;margin-top:0}
+.totals td{padding:6px 12px}
+.totals tr.grand td{background:#0099CC;color:#fff;font-weight:800;font-size:16px;padding:10px 12px;border-radius:0 0 6px 6px}
+.status-badge{display:inline-block;padding:4px 14px;border-radius:20px;font-weight:700;font-size:11px}
+.nota-fiscal{background:#E8F5FA;border:1px solid #0099CC;padding:8px 14px;border-radius:6px;font-size:11px;color:#0277BD;margin-bottom:14px}
+.footer{margin-top:20px;border-top:1px solid #eee;padding-top:10px;font-size:10px;color:#aaa;display:flex;justify-content:space-between}
+@media print{@page{size:Letter;margin:12mm}.no-print{display:none}}
+.btn-row{display:flex;gap:10px;margin-bottom:18px}
+button{padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:700}
+.print-btn{background:#0099CC;color:#fff}.close-btn{background:#eee;color:#333}
+</style></head><body>
+<div class="no-print btn-row">
+  <button class="print-btn" onclick="window.print()">🖨️ Imprimir</button>
+  <button class="close-btn" onclick="window.close()">✕ Cerrar</button>
+</div>
+<div class="header">
+  <div>${logo}</div>
+  <div style="text-align:right">
+    <div class="doc-title">FACTURA</div>
+    <div style="font-size:11px;color:#888">Comprobante de pago</div>
+    <div class="folio">${f.serie||"A"}-${f.numeroFactura||"---"}</div>
+  </div>
+</div>
+
+<div class="nota-fiscal">
+  ℹ️ Este documento es una <strong>vista previa interna</strong>. El CFDI oficial timbrado se genera al conectar con FacturAPI.
+</div>
+
+<div class="grid2">
+  <div>
+    <div class="field" style="margin-bottom:8px"><label>Emisor</label><strong>${co}</strong></div>
+  </div>
+  <div>
+    <div class="field" style="margin-bottom:8px"><label>Receptor / Cliente</label><strong>${nombreCli}</strong></div>
+    <div class="grid2">
+      <div class="field"><label>RFC</label>${rfcCli}</div>
+      <div class="field"><label>Código Postal</label>${cpCli}</div>
+      <div class="field"><label>Régimen Fiscal</label>${f.regimenFiscalReceptor||"—"}</div>
+      <div class="field"><label>Uso CFDI</label>${f.usoCFDI||"—"}</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid2" style="margin-bottom:14px">
+  <div class="field"><label>Fecha de Emisión</label>${f.fechaEmision||"—"}</div>
+  <div class="field"><label>Fecha de Vencimiento</label>${fechaVenc||"—"}</div>
+  <div class="field"><label>Forma de Pago</label>${f.formaPago||"—"}</div>
+  <div class="field"><label>Método de Pago</label>${f.metodoPago||"—"}</div>
+  <div class="field"><label>Moneda</label>${f.moneda||"MXN"}</div>
+  ${f.condicionesPago ? `<div class="field"><label>Condiciones de Pago</label>${f.condicionesPago}</div>` : ""}
+</div>
+
+<table class="conceptos">
+  <thead><tr>
+    <th>Clave SAT</th><th>Descripción</th><th style="text-align:center">Cant.</th>
+    <th>Unidad</th><th style="text-align:right">P.Unit.</th><th style="text-align:right">Importe</th>
+  </tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+
+<div style="display:flex;justify-content:flex-end">
+  <table class="totals" style="max-width:320px">
+    <tr><td style="color:#666">Subtotal</td><td style="text-align:right;font-weight:600">$${subtotal.toLocaleString("es-MX",{minimumFractionDigits:2})}</td></tr>
+    <tr><td style="color:#666">IVA (16%)</td><td style="text-align:right;color:#2E7D32;font-weight:600">+$${iva.toLocaleString("es-MX",{minimumFractionDigits:2})}</td></tr>
+    ${retIVA > 0 ? `<tr><td style="color:#666">Ret. IVA 4% (P. Moral)</td><td style="text-align:right;color:#c62828;font-weight:600">-$${retIVA.toLocaleString("es-MX",{minimumFractionDigits:2})}</td></tr>` : ""}
+    <tr class="grand"><td>TOTAL</td><td style="text-align:right">$${total.toLocaleString("es-MX",{minimumFractionDigits:2})}</td></tr>
+  </table>
+</div>
+
+${f.notas ? `<div class="field" style="margin-top:14px"><label>Notas / Observaciones</label>${f.notas}</div>` : ""}
+
+<div class="footer">
+  <span>${co}</span>
+  <span>Generado: ${new Date().toLocaleDateString("es-MX",{year:"numeric",month:"long",day:"numeric"})}</span>
+</div>
+</body></html>`;
+  };
+
+  const handlePrint = () => {
+    const html = buildHtml();
+    const w = window.open("", "_blank");
+    if (w) { w.document.write(html); w.document.close(); w.focus(); setTimeout(() => w.print(), 500); }
   };
 
   const selStyle = {background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"};
@@ -4181,6 +4296,7 @@ function FacturaModal({ factura, clientes, viajes, onSave, onClose }) {
         </div>
         <div className="mftr">
           <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-ghost btn-sm" onClick={handlePrint}>🖨️ Vista previa</button>
           <button className="btn btn-cyan" onClick={ok}>💾 Guardar Factura</button>
         </div>
       </div>
@@ -11514,6 +11630,8 @@ const AYUDA_DATA = [
         a: "Ve a Finanzas → Facturación → '🗺️ Carta Porte'. Llena: cliente, fecha, folio (ej. CP-001), origen, destino, unidad, operador, descripción de mercancía, peso y monto del flete. Al imprimir genera un documento profesional tamaño carta con espacios de firma para operador y destinatario. Útil para documentar el traslado de mercancía." },
       { q: "¿Qué es una Remisión y en qué se diferencia de una Factura?",
         a: "La Remisión es un documento de cobro sin IVA — útil para clientes que pagan sin factura fiscal. Al crear un documento en Facturación, elige entre '🧾 Factura (con IVA)' y '📋 Remisión (sin IVA)'. Las remisiones sí se incluyen en los totales de cobrado/pendiente del módulo, se pueden filtrar por separado en la tabla, y se muestran con la etiqueta REM en la lista." },
+      { q: "¿Los folios se asignan automáticamente?",
+        a: "Sí. Al crear una nueva Factura, Remisión o Carta Porte, el sistema propone automáticamente el siguiente folio disponible: Facturas: 001, 002, 003... (por serie). Remisiones: REM-001, REM-002... Cartas Porte: CP-001, CP-002... Puedes cambiar el folio si lo necesitas. El folio interno es para tu control — el identificador fiscal oficial es el UUID que asigna el SAT al timbrar con FacturAPI." },
       { q: "¿Cómo creo una factura?",
         a: "Ve a Finanzas → Facturación → '➕ Nueva Factura'. Selecciona el cliente, agrega los conceptos y el monto. La factura queda en status PENDIENTE hasta que la marques como cobrada con el botón '✓ Pagar'." },
       { q: "¿Cómo timbro una factura (CFDI)?",
@@ -12299,6 +12417,24 @@ export default function App() {
     const updated = { ...fac, status: "PAGADA", fechaPago: hoy };
     FacC.save(updated);
   };
+  // ── Auto-folio: siguiente número disponible por tipo y serie ──────────────────
+  const getNextFolio = (tipoDoc, serie = "A") => {
+    const prefix = tipoDoc === "remision" ? "REM" : tipoDoc === "cartaporte" ? "CP" : serie;
+    const same = facturas.filter(f =>
+      (f.tipoDoc || "factura") === tipoDoc &&
+      (tipoDoc === "factura" ? (f.serie || "A") === serie : true)
+    );
+    if (same.length === 0) return tipoDoc === "factura" ? "001" : `${prefix}-001`;
+    const nums = same.map(f => {
+      const raw = tipoDoc === "factura" ? (f.numeroFactura || "0") : (f.folio || "0");
+      const n = parseInt(raw.replace(/\D/g, "")) || 0;
+      return n;
+    });
+    const next = Math.max(...nums) + 1;
+    const padded = String(next).padStart(3, "0");
+    return tipoDoc === "factura" ? padded : `${prefix}-${padded}`;
+  };
+
   const revertirPendiente = (fac) => { FacC.save({ ...fac, status: "PENDIENTE", fechaPago: "", pagoForma: "" }); };
   const printFactura = (fac) => {
     const cli = clientes.find(c => c.id === fac.clienteId);
@@ -12643,9 +12779,9 @@ ${fac.fechaPago ? `<div style="margin-top:14px;background:#D4F4DD;border-radius:
             facturas={facturas}
             clientes={clientes}
             viajes={trips}
-            onAdd={() => setModal({ type: "factura", data: null, _ts: Date.now() })}
-            onAddRemision={() => setModal({ type: "remision", data: null, _ts: Date.now() })}
-            onAddCartaPorte={() => setModal({ type: "cartaporte", data: null, _ts: Date.now() })}
+            onAdd={() => setModal({ type: "factura", data: { numeroFactura: getNextFolio("factura", "A"), serie: "A" }, _ts: Date.now() })}
+            onAddRemision={() => setModal({ type: "remision", data: { folio: getNextFolio("remision") }, _ts: Date.now() })}
+            onAddCartaPorte={() => setModal({ type: "cartaporte", data: { folio: getNextFolio("cartaporte") }, _ts: Date.now() })}
             onEdit={f => setModal({ type: "factura", data: f })}
             onDelete={FacC.del}
             onMarcarPagada={marcarPagada}
@@ -12791,7 +12927,7 @@ ${fac.fechaPago ? `<div style="margin-top:14px;background:#D4F4DD;border-radius:
       {modal?.type === "externo" && <ExternoModal key={modal.data?.id || "new-ext"} externo={modal.data} tiposPersonalizados={tiposPersonalizados} proveedores={proveedores} clientes={clientes} rutasCatalogo={rutasCatalogo} onSaveRuta={r=>setRutasCatalogo(p=>[...p,r])} onNuevoProveedor={p=>{PVC.save(p);}} onSave={e => saveExternoWithTipo({ ...e, id: e.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "changeDriver" && <ChangeDriverModal unit={modal.data} drivers={drivers} onSave={u => UC.save(u)} onClose={() => setModal(null)} />}
       {modal?.type === "cliente" && <ClienteModal key={modal.data?.id || modal._ts || "new-cliente"} cliente={modal.data} onSave={c => CliC.save({ ...c, id: c.id || uid() })} onClose={() => setModal(null)} />}
-      {modal?.type === "factura" && <FacturaModal key={modal.data?.id || "new-fact"} factura={modal.data} clientes={clientes} viajes={trips} onSave={f => FacC.save(f)} onClose={() => setModal(null)} />}
+      {modal?.type === "factura" && <FacturaModal key={modal.data?.id || "new-fact"} factura={modal.data} clientes={clientes} branding={branding} viajes={trips} onSave={f => FacC.save(f)} onClose={() => setModal(null)} />}
       {modal?.type === "remision" && <RemisionModal key={modal.data?.id||modal._ts||"new-rem"} remision={modal.data} clientes={clientes} viajes={trips} branding={branding} remitentes={remitentes} onSave={f=>{FacC.save({...f,id:f.id||uid()});setModal(null);}} onClose={()=>setModal(null)}/>}
       {modal?.type === "cartaporte" && <CartaPorteModal key={modal.data?.id||modal._ts||"new-cp"} cartaporte={modal.data} clientes={clientes} units={units} drivers={drivers} branding={branding} onSave={f=>{FacC.save({...f,id:f.id||uid()});setModal(null);}} onClose={()=>setModal(null)}/>}
       {modal?.type === "proveedor" && <ProveedorModal key={modal.data?.id || "new-prov"} proveedor={modal.data} onSave={p => PVC.save({ ...p, id: p.id || uid() })} onClose={() => setModal(null)} />}
