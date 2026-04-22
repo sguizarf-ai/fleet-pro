@@ -11670,13 +11670,13 @@ const AYUDA_DATA = [
     color: "var(--green)",
     preguntas: [
       { q: "¿Cómo creo una Remisión?",
-        a: "Ve a Finanzas → Facturación → '📋 Remisión'. Llena: cliente, fecha, folio (ej. REM-001), descripción del servicio y monto. La remisión NO genera IVA y NO es un CFDI. Usa el botón '🖨️ Imprimir' para generar el documento en tamaño carta. Ideal para clientes que pagan sin factura fiscal." },
+        a: "Ve a Finanzas → Facturación → '📋 Remisión'. Llena: cliente (del catálogo o escribe el nombre), fecha, folio automático (REM-001...), y agrega los conceptos del servicio con descripción, cantidad, unidad e importe. La remisión NO genera IVA y NO es CFDI — es un documento interno de cobro. El folio se propone automáticamente. Tiene botón Imprimir para generar documento profesional tamaño carta." },
       { q: "¿Cómo creo una Carta Porte?",
-        a: "Ve a Finanzas → Facturación → '🗺️ Carta Porte'. Llena: cliente, fecha, folio (ej. CP-001), origen, destino, unidad, operador, descripción de mercancía, peso y monto del flete. Al imprimir genera un documento profesional tamaño carta con espacios de firma para operador y destinatario. Útil para documentar el traslado de mercancía." },
+        a: "Ve a Finanzas → Facturación → '🗺️ Carta Porte'. El formulario incluye todos los campos requeridos por el SAT para el Complemento Carta Porte 3.1: (1) Remitente y Destinatario con RFC y CP. (2) Ubicaciones SAT: Origen y Destino con ID de ubicación, CP, municipio, estado y fechas. (3) Autotransporte: placas, año, configuración vehicular, Tipo y No. de Permiso SCT, Seguro de Responsabilidad Civil (obligatorio) y Seguro de Carga. (4) Operador con RFC, tipo y número de licencia. (5) Mercancías con clave BienesTransp del catálogo SAT, cantidad, unidad, peso y valor. Al guardar, el documento imprimible tamaño carta incluye todos estos datos con 3 espacios de firma." },
       { q: "¿Qué es una Remisión y en qué se diferencia de una Factura?",
         a: "La Remisión es un documento de cobro sin IVA — útil para clientes que pagan sin factura fiscal. Al crear un documento en Facturación, elige entre '🧾 Factura (con IVA)' y '📋 Remisión (sin IVA)'. Las remisiones sí se incluyen en los totales de cobrado/pendiente del módulo, se pueden filtrar por separado en la tabla, y se muestran con la etiqueta REM en la lista." },
       { q: "¿Qué es el Complemento de Pagos y cuándo debo emitirlo?",
-        a: "El Complemento de Pagos 2.0 (CP) se emite cuando la factura original tiene Método de Pago PPD (Pago en Parcialidades o Diferido). Cada vez que el cliente te paga (total o parcial), debes emitir un CP que 'cierra' esa deuda ante el SAT. En Fleet Pro, las facturas PPD muestran el botón '💳 Pago' para registrar el complemento. Campos requeridos SAT: fecha de pago, forma de pago, moneda, importe pagado, saldo anterior e insoluto, y opcionalmente datos bancarios (cuentas y RFC bancarios)." },
+        a: "El Complemento de Pagos 2.0 (CP) se emite cuando la factura original tiene Método de Pago PPD (Pago en Parcialidades o Diferido). Cada vez que el cliente paga (parcial o total), debes emitir un CP que cierra la deuda ante el SAT. En Fleet Pro: las facturas PPD muestran el botón '💳 Pago' — al tocarlo abre el formulario con campos requeridos SAT: fecha de pago, forma de pago (transferencia, cheque, etc.), moneda, tipo de cambio (si es en USD), número de parcialidad, saldo anterior, importe pagado y saldo insoluto (calculado automáticamente). Opcionalmente: cuentas bancarias y RFC de bancos para mayor trazabilidad." },
       { q: "¿Los folios se asignan automáticamente?",
         a: "Sí. Al crear una nueva Factura, Remisión o Carta Porte, el sistema propone automáticamente el siguiente folio disponible: Facturas: 001, 002, 003... (por serie). Remisiones: REM-001, REM-002... Cartas Porte: CP-001, CP-002... Puedes cambiar el folio si lo necesitas. El folio interno es para tu control — el identificador fiscal oficial es el UUID que asigna el SAT al timbrar con FacturAPI." },
       { q: "¿Cómo creo una factura?",
@@ -11686,7 +11686,7 @@ const AYUDA_DATA = [
       { q: "¿Qué es el Complemento Carta Porte?",
         a: "Es el complemento fiscal obligatorio en México para facturas de servicios de transporte de carga. El sistema lo genera automáticamente con datos del viaje: origen, destino, unidad, operador y mercancía." },
       { q: "¿Cómo registro un cliente nuevo?",
-        a: "Ve a Finanzas → Clientes → '➕ Nuevo Cliente'. El formulario tiene 3 pestañas: (1) 🧾 Facturación: RFC, Régimen Fiscal (catálogo SAT completo), Uso CFDI, Forma y Método de Pago, email y teléfono. (2) 📍 Dirección: calle, número, código postal, estado, municipio y colonia — datos requeridos para el CFDI. (3) 💼 Comercial: días de crédito, límite de crédito y status. Estos datos se usan automáticamente al generar facturas y CFDIs." },
+        a: "Ve a Finanzas → Clientes → '➕ Nuevo Cliente'. El formulario tiene 3 pestañas: (1) 🧾 Facturación: RFC, Tipo de Persona (Física/Moral), Régimen Fiscal (catálogo SAT completo), Uso CFDI, Forma y Método de Pago predeterminados, email y teléfono — estos datos se auto-llenan al seleccionar el cliente en una nueva factura. (2) 📍 Dirección: calle, número, Código Postal (obligatorio para CFDI 4.0), estado, municipio y colonia. (3) 💼 Comercial: días de crédito, límite de crédito y status." },
       { q: "¿Puedo ver el historial de facturas por cliente?",
         a: "Sí. En Finanzas → Clientes, cada cliente muestra el total facturado, el saldo pendiente y el % del límite de crédito usado." },
       { q: "¿Para qué sirve el Régimen Fiscal en el cliente?",
@@ -12264,6 +12264,7 @@ export default function App() {
   const [tiposPersonalizados, setTiposPersonalizados] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
+  const [compPagoModal, setCompPagoModal] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [confirm, setConfirm] = useState(null);
   const [toast, setToast] = useState(null);
