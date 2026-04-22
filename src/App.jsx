@@ -3567,6 +3567,113 @@ function ClienteModal({ cliente, onSave, onClose }) {
 
 
 // ── RemisionModal ─────────────────────────────────────────────────────────────
+// ── ComplementoPagoModal — Complemento de Pagos 2.0 SAT ─────────────────────
+function ComplementoPagoModal({ factura, clientes = [], branding = {}, onSave, onClose }) {
+  const DEFAULTS_CP = {
+    facturaId: factura?.id || "", serie: factura?.serie || "A", folio: factura?.numeroFactura || "",
+    clienteId: factura?.clienteId || "",
+    fechaPago: "", formaPago: "03", moneda: "MXN", tipoCambio: 1,
+    monto: factura?.total || 0,
+    numParcialidad: 1,
+    importeSaldoAnterior: factura?.total || 0,
+    importePagado: factura?.total || 0,
+    importeSaldoInsoluto: 0,
+    numCuentaOrd: "", rfcEmisorCtaOrd: "", nomBancoOrdExt: "",
+    numCuentaBen: "", rfcEmisorCtaBen: "",
+    notas: ""
+  };
+  const [f, setF] = useState({ ...DEFAULTS_CP });
+  const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
+  const cliente = (clientes||[]).find(c => c.id === f.clienteId);
+
+  useEffect(() => {
+    const monto = Number(f.importePagado)||0;
+    const ant = Number(f.importeSaldoAnterior)||0;
+    setF(p => ({ ...p, importeSaldoInsoluto: Math.max(0, ant - monto) }));
+  }, [f.importePagado, f.importeSaldoAnterior]);
+
+  const ok = () => {
+    if (!f.fechaPago) return alert("Fecha de pago requerida");
+    if (!f.importePagado || Number(f.importePagado)<=0) return alert("Monto pagado requerido");
+    onSave({ ...f, id: uid(), tipoDoc: "complementopago", status: "PAGADA",
+      cliente: cliente?.nombre||factura?.cliente||"",
+      rfcCliente: cliente?.rfc||factura?.rfcCliente||"",
+      total: Number(f.importePagado), monto: Number(f.importePagado),
+    });
+  };
+
+  const selStyle = {background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"};
+
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="mhdr">
+          <h3>💳 Complemento de Pagos 2.0</h3>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+        </div>
+        <div className="mbody">
+          <div style={{background:"#E8F5FA",border:"1px solid var(--cyan)",borderRadius:8,padding:"8px 14px",marginBottom:12,fontSize:12}}>
+            💳 El <strong>Complemento de Pagos 2.0</strong> se emite cuando el método de pago es <strong>PPD</strong> (diferido/parcialidades). Se timbra por cada pago recibido y "cierra" la deuda.
+          </div>
+
+          {factura && <div style={{background:"var(--bg2)",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:12,border:"1px solid var(--border)"}}>
+            <div style={{fontWeight:700,marginBottom:4}}>📄 Factura relacionada: {factura.serie||"A"}-{factura.numeroFactura||"—"}</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,fontSize:11}}>
+              <div><strong>Cliente:</strong> {factura.cliente||"—"}</div>
+              <div><strong>RFC:</strong> {factura.rfcCliente||"—"}</div>
+              <div><strong>Total original:</strong> ${Number(factura.total||0).toLocaleString("es-MX",{minimumFractionDigits:2})}</div>
+            </div>
+          </div>}
+
+          <div className="sec-lbl">💳 Datos del Pago</div>
+          <div className="fg">
+            <div className="field"><label>Fecha de Pago *</label><DatePicker value={f.fechaPago} onChange={v=>setF(p=>({...p,fechaPago:v}))}/></div>
+            <div className="field"><label>Forma de Pago *</label>
+              <select value={f.formaPago} onChange={ch("formaPago")} style={selStyle}>
+                {Object.entries(FORMAS_PAGO_SAT).map(([k,v])=><option key={k} value={k}>{k} - {v}</option>)}
+              </select>
+            </div>
+            <div className="field"><label>Moneda *</label>
+              <select value={f.moneda||"MXN"} onChange={ch("moneda")} style={selStyle}>
+                {["MXN","USD","EUR"].map(m=><option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            {f.moneda !== "MXN" && <div className="field"><label>Tipo de Cambio *</label><input value={f.tipoCambio} onChange={ch("tipoCambio")} type="number" min="0" step="0.0001" style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)"}}/></div>}
+            <div className="field"><label>No. Parcialidad</label><input value={f.numParcialidad} onChange={ch("numParcialidad")} type="number" min="1" style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)"}}/></div>
+          </div>
+
+          <div className="sec-lbl">💰 Importes</div>
+          <div className="fg">
+            <div className="field"><label>Saldo Anterior (docto.) *</label><input value={f.importeSaldoAnterior} onChange={ch("importeSaldoAnterior")} type="number" min="0" step="0.01" style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)"}}/></div>
+            <div className="field"><label>Importe Pagado *</label><input value={f.importePagado} onChange={ch("importePagado")} type="number" min="0" step="0.01" style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--cyan)",background:"var(--bg0)",color:"var(--text)"}}/></div>
+            <div className="field"><label>Saldo Insoluto (auto)</label><input value={f.importeSaldoInsoluto} readOnly style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--muted)"}}/></div>
+          </div>
+
+          {Number(f.importePagado)>0 && <div className="profit-card">
+            <div className="profit-row"><span className="profit-lbl">Importe pagado</span><span className="profit-val" style={{color:"var(--green)"}}>${Number(f.importePagado).toLocaleString("es-MX",{minimumFractionDigits:2})}</span></div>
+            <div className="profit-row"><span className="profit-lbl">Saldo pendiente tras pago</span><span className="profit-val" style={{color:Number(f.importeSaldoInsoluto)>0?"var(--orange)":"var(--green)"}}>${Number(f.importeSaldoInsoluto||0).toLocaleString("es-MX",{minimumFractionDigits:2})}</span></div>
+          </div>}
+
+          <div className="sec-lbl">🏦 Datos Bancarios (opcional)</div>
+          <div className="fg">
+            <div className="field"><label>Cta. Ordenante</label><input value={f.numCuentaOrd||""} onChange={ch("numCuentaOrd")} placeholder="4 últimos dígitos" style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)"}}/></div>
+            <div className="field"><label>RFC Banco Ordenante</label><input value={f.rfcEmisorCtaOrd||""} onChange={ch("rfcEmisorCtaOrd")} placeholder="RFC del banco" style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)"}}/></div>
+            <div className="field"><label>Cta. Beneficiario</label><input value={f.numCuentaBen||""} onChange={ch("numCuentaBen")} placeholder="4 últimos dígitos" style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)"}}/></div>
+            <div className="field"><label>RFC Banco Beneficiario</label><input value={f.rfcEmisorCtaBen||""} onChange={ch("rfcEmisorCtaBen")} placeholder="RFC del banco" style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)"}}/></div>
+          </div>
+          <div className="fg">
+            <div className="field s2"><label>Notas</label><input value={f.notas||""} onChange={ch("notas")} placeholder="Referencia, observaciones..." style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)"}}/></div>
+          </div>
+        </div>
+        <div className="mftr">
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-cyan" onClick={ok}>💳 Registrar Pago</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RemisionModal({ remision, clientes = [], viajes = [], branding = {}, onSave, onClose }) {
   const DEFAULTS_REM = { clienteId: "", clienteNombre: "", viajeId: "", fecha: "", folio: "", conceptos: [{ descripcion: "", cantidad: 1, unidad: "E48", precioUnitario: 0 }], notas: "" };
   const [f, setF] = useState({ ...DEFAULTS_REM, ...(remision || {}) });
@@ -3732,267 +3839,234 @@ ${f.notas?`<div class="field" style="margin-bottom:14px"><label>Notas</label>${f
 
 // ── CartaPorteModal ────────────────────────────────────────────────────────────
 function CartaPorteModal({ cartaporte, clientes = [], units = [], drivers = [], branding = {}, onSave, onClose }) {
-  const DEFAULTS_CP = { clienteId: "", fecha: "", folio: "", origenCP: "", origenMunicipio: "", origenEstado: "", origenDireccion: "", origenFechaSalida: "", destinoCP: "", destinoMunicipio: "", destinoEstado: "", destinoDireccion: "", destinoFechaLlegada: "", unidadId: "", placas: "", anioModelo: "", configVehicular: "C2", polizaSeguro: "", aseguradora: "", numPermisoSCT: "", tipoCarro: "VL", operador: "", rfcOperador: "", licenciaOperador: "", numLicencia: "", pesoBrutoTotal: "", unidadPeso: "KGM", numTotalMercancias: 1, mercancias: [{ descripcion: "", claveSTCC: "", cantidad: 1, unidad: "KGM", peso: 0, valorMercancia: 0, moneda: "MXN", fraccionArancelaria: "" }], monto: 0, notas: "" };
+  const DEFAULTS_CP = {
+    clienteId: "", fecha: "", folio: "",
+    remitenteNombre: "", remitenteRFC: "", remitenteCP: "",
+    destinatarioNombre: "", destinatarioRFC: "", destinatarioCP: "",
+    origenIdUbicacion: "OR000001", origenDireccion: "", origenCP: "",
+    origenMunicipio: "", origenEstado: "", origenPais: "MEX", origenFechaSalida: "",
+    destinoIdUbicacion: "DE000001", destinoDireccion: "", destinoCP: "",
+    destinoMunicipio: "", destinoEstado: "", destinoPais: "MEX",
+    destinoFechaLlegada: "", destinoDistancia: "",
+    unidadId: "", placas: "", anioModelo: "", configVehicular: "C2", pesoBrutoVehicular: "",
+    aseguradoraResponsabilidad: "", polizaResponsabilidad: "",
+    aseguradoraCarga: "", polizaCarga: "",
+    numPermisoSCT: "", tipoPermisoSCT: "TPAF01",
+    placasRemolque: "", subtipoRemolque: "",
+    operador: "", rfcOperador: "", numLicencia: "", tipoLicencia: "E",
+    pesoBrutoTotal: "", unidadPeso: "KGM", numTotalMercancias: 1,
+    mercancias: [{ descripcion: "", bienesTransp: "47000000", cantidad: 1, claveUnidad: "KGM", peso: "", valorMercancia: 0, moneda: "MXN", materialPeligroso: "No", cveMaterialPeligroso: "", embalaje: "" }],
+    monto: 0, notas: ""
+  };
   const [f, setF] = useState({ ...DEFAULTS_CP, ...(cartaporte || {}) });
-
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const cliente = (clientes||[]).find(c => c.id === f.clienteId);
-  const unidad = (units||[]).find(u => u.id === f.unidadId);
+  const unidad  = (units||[]).find(u => u.id === f.unidadId);
 
   const handleUnidadChange = (uid) => {
     const u = (units||[]).find(u => u.id === uid);
     setF(p => ({ ...p, unidadId: uid, placas: u?.placas||p.placas, anioModelo: u?.anio||p.anioModelo }));
   };
-
+  const handleClienteChange = (id) => {
+    const cli = (clientes||[]).find(c => c.id === id);
+    setF(p => ({ ...p, clienteId: id,
+      remitenteNombre: cli ? (cli.nombreCorto||cli.nombre) : p.remitenteNombre,
+      remitenteRFC: cli?.rfc || p.remitenteRFC,
+      remitenteCP: cli?.codigoPostal || p.remitenteCP,
+    }));
+  };
   const updMercia = (idx, k, val) => setF(p => ({ ...p, mercancias: p.mercancias.map((m,i) => i===idx ? {...m,[k]:val} : m) }));
-  const addMercia = () => setF(p => ({ ...p, mercancias: [...p.mercancias, { descripcion: "", claveSTCC: "", cantidad: 1, unidad: "KGM", peso: 0, valorMercancia: 0, moneda: "MXN", fraccionArancelaria: "" }] }));
+  const addMercia = () => setF(p => ({ ...p, mercancias: [...p.mercancias, { descripcion: "", bienesTransp: "47000000", cantidad: 1, claveUnidad: "KGM", peso: "", valorMercancia: 0, moneda: "MXN", materialPeligroso: "No", cveMaterialPeligroso: "", embalaje: "" }] }));
   const delMercia = idx => setF(p => ({ ...p, mercancias: p.mercancias.filter((_,i)=>i!==idx) }));
 
-  const CONFIGS_VEH = [["C2","C2 - Camión unitario 2 ejes"],["C3","C3 - Camión unitario 3 ejes"],["T2S1","T2S1 - Tractocamión 2 ejes + semirremolque 1 eje"],["T3S2","T3S2 - Tractocamión 3 ejes + semirremolque 2 ejes"],["T3S3","T3S3 - Tractocamión 3 ejes + semirremolque 3 ejes"],["OTROAUT","OTROAUT - Otro autotransporte"]];
-  const TIPOS_CARRO = [["VL","VL - Vehículo ligero de carga"],["MR","MR - Motocicleta de reparto"],["MRE","MRE - Montacargas de empresa"],["T","T - Tractocamión"]];
-
-  const buildHtml = () => {
-    const co = branding.nombre || "MI EMPRESA";
-    const logo = branding.logo ? `<img src="${branding.logo}" style="height:50px;object-fit:contain;margin-bottom:8px"/>` : `<div style="font-size:22px;font-weight:800;color:#0099CC">${co}</div>`;
-    const mercsRows = f.mercancias.map(m=>`<tr><td style="padding:6px 10px;border-bottom:1px solid #eee">${m.descripcion||"—"}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center">${m.cantidad} ${m.unidad}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right">${m.peso} kg</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:700">$${Number(m.valorMercancia||0).toLocaleString("es-MX",{minimumFractionDigits:2})}</td></tr>`).join("");
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Carta Porte ${f.folio||""}</title>
-<style>body{font-family:Arial,sans-serif;font-size:11px;color:#222;padding:22px 30px;max-width:740px;margin:0 auto}
-.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #0099CC;padding-bottom:10px;margin-bottom:14px}
-.doc-title{font-size:24px;font-weight:800;color:#0099CC}.doc-sub{font-size:10px;color:#888;margin-top:2px}
-.folio{background:#0099CC;color:#fff;padding:4px 14px;border-radius:20px;font-weight:700;margin-top:6px;display:inline-block}
-.sec{font-size:10px;font-weight:700;color:#0099CC;text-transform:uppercase;border-bottom:1px solid #0099CC;padding-bottom:3px;margin:12px 0 7px}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
-.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}
-.field{border:1px solid #e0e0e0;padding:6px 10px;border-radius:5px;background:#fafbfc}
-.field label{font-size:8px;font-weight:700;color:#999;text-transform:uppercase;display:block;margin-bottom:1px}
-.ruta{background:#E8F5FA;border:2px solid #0099CC;border-radius:8px;padding:10px 16px;display:flex;align-items:center;gap:12px;margin-bottom:12px}
-table.mercs{width:100%;border-collapse:collapse;margin-bottom:10px}
-table.mercs thead th{background:#0099CC;color:#fff;padding:6px 10px;text-align:left;font-size:10px}
-.total-box{background:#0099CC;color:#fff;padding:10px 16px;border-radius:8px;display:flex;justify-content:space-between;align-items:center}
-.firma-row{display:flex;gap:24px;margin-top:28px}
-.firma{flex:1;text-align:center}.firma-line{border-top:1px solid #333;padding-top:5px;font-size:10px;color:#555;margin-top:28px}
-.footer{margin-top:14px;border-top:1px solid #eee;padding-top:8px;font-size:9px;color:#aaa;display:flex;justify-content:space-between}
-@media print{@page{size:Letter;margin:10mm}.no-print{display:none}}
-.btn-row{display:flex;gap:10px;margin-bottom:14px}button{padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:700}
-.print-btn{background:#0099CC;color:#fff}.close-btn{background:#eee;color:#333}
-</style></head><body>
-<div class="no-print btn-row"><button class="print-btn" onclick="window.print()">🖨️ Imprimir</button><button class="close-btn" onclick="window.close()">✕ Cerrar</button></div>
-<div class="header"><div>${logo}</div>
-<div style="text-align:right"><div class="doc-title">CARTA PORTE</div><div class="doc-sub">Complemento Carta Porte 3.1 — Autotransporte</div>${f.folio?`<div class="folio">${f.folio}</div>`:""}</div></div>
-
-<div class="sec">📋 Datos del Servicio</div>
-<div class="grid2">
-<div class="field"><label>Cliente / Remitente</label>${cliente?.nombre||"—"}</div>
-<div class="field"><label>Fecha</label>${f.fecha||"—"}</div>
-${cliente?.rfc?`<div class="field"><label>RFC Cliente</label>${cliente.rfc}</div>`:""}
-<div class="field"><label>Folio</label>${f.folio||"—"}</div>
-</div>
-
-<div class="sec">📍 Ruta</div>
-<div class="ruta">
-<div style="flex:1"><div style="font-size:9px;color:#0099CC;font-weight:700">ORIGEN</div>
-<div style="font-weight:700">${f.origenDireccion||f.origenMunicipio||"—"}</div>
-<div style="font-size:10px;color:#666">${f.origenMunicipio||""} ${f.origenEstado?", "+f.origenEstado:""} ${f.origenCP?"CP "+f.origenCP:""}</div>
-${f.origenFechaSalida?`<div style="font-size:10px;color:#0099CC">Salida: ${f.origenFechaSalida}</div>`:""}
-</div>
-<div style="color:#0099CC;font-size:22px;padding:0 8px">→</div>
-<div style="flex:1"><div style="font-size:9px;color:#0099CC;font-weight:700">DESTINO</div>
-<div style="font-weight:700">${f.destinoDireccion||f.destinoMunicipio||"—"}</div>
-<div style="font-size:10px;color:#666">${f.destinoMunicipio||""} ${f.destinoEstado?", "+f.destinoEstado:""} ${f.destinoCP?"CP "+f.destinoCP:""}</div>
-${f.destinoFechaLlegada?`<div style="font-size:10px;color:#0099CC">Llegada est.: ${f.destinoFechaLlegada}</div>`:""}
-</div></div>
-
-<div class="sec">🚛 Autotransporte</div>
-<div class="grid3">
-<div class="field"><label>Unidad / No. Econ.</label>${unidad?`${unidad.num} — ${unidad.placas}`:(f.placas||"—")}</div>
-<div class="field"><label>Placas</label>${f.placas||unidad?.placas||"—"}</div>
-<div class="field"><label>Año Modelo</label>${f.anioModelo||"—"}</div>
-<div class="field"><label>Config. Vehicular</label>${f.configVehicular||"—"}</div>
-<div class="field"><label>No. Permiso SCT</label>${f.numPermisoSCT||"—"}</div>
-<div class="field"><label>Aseguradora / Póliza</label>${f.aseguradora||"—"} ${f.polizaSeguro||""}</div>
-</div>
-
-<div class="sec">👷 Operador / Figura de Transporte</div>
-<div class="grid3">
-<div class="field"><label>Nombre Operador</label>${f.operador||"—"}</div>
-<div class="field"><label>RFC Operador</label>${f.rfcOperador||"—"}</div>
-<div class="field"><label>Licencia</label>${f.numLicencia||f.licenciaOperador||"—"}</div>
-</div>
-
-<div class="sec">📦 Mercancías</div>
-<table class="mercs"><thead><tr><th>Descripción</th><th>Cantidad / Unidad</th><th>Peso</th><th style="text-align:right">Valor</th></tr></thead>
-<tbody>${mercsRows}</tbody></table>
-<div class="grid2" style="margin-bottom:12px">
-<div class="field"><label>Peso Bruto Total</label>${f.pesoBrutoTotal||"—"} ${f.unidadPeso||"KGM"}</div>
-<div class="field"><label>No. Total Mercancías</label>${f.numTotalMercancias||f.mercancias.length}</div>
-</div>
-
-${f.notas?`<div class="field" style="margin-bottom:12px"><label>Instrucciones Especiales</label>${f.notas}</div>`:""}
-<div class="total-box"><div style="font-size:12px;opacity:.9">FLETE / MONTO DEL SERVICIO</div><div style="font-size:20px;font-weight:800">$${Number(f.monto||0).toLocaleString("es-MX",{minimumFractionDigits:2})}</div></div>
-<div class="firma-row">
-<div class="firma"><div class="firma-line">Firma del operador</div></div>
-<div class="firma"><div class="firma-line">Firma de recibido (destino)</div></div>
-<div class="firma"><div class="firma-line">Sello del cliente</div></div>
-</div>
-<div class="footer"><span>${co}</span><span>Generado: ${new Date().toLocaleDateString("es-MX",{year:"numeric",month:"long",day:"numeric"})}</span></div>
-</body></html>`;
-  };
+  const CONFIGS_VEH = [["C2","C2 - Camión 2 ejes"],["C3","C3 - Camión 3 ejes"],["T2S1","T2S1 - Tracto+semi 1 eje"],["T3S2","T3S2 - Tracto+semi 2 ejes"],["T3S3","T3S3 - Tracto+semi 3 ejes"],["OTROAUT","OTROAUT - Otro"]];
+  const TIPOS_PERMISO = [["TPAF01","TPAF01 - Carga general"],["TPAF02","TPAF02 - Carga especializada"],["TPAF03","TPAF03 - Mudanzas"],["TPAF04","TPAF04 - Paquetería"],["TPAF05","TPAF05 - Materiales"],["TPAF06","TPAF06 - Viajes redituables"],["TPAF07","TPAF07 - Subcontratación"],["TPAF10","TPAF10 - Mat. y residuos peligrosos"],["TPAF11","TPAF11 - Adm. del permiso"]];
+  const UNIDADES_PESO = [["KGM","KGM - Kilogramo"],["TNE","TNE - Tonelada"],["XBX","XBX - Caja"],["XPK","XPK - Paquete"]];
+  const CLAVES_UNIDAD_MERC = [["KGM","KGM - Kilogramo"],["TNE","TNE - Tonelada"],["H87","H87 - Pieza"],["LTR","LTR - Litro"],["XBX","XBX - Caja"],["XPK","XPK - Paquete"],["E48","E48 - Servicio"]];
 
   const handlePrint = () => {
+    const co = branding?.nombre || "MI EMPRESA";
+    const logo = branding?.logo ? `<img src="${branding.logo}" style="height:46px;object-fit:contain"/>` : `<div style="font-size:20px;font-weight:800;color:#0099CC">${co}</div>`;
+    const mercsRows = f.mercancias.map(m => `<tr><td style="padding:5px 8px;border-bottom:1px solid #eee">${m.bienesTransp}</td><td style="padding:5px 8px;border-bottom:1px solid #eee">${m.descripcion||"—"}</td><td style="padding:5px 8px;border-bottom:1px solid #eee;text-align:center">${m.cantidad} ${m.claveUnidad}</td><td style="padding:5px 8px;border-bottom:1px solid #eee;text-align:right">${m.peso} ${f.unidadPeso}</td><td style="padding:5px 8px;border-bottom:1px solid #eee;text-align:right;font-weight:700">$${Number(m.valorMercancia||0).toLocaleString("es-MX",{minimumFractionDigits:2})}</td><td style="padding:5px 8px;border-bottom:1px solid #eee;color:${m.materialPeligroso==="Si"?"#c62828":"#888"}">${m.materialPeligroso==="Si"?"⚠️ "+m.cveMaterialPeligroso:"No"}</td></tr>`).join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Carta Porte ${f.folio||""}</title><style>body{font-family:Arial,sans-serif;font-size:11px;color:#222;padding:22px 28px;max-width:760px;margin:0 auto}.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #0099CC;padding-bottom:10px;margin-bottom:14px}.doc-title{font-size:22px;font-weight:800;color:#0099CC}.folio{background:#0099CC;color:#fff;padding:4px 12px;border-radius:20px;font-weight:700;margin-top:6px;display:inline-block}.sec{font-size:10px;font-weight:700;color:#0099CC;text-transform:uppercase;border-bottom:1px solid #0099CC;padding-bottom:3px;margin:12px 0 7px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}.f{border:1px solid #e0e0e0;padding:6px 10px;border-radius:5px;background:#fafbfc}.f label{font-size:8px;font-weight:700;color:#999;text-transform:uppercase;display:block;margin-bottom:1px}.remi-dest{display:flex;gap:10px;margin-bottom:12px}.rd-box{flex:1;padding:10px 12px;border-radius:8px}.rd-tipo{font-size:9px;font-weight:700;text-transform:uppercase;margin-bottom:4px}.ruta{display:flex;gap:10px;align-items:stretch;margin-bottom:12px}.ubi{flex:1;border:2px solid #0099CC;border-radius:8px;padding:10px 12px;background:#f0f8ff}.ubi-tipo{font-size:9px;font-weight:700;color:#0099CC;text-transform:uppercase;margin-bottom:4px}.ubi-lugar{font-size:13px;font-weight:800;color:#003366;margin-bottom:3px}.ubi-det{font-size:10px;color:#666}.arrow{display:flex;align-items:center;color:#0099CC;font-size:24px;padding:0 6px}table.mercs{width:100%;border-collapse:collapse;margin-bottom:10px}table.mercs thead th{background:#0099CC;color:#fff;padding:6px 8px;text-align:left;font-size:10px}.total-box{background:#0099CC;color:#fff;padding:10px 14px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.firma-row{display:flex;gap:20px;margin-top:24px}.firma{flex:1;text-align:center}.firma-line{border-top:1px solid #333;padding-top:5px;font-size:10px;color:#555;margin-top:26px}.footer{margin-top:12px;border-top:1px solid #eee;padding-top:8px;font-size:9px;color:#aaa;display:flex;justify-content:space-between}@media print{@page{size:Letter;margin:10mm}.no-print{display:none}}.btn-row{display:flex;gap:10px;margin-bottom:12px}button{padding:7px 16px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:700}.print-btn{background:#0099CC;color:#fff}.close-btn{background:#eee;color:#333}</style></head><body>
+<div class="no-print btn-row"><button class="print-btn" onclick="window.print()">🖨️ Imprimir</button><button class="close-btn" onclick="window.close()">✕ Cerrar</button></div>
+<div class="header"><div>${logo}</div><div style="text-align:right"><div class="doc-title">CARTA PORTE</div><div style="font-size:10px;color:#888">Complemento Carta Porte 3.1 — Autotransporte Federal</div>${f.folio?`<div class="folio">${f.folio}</div>`:""}</div></div>
+<div class="sec">📋 Datos Generales</div>
+<div class="grid3"><div class="f"><label>Fecha</label>${f.fecha||"—"}</div><div class="f"><label>Tipo Permiso SCT</label>${f.tipoPermisoSCT||"—"}</div><div class="f"><label>No. Permiso SCT</label>${f.numPermisoSCT||"—"}</div></div>
+<div class="sec">🏭 Remitente y Destinatario</div>
+<div class="remi-dest">
+<div class="rd-box" style="background:#E8F5E9;border:1px solid #4CAF50"><div class="rd-tipo" style="color:#2E7D32">🟢 Remitente (envía)</div><strong>${f.remitenteNombre||"—"}</strong><br><span style="font-size:10px;color:#555">RFC: ${f.remitenteRFC||"—"} | CP: ${f.remitenteCP||"—"}</span></div>
+<div class="rd-box" style="background:#FFEBEE;border:1px solid #F44336"><div class="rd-tipo" style="color:#C62828">🔴 Destinatario (recibe)</div><strong>${f.destinatarioNombre||"—"}</strong><br><span style="font-size:10px;color:#555">RFC: ${f.destinatarioRFC||"—"} | CP: ${f.destinatarioCP||"—"}</span></div>
+</div>
+<div class="sec">📍 Ruta</div>
+<div class="ruta">
+<div class="ubi"><div class="ubi-tipo">🟢 Origen — ${f.origenIdUbicacion||"OR000001"}</div><div class="ubi-lugar">${f.origenMunicipio||"—"}, ${f.origenEstado||"—"}</div><div class="ubi-det">${f.origenDireccion||""} CP: ${f.origenCP||"—"} | ${f.origenPais||"MEX"}</div>${f.origenFechaSalida?`<div class="ubi-det" style="color:#0099CC;font-weight:700">Salida: ${f.origenFechaSalida}</div>`:""}</div>
+<div class="arrow">→</div>
+<div class="ubi"><div class="ubi-tipo">🔴 Destino — ${f.destinoIdUbicacion||"DE000001"}</div><div class="ubi-lugar">${f.destinoMunicipio||"—"}, ${f.destinoEstado||"—"}</div><div class="ubi-det">${f.destinoDireccion||""} CP: ${f.destinoCP||"—"} | ${f.destinoPais||"MEX"}</div>${f.destinoFechaLlegada?`<div class="ubi-det" style="color:#0099CC;font-weight:700">Llegada: ${f.destinoFechaLlegada}</div>`:""} ${f.destinoDistancia?`<div class="ubi-det" style="color:#0099CC">Distancia: ${f.destinoDistancia} km</div>`:""}</div>
+</div>
+<div class="sec">🚛 Autotransporte</div>
+<div class="grid3"><div class="f"><label>Unidad / Placas</label>${f.placas||"—"}</div><div class="f"><label>Conf. Vehicular</label>${f.configVehicular||"—"}</div><div class="f"><label>Año Modelo</label>${f.anioModelo||"—"}</div><div class="f"><label>Seguro RC — Póliza</label>${f.aseguradoraResponsabilidad||"—"} — ${f.polizaResponsabilidad||"—"}</div>${f.aseguradoraCarga?`<div class="f"><label>Seguro Carga</label>${f.aseguradoraCarga} — ${f.polizaCarga||""}</div>`:""} ${f.placasRemolque?`<div class="f"><label>Remolque</label>${f.placasRemolque} (${f.subtipoRemolque||""})</div>`:""}</div>
+<div class="sec">👷 Operador</div>
+<div class="grid3"><div class="f"><label>Nombre</label>${f.operador||"—"}</div><div class="f"><label>RFC Operador</label>${f.rfcOperador||"—"}</div><div class="f"><label>Licencia | Tipo</label>${f.numLicencia||"—"} | Tipo ${f.tipoLicencia||"E"}</div></div>
+<div class="sec">📦 Mercancías</div>
+<div class="grid3" style="margin-bottom:8px"><div class="f"><label>Peso Bruto Total</label>${f.pesoBrutoTotal||"—"} ${f.unidadPeso||"KGM"}</div><div class="f"><label>No. Mercancías</label>${f.numTotalMercancias||f.mercancias.length}</div>${f.pesoBrutoVehicular?`<div class="f"><label>Peso Bruto Vehículo</label>${f.pesoBrutoVehicular} kg</div>`:""}</div>
+<table class="mercs"><thead><tr><th>Clave BienesTransp</th><th>Descripción</th><th>Cantidad/Unidad</th><th>Peso</th><th>Valor</th><th>Mat. Peligroso</th></tr></thead><tbody>${mercsRows}</tbody></table>
+${f.notas?`<div class="f" style="margin-bottom:10px"><label>Notas</label>${f.notas}</div>`:""}
+<div class="total-box"><div style="font-size:12px;opacity:.9">FLETE / MONTO DEL SERVICIO</div><div style="font-size:20px;font-weight:800">$${Number(f.monto||0).toLocaleString("es-MX",{minimumFractionDigits:2})}</div></div>
+<div class="firma-row"><div class="firma"><div class="firma-line">Operador: ${f.operador||""}</div></div><div class="firma"><div class="firma-line">Destinatario: ${f.destinatarioNombre||""}</div></div><div class="firma"><div class="firma-line">Remitente: ${f.remitenteNombre||""}</div></div></div>
+<div class="footer"><span>${co}</span><span>Generado: ${new Date().toLocaleDateString("es-MX",{year:"numeric",month:"long",day:"numeric"})}</span></div>
+</body></html>`;
     const w = window.open("","_blank");
-    if (w) { w.document.write(buildHtml()); w.document.close(); w.focus(); setTimeout(()=>w.print(),500); }
+    if (w) { w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>w.print(),500); }
   };
 
   const ok = () => {
-    if (!f.clienteId && !f.origenDireccion) return alert("Selecciona un cliente y el origen del servicio");
-    if (!f.origenCP || !f.destinoCP) return alert("Código Postal de origen y destino son requeridos por el SAT");
-    onSave({ ...f, id: f.id || uid(), tipoDoc: "cartaporte",
-      status: "PENDIENTE", total: Number(f.monto),
-      cliente: cliente?.nombre||"", rfcCliente: cliente?.rfc||"",
-    });
+    if (!f.remitenteRFC) return alert("RFC del Remitente es obligatorio (SAT)");
+    if (!f.destinatarioRFC) return alert("RFC del Destinatario es obligatorio (SAT)");
+    if (!f.origenCP || !f.destinoCP) return alert("Código Postal de origen y destino son obligatorios (SAT)");
+    if (!f.numPermisoSCT) return alert("Número de Permiso SCT es obligatorio (SAT)");
+    if (!f.aseguradoraResponsabilidad || !f.polizaResponsabilidad) return alert("Seguro de Responsabilidad Civil es obligatorio (SAT)");
+    if (!f.rfcOperador) return alert("RFC del Operador es obligatorio (SAT)");
+    if (!f.numLicencia) return alert("Número de Licencia del Operador es obligatorio (SAT)");
+    if (!f.pesoBrutoTotal) return alert("Peso Bruto Total es obligatorio (SAT)");
+    onSave({ ...f, id: f.id || uid(), tipoDoc: "cartaporte", status: "PENDIENTE", total: Number(f.monto), cliente: cliente?.nombre||"", rfcCliente: cliente?.rfc||"" });
   };
 
   const selStyle = {background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"};
-  const inpStyle = {width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)"};
+  const inp = {width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)"};
+  const req = {borderColor:"var(--cyan)"};
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal wide" style={{maxWidth:800}} onClick={e => e.stopPropagation()}>
-        <div className="mhdr"><h3>{f.id?"✏️ Editar Carta Porte":"🗺️ Nueva Carta Porte (CP 3.1)"}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
+      <div className="modal wide" style={{maxWidth:860}} onClick={e => e.stopPropagation()}>
+        <div className="mhdr"><h3>{f.id?"✏️ Editar Carta Porte":"🗺️ Nueva Carta Porte — CP 3.1"}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
         <div className="mbody">
-          <div style={{background:"#E8F5FA",border:"1px solid var(--cyan)",borderRadius:8,padding:"8px 14px",marginBottom:12,fontSize:12}}>
-            🗺️ Complemento <strong>Carta Porte 3.1</strong> del SAT. Los campos con * son requeridos para timbrado.
-          </div>
+          <div style={{background:"#E8F5FA",border:"1px solid var(--cyan)",borderRadius:8,padding:"8px 14px",marginBottom:12,fontSize:12}}>🗺️ <strong>Complemento Carta Porte 3.1 SAT.</strong> Campos <strong style={{color:"var(--cyan)"}}>* requeridos</strong> para timbrado.</div>
 
-          {/* DATOS BÁSICOS */}
           <div className="sec-lbl">📋 Datos del Servicio</div>
           <div className="fg">
-            <div className="field s2">
-              <label>Cliente / Remitente</label>
-              <select value={f.clienteId} onChange={e=>{const cli=(clientes||[]).find(c=>c.id===e.target.value);setF(p=>({...p,clienteId:e.target.value}));}} style={selStyle}>
-                <option value="">— Seleccionar cliente —</option>
-                {(clientes||[]).filter(c=>c.status==="ACTIVO"||!c.status).map(c=><option key={c.id} value={c.id}>{c.nombreCorto||c.nombre} ({c.rfc||"Sin RFC"})</option>)}
-              </select>
-            </div>
+            <div className="field"><label>Cliente / Contratante</label><select value={f.clienteId} onChange={e=>handleClienteChange(e.target.value)} style={selStyle}><option value="">— Seleccionar cliente —</option>{(clientes||[]).filter(c=>c.status==="ACTIVO"||!c.status).map(c=><option key={c.id} value={c.id}>{c.nombreCorto||c.nombre} ({c.rfc||"Sin RFC"})</option>)}</select></div>
             <div className="field"><label>Fecha *</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))}/></div>
-            <div className="field"><label>Folio / No. CP</label><input value={f.folio} onChange={ch("folio")} placeholder="CP-001" style={inpStyle}/></div>
-            <div className="field"><label>Monto del Flete ($)</label><input value={f.monto} onChange={ch("monto")} type="number" min="0" step="0.01" style={inpStyle}/></div>
+            <div className="field"><label>Folio</label><input value={f.folio} onChange={ch("folio")} placeholder="CP-001" style={inp}/></div>
+            <div className="field"><label>Monto del Flete ($)</label><input value={f.monto} onChange={ch("monto")} type="number" min="0" step="0.01" style={inp}/></div>
+            <div className="field"><label>Tipo Permiso SCT *</label><select value={f.tipoPermisoSCT||"TPAF01"} onChange={ch("tipoPermisoSCT")} style={selStyle}>{TIPOS_PERMISO.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></div>
+            <div className="field"><label>No. Permiso SCT *</label><input value={f.numPermisoSCT} onChange={ch("numPermisoSCT")} placeholder="TPAF-123456" style={{...inp,...req}}/></div>
           </div>
 
-          {/* UBICACIONES SAT */}
-          <div className="sec-lbl">📍 Origen (Ubicación SAT)</div>
-          <div className="fg">
-            <div className="field s2"><label>Dirección / Calle</label><input value={f.origenDireccion} onChange={ch("origenDireccion")} placeholder="Av. Industrial 100, Col. Centro" style={inpStyle}/></div>
-            <div className="field"><label>Código Postal * (SAT)</label><input value={f.origenCP} onChange={ch("origenCP")} placeholder="64000" style={inpStyle}/></div>
-            <div className="field"><label>Municipio</label><input value={f.origenMunicipio} onChange={ch("origenMunicipio")} placeholder="Monterrey" style={inpStyle}/></div>
-            <div className="field"><label>Estado</label><input value={f.origenEstado} onChange={ch("origenEstado")} placeholder="Nuevo León" style={inpStyle}/></div>
-            <div className="field"><label>Fecha/Hora de Salida</label><DatePicker value={f.origenFechaSalida} onChange={v=>setF(p=>({...p,origenFechaSalida:v}))}/></div>
-          </div>
-
-          <div className="sec-lbl">🏁 Destino (Ubicación SAT)</div>
-          <div className="fg">
-            <div className="field s2"><label>Dirección / Calle</label><input value={f.destinoDireccion} onChange={ch("destinoDireccion")} placeholder="Av. Insurgentes 500, Col. Napoles" style={inpStyle}/></div>
-            <div className="field"><label>Código Postal * (SAT)</label><input value={f.destinoCP} onChange={ch("destinoCP")} placeholder="03810" style={inpStyle}/></div>
-            <div className="field"><label>Municipio</label><input value={f.destinoMunicipio} onChange={ch("destinoMunicipio")} placeholder="Ciudad de México" style={inpStyle}/></div>
-            <div className="field"><label>Estado</label><input value={f.destinoEstado} onChange={ch("destinoEstado")} placeholder="Ciudad de México" style={inpStyle}/></div>
-            <div className="field"><label>Fecha/Hora Llegada Est.</label><DatePicker value={f.destinoFechaLlegada} onChange={v=>setF(p=>({...p,destinoFechaLlegada:v}))}/></div>
-          </div>
-
-          {/* AUTOTRANSPORTE */}
-          <div className="sec-lbl">🚛 Autotransporte (SAT)</div>
-          <div className="fg">
-            <div className="field s2">
-              <label>Unidad</label>
-              <select value={f.unidadId} onChange={e=>handleUnidadChange(e.target.value)} style={selStyle}>
-                <option value="">— Seleccionar unidad —</option>
-                {(units||[]).map(u=><option key={u.id} value={u.id}>{u.num} — {u.placas} ({u.tipo})</option>)}
-              </select>
+          <div className="sec-lbl">🏭 Remitente y Destinatario (SAT obligatorio)</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+            <div style={{background:"var(--bg2)",borderRadius:10,padding:"12px",border:"2px solid var(--green)"}}>
+              <div style={{fontSize:11,fontWeight:700,color:"var(--green)",marginBottom:8}}>🟢 REMITENTE (quien envía)</div>
+              <div className="fg">
+                <div className="field s2"><label>Nombre / Razón Social *</label><input value={f.remitenteNombre} onChange={ch("remitenteNombre")} placeholder="Razón social del remitente" style={inp}/></div>
+                <div className="field"><label>RFC Remitente *</label><input value={f.remitenteRFC} onChange={ch("remitenteRFC")} placeholder="AAA010101AAA" style={{...inp,...req,textTransform:"uppercase"}}/></div>
+                <div className="field"><label>Código Postal *</label><input value={f.remitenteCP} onChange={ch("remitenteCP")} placeholder="64000" style={{...inp,...req}}/></div>
+              </div>
             </div>
-            <div className="field"><label>Placas *</label><input value={f.placas||unidad?.placas||""} onChange={ch("placas")} placeholder="XXX-000-XX" style={inpStyle}/></div>
-            <div className="field"><label>Año Modelo *</label><input value={f.anioModelo} onChange={ch("anioModelo")} placeholder="2022" style={inpStyle}/></div>
-            <div className="field s2">
-              <label>Configuración Vehicular (SAT) *</label>
-              <select value={f.configVehicular||"C2"} onChange={ch("configVehicular")} style={selStyle}>
-                {CONFIGS_VEH.map(([v,l])=><option key={v} value={v}>{l}</option>)}
-              </select>
+            <div style={{background:"var(--bg2)",borderRadius:10,padding:"12px",border:"2px solid var(--red)"}}>
+              <div style={{fontSize:11,fontWeight:700,color:"var(--red)",marginBottom:8}}>🔴 DESTINATARIO (quien recibe)</div>
+              <div className="fg">
+                <div className="field s2"><label>Nombre / Razón Social *</label><input value={f.destinatarioNombre} onChange={ch("destinatarioNombre")} placeholder="Razón social del destinatario" style={inp}/></div>
+                <div className="field"><label>RFC Destinatario *</label><input value={f.destinatarioRFC} onChange={ch("destinatarioRFC")} placeholder="BBB010101BBB" style={{...inp,...req,textTransform:"uppercase"}}/></div>
+                <div className="field"><label>Código Postal *</label><input value={f.destinatarioCP} onChange={ch("destinatarioCP")} placeholder="03810" style={{...inp,...req}}/></div>
+              </div>
             </div>
-            <div className="field"><label>No. Permiso SCT *</label><input value={f.numPermisoSCT} onChange={ch("numPermisoSCT")} placeholder="TPAF..." style={inpStyle}/></div>
-            <div className="field"><label>Aseguradora *</label><input value={f.aseguradora} onChange={ch("aseguradora")} placeholder="GNP, AFIRME..." style={inpStyle}/></div>
-            <div className="field s2"><label>Número de Póliza Seguro *</label><input value={f.polizaSeguro} onChange={ch("polizaSeguro")} placeholder="AN-45035120" style={inpStyle}/></div>
           </div>
 
-          {/* OPERADOR / FIGURA */}
-          <div className="sec-lbl">👷 Operador / Figura de Transporte (SAT)</div>
+          <div className="sec-lbl">📍 Ubicaciones SAT</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:"var(--green)",marginBottom:6}}>🟢 Origen</div>
+              <div className="fg">
+                <div className="field"><label>ID Ubicación</label><input value={f.origenIdUbicacion||"OR000001"} onChange={ch("origenIdUbicacion")} placeholder="OR000001" style={inp}/></div>
+                <div className="field"><label>Código Postal *</label><input value={f.origenCP} onChange={ch("origenCP")} placeholder="64000" style={{...inp,...req}}/></div>
+                <div className="field"><label>Municipio</label><input value={f.origenMunicipio} onChange={ch("origenMunicipio")} placeholder="Monterrey" style={inp}/></div>
+                <div className="field"><label>Estado</label><input value={f.origenEstado} onChange={ch("origenEstado")} placeholder="Nuevo León" style={inp}/></div>
+                <div className="field s2"><label>Dirección</label><input value={f.origenDireccion} onChange={ch("origenDireccion")} placeholder="Av. Industrial 100" style={inp}/></div>
+                <div className="field s2"><label>Fecha/Hora Salida *</label><DatePicker value={f.origenFechaSalida} onChange={v=>setF(p=>({...p,origenFechaSalida:v}))}/></div>
+              </div>
+            </div>
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:"var(--red)",marginBottom:6}}>🔴 Destino</div>
+              <div className="fg">
+                <div className="field"><label>ID Ubicación</label><input value={f.destinoIdUbicacion||"DE000001"} onChange={ch("destinoIdUbicacion")} placeholder="DE000001" style={inp}/></div>
+                <div className="field"><label>Código Postal *</label><input value={f.destinoCP} onChange={ch("destinoCP")} placeholder="03810" style={{...inp,...req}}/></div>
+                <div className="field"><label>Municipio</label><input value={f.destinoMunicipio} onChange={ch("destinoMunicipio")} placeholder="Ciudad de México" style={inp}/></div>
+                <div className="field"><label>Estado</label><input value={f.destinoEstado} onChange={ch("destinoEstado")} placeholder="CDMX" style={inp}/></div>
+                <div className="field s2"><label>Dirección</label><input value={f.destinoDireccion} onChange={ch("destinoDireccion")} placeholder="Av. Insurgentes 500" style={inp}/></div>
+                <div className="field"><label>Fecha/Hora Llegada Est.</label><DatePicker value={f.destinoFechaLlegada} onChange={v=>setF(p=>({...p,destinoFechaLlegada:v}))}/></div>
+                <div className="field"><label>Distancia (km)</label><input value={f.destinoDistancia} onChange={ch("destinoDistancia")} type="number" min="0" placeholder="0" style={inp}/></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="sec-lbl">🚛 Autotransporte</div>
           <div className="fg">
-            <div className="field s2">
-              <label>Operador *</label>
-              <select value={f.operador||""} onChange={e=>{const d=(drivers||[]).find(d=>d.nombre===e.target.value);setF(p=>({...p,operador:e.target.value,rfcOperador:d?.rfc||p.rfcOperador,numLicencia:d?.licencia||p.numLicencia}));}} style={selStyle}>
-                <option value="">— Seleccionar operador —</option>
-                {(drivers||[]).filter(d=>d.activo!==false).map(d=><option key={d.id} value={d.nombre}>{d.nombre}{d.licencia?" · "+d.licencia:""}</option>)}
-              </select>
+            <div className="field s2"><label>Unidad</label><select value={f.unidadId} onChange={e=>handleUnidadChange(e.target.value)} style={selStyle}><option value="">— Seleccionar unidad —</option>{(units||[]).map(u=><option key={u.id} value={u.id}>{u.num} — {u.placas} ({u.tipo})</option>)}</select></div>
+            <div className="field"><label>Placas *</label><input value={f.placas||unidad?.placas||""} onChange={ch("placas")} placeholder="XXX-000-XX" style={{...inp,...req}}/></div>
+            <div className="field"><label>Año Modelo *</label><input value={f.anioModelo} onChange={ch("anioModelo")} placeholder="2022" style={{...inp,...req}}/></div>
+            <div className="field s2"><label>Config. Vehicular SAT *</label><select value={f.configVehicular||"C2"} onChange={ch("configVehicular")} style={selStyle}>{CONFIGS_VEH.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></div>
+            <div className="field"><label>Peso Bruto Vehicular (kg)</label><input value={f.pesoBrutoVehicular} onChange={ch("pesoBrutoVehicular")} type="number" min="0" style={inp}/></div>
+            <div className="field s2" style={{gridColumn:"1/-1",background:"#FFF3E0",border:"1px solid #FF9800",borderRadius:8,padding:"10px 12px"}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#E65100",marginBottom:8}}>⚠️ Seguros obligatorios SAT — Art. 66 Ley de Caminos</div>
+              <div className="fg">
+                <div className="field"><label>Aseguradora Resp. Civil *</label><input value={f.aseguradoraResponsabilidad} onChange={ch("aseguradoraResponsabilidad")} placeholder="GNP, AFIRME, HDI..." style={{...inp,...req}}/></div>
+                <div className="field"><label>No. Póliza Resp. Civil *</label><input value={f.polizaResponsabilidad} onChange={ch("polizaResponsabilidad")} placeholder="Número de póliza" style={{...inp,...req}}/></div>
+                <div className="field"><label>Aseguradora de la Carga</label><input value={f.aseguradoraCarga||""} onChange={ch("aseguradoraCarga")} placeholder="(si aplica)" style={inp}/></div>
+                <div className="field"><label>No. Póliza Carga</label><input value={f.polizaCarga||""} onChange={ch("polizaCarga")} placeholder="(si aplica)" style={inp}/></div>
+              </div>
             </div>
-            <div className="field"><label>RFC del Operador *</label><input value={f.rfcOperador||""} onChange={ch("rfcOperador")} placeholder="XXXX000000XX0" style={{...inpStyle,textTransform:"uppercase"}}/></div>
-            <div className="field"><label>No. Licencia *</label><input value={f.numLicencia||""} onChange={ch("numLicencia")} placeholder="A1234567" style={inpStyle}/></div>
+            <div className="field"><label>Placas Remolque</label><input value={f.placasRemolque||""} onChange={ch("placasRemolque")} placeholder="CTR-000 (si aplica)" style={inp}/></div>
+            <div className="field"><label>Subtipo Remolque</label><input value={f.subtipoRemolque||""} onChange={ch("subtipoRemolque")} placeholder="CTR001, CTR002..." style={inp}/></div>
           </div>
 
-          {/* MERCANCIAS */}
+          <div className="sec-lbl">👷 Operador — Figura de Transporte SAT</div>
+          <div className="fg">
+            <div className="field s2"><label>Operador *</label><select value={f.operador||""} onChange={e=>{const d=(drivers||[]).find(d=>d.nombre===e.target.value);setF(p=>({...p,operador:e.target.value,rfcOperador:d?.rfc||p.rfcOperador,numLicencia:d?.licencia||p.numLicencia}));}} style={selStyle}><option value="">— Seleccionar operador —</option>{(drivers||[]).filter(d=>d.activo!==false).map(d=><option key={d.id} value={d.nombre}>{d.nombre}{d.licencia?" · Lic: "+d.licencia:""}{d.rfc?" · RFC: "+d.rfc:""}</option>)}</select></div>
+            <div className="field"><label>RFC Operador *</label><input value={f.rfcOperador||""} onChange={ch("rfcOperador")} placeholder="XXXX000000XX0" style={{...inp,...req,textTransform:"uppercase"}}/></div>
+            <div className="field"><label>No. Licencia *</label><input value={f.numLicencia||""} onChange={ch("numLicencia")} placeholder="A1234567" style={{...inp,...req}}/></div>
+            <div className="field"><label>Tipo Licencia *</label><select value={f.tipoLicencia||"E"} onChange={ch("tipoLicencia")} style={selStyle}>{[["A","A - Motocicletas"],["B","B - Auto/Camioneta"],["C","C - Camión unitario"],["D","D - Autobús"],["E","E - Tractocamión"]].map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></div>
+          </div>
+
           <div className="sec-lbl" style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span>📦 Mercancías (SAT)</span>
+            <span>📦 Mercancías SAT</span>
             <button className="btn btn-ghost btn-sm" onClick={addMercia}>+ Agregar</button>
           </div>
           <div className="fg" style={{marginBottom:8}}>
-            <div className="field"><label>Peso Bruto Total *</label><input value={f.pesoBrutoTotal} onChange={ch("pesoBrutoTotal")} type="number" min="0" step="0.01" placeholder="0.00" style={inpStyle}/></div>
-            <div className="field">
-              <label>Unidad de Peso *</label>
-              <select value={f.unidadPeso||"KGM"} onChange={ch("unidadPeso")} style={selStyle}>
-                {["KGM","TNE","XBX","XPK"].map(u=><option key={u} value={u}>{u}</option>)}
-              </select>
+            <div className="field"><label>Peso Bruto Total *</label><input value={f.pesoBrutoTotal} onChange={ch("pesoBrutoTotal")} type="number" min="0" step="0.001" placeholder="0.000" style={{...inp,...req}}/></div>
+            <div className="field"><label>Unidad de Peso *</label><select value={f.unidadPeso||"KGM"} onChange={ch("unidadPeso")} style={selStyle}>{UNIDADES_PESO.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></div>
+            <div className="field"><label>No. Total Mercancías</label><input value={f.numTotalMercancias||f.mercancias.length} onChange={ch("numTotalMercancias")} type="number" min="1" style={inp}/></div>
+          </div>
+          {f.mercancias.map((m,idx)=>(
+            <div key={idx} style={{background:"var(--bg2)",borderRadius:10,padding:"12px",marginBottom:10,border:"1px solid var(--border)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <span style={{fontSize:12,fontWeight:700,color:"var(--cyan)"}}>📦 Mercancía {idx+1}</span>
+                {f.mercancias.length>1&&<button onClick={()=>delMercia(idx)} style={{background:"var(--red)",color:"#fff",border:"none",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontSize:11}}>Eliminar</button>}
+              </div>
+              <div className="fg">
+                <div className="field s2"><label>Descripción *</label><input value={m.descripcion} onChange={e=>updMercia(idx,"descripcion",e.target.value)} placeholder="Autopartes metálicas, cajas..." style={inp}/></div>
+                <div className="field"><label>Clave BienesTransp * (SAT)</label><input value={m.bienesTransp} onChange={e=>updMercia(idx,"bienesTransp",e.target.value)} placeholder="47000000" style={{...inp,...req}} title="Catálogo SAT de bienes y servicios (productos de SAT)"/></div>
+                <div className="field"><label>Fracción Arancelaria</label><input value={m.fraccionArancelaria||""} onChange={e=>updMercia(idx,"fraccionArancelaria",e.target.value)} placeholder="Solo exportación" style={inp}/></div>
+                <div className="field"><label>Cantidad *</label><input value={m.cantidad} onChange={e=>updMercia(idx,"cantidad",e.target.value)} type="number" min="0.001" step="0.001" style={inp}/></div>
+                <div className="field"><label>Clave Unidad *</label><select value={m.claveUnidad} onChange={e=>updMercia(idx,"claveUnidad",e.target.value)} style={selStyle}>{CLAVES_UNIDAD_MERC.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></div>
+                <div className="field"><label>Peso * ({f.unidadPeso||"KGM"})</label><input value={m.peso} onChange={e=>updMercia(idx,"peso",e.target.value)} type="number" min="0" step="0.001" style={{...inp,...req}}/></div>
+                <div className="field"><label>Valor Mercancía *</label><input value={m.valorMercancia} onChange={e=>updMercia(idx,"valorMercancia",e.target.value)} type="number" min="0" step="0.01" style={{...inp,...req}}/></div>
+                <div className="field"><label>¿Material Peligroso?</label><select value={m.materialPeligroso||"No"} onChange={e=>updMercia(idx,"materialPeligroso",e.target.value)} style={selStyle}><option value="No">No</option><option value="Si">Sí</option></select></div>
+                {m.materialPeligroso==="Si"&&<><div className="field"><label>Clave Mat. Peligroso *</label><input value={m.cveMaterialPeligroso||""} onChange={e=>updMercia(idx,"cveMaterialPeligroso",e.target.value)} placeholder="Ej: 1203" style={{...inp,...req}}/></div><div className="field"><label>Embalaje</label><input value={m.embalaje||""} onChange={e=>updMercia(idx,"embalaje",e.target.value)} placeholder="4G, 1A2..." style={inp}/></div></>}
+              </div>
             </div>
-            <div className="field"><label>No. Total Mercancías</label><input value={f.numTotalMercancias||f.mercancias.length} onChange={ch("numTotalMercancias")} type="number" min="1" style={inpStyle}/></div>
-          </div>
-          <div style={{overflowX:"auto",marginBottom:12}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-              <thead><tr style={{background:"var(--bg2)"}}>
-                <th style={{padding:"5px 7px",textAlign:"left",fontSize:9,color:"var(--muted)"}}>DESCRIPCIÓN</th>
-                <th style={{padding:"5px 7px",fontSize:9,color:"var(--muted)"}}>CLAVE STCC</th>
-                <th style={{padding:"5px 7px",textAlign:"center",fontSize:9,color:"var(--muted)"}}>CANT.</th>
-                <th style={{padding:"5px 7px",fontSize:9,color:"var(--muted)"}}>UNIDAD</th>
-                <th style={{padding:"5px 7px",textAlign:"right",fontSize:9,color:"var(--muted)"}}>PESO (kg)</th>
-                <th style={{padding:"5px 7px",textAlign:"right",fontSize:9,color:"var(--muted)"}}>VALOR</th>
-                <th style={{width:22}}></th>
-              </tr></thead>
-              <tbody>
-                {f.mercancias.map((m,idx)=>(
-                  <tr key={idx} style={{borderBottom:"1px solid var(--border)"}}>
-                    <td style={{padding:"3px 5px"}}><input value={m.descripcion} onChange={e=>updMercia(idx,"descripcion",e.target.value)} placeholder="Autopartes, maquinaria..." style={{width:"100%",minWidth:140,padding:"3px 6px",border:"1px solid var(--border)",borderRadius:5,background:"var(--bg0)",color:"var(--text)",fontSize:11}}/></td>
-                    <td style={{padding:"3px 5px"}}><input value={m.claveSTCC} onChange={e=>updMercia(idx,"claveSTCC",e.target.value)} placeholder="47000000" style={{width:80,padding:"3px 6px",border:"1px solid var(--border)",borderRadius:5,background:"var(--bg0)",color:"var(--text)",fontSize:11}} title="Clave del producto o servicio SAT (catálogo STCC)"/></td>
-                    <td style={{padding:"3px 5px"}}><input value={m.cantidad} onChange={e=>updMercia(idx,"cantidad",e.target.value)} type="number" min="0" style={{width:50,padding:"3px 5px",border:"1px solid var(--border)",borderRadius:5,background:"var(--bg0)",color:"var(--text)",fontSize:11,textAlign:"center"}}/></td>
-                    <td style={{padding:"3px 5px"}}><select value={m.unidad} onChange={e=>updMercia(idx,"unidad",e.target.value)} style={{padding:"3px 5px",border:"1px solid var(--border)",borderRadius:5,background:"var(--bg0)",color:"var(--text)",fontSize:11}}>
-                      {["KGM","TNE","H87","LTR","XBX","XPK","E48"].map(u=><option key={u} value={u}>{u}</option>)}
-                    </select></td>
-                    <td style={{padding:"3px 5px"}}><input value={m.peso} onChange={e=>updMercia(idx,"peso",e.target.value)} type="number" min="0" step="0.01" style={{width:70,padding:"3px 5px",border:"1px solid var(--border)",borderRadius:5,background:"var(--bg0)",color:"var(--text)",fontSize:11,textAlign:"right"}}/></td>
-                    <td style={{padding:"3px 5px"}}><input value={m.valorMercancia} onChange={e=>updMercia(idx,"valorMercancia",e.target.value)} type="number" min="0" step="0.01" style={{width:85,padding:"3px 5px",border:"1px solid var(--border)",borderRadius:5,background:"var(--bg0)",color:"var(--text)",fontSize:11,textAlign:"right"}}/></td>
-                    <td>{f.mercancias.length>1&&<button onClick={()=>delMercia(idx)} style={{background:"none",border:"none",color:"var(--red)",cursor:"pointer",fontSize:15,padding:"0 3px",lineHeight:1}}>×</button>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="fg">
-            <div className="field s2"><label>Instrucciones / Notas</label><input value={f.notas||""} onChange={ch("notas")} placeholder="Temperatura, cuidados especiales, instrucciones de entrega..." style={inpStyle}/></div>
-          </div>
+          ))}
+          <div className="fg"><div className="field s2"><label>Instrucciones / Notas</label><input value={f.notas||""} onChange={ch("notas")} placeholder="Temperatura, cuidados, instrucciones de entrega..." style={inp}/></div></div>
         </div>
         <div className="mftr">
           <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-ghost btn-sm" onClick={handlePrint}>🖨️ Imprimir</button>
+          <button className="btn btn-ghost btn-sm" onClick={handlePrint} style={{border:"1px solid var(--cyan)",color:"var(--cyan)"}}>🖨️ Imprimir</button>
           <button className="btn btn-cyan" onClick={ok}>💾 Guardar Carta Porte</button>
         </div>
       </div>
     </div>
   );
 }
-
 
 function FacturaModal({ factura, clientes, viajes, branding = {}, onSave, onClose }) {
   const DEFAULTS_FAC = { serie: "A", numeroFactura: "", clienteId: "", fechaEmision: "", diasCredito: 30, viajeId: "", formaPago: "03", metodoPago: "PUE", usoCFDI: "G03", regimenFiscalReceptor: "601", moneda: "MXN", condicionesPago: "", conceptos: [{ descripcion: "", cantidad: 1, unidad: "E48", precioUnitario: 0, claveProducto: "78101803" }], notas: "", tipoDoc: "factura" };
@@ -11601,6 +11675,8 @@ const AYUDA_DATA = [
         a: "Ve a Finanzas → Facturación → '🗺️ Carta Porte'. Llena: cliente, fecha, folio (ej. CP-001), origen, destino, unidad, operador, descripción de mercancía, peso y monto del flete. Al imprimir genera un documento profesional tamaño carta con espacios de firma para operador y destinatario. Útil para documentar el traslado de mercancía." },
       { q: "¿Qué es una Remisión y en qué se diferencia de una Factura?",
         a: "La Remisión es un documento de cobro sin IVA — útil para clientes que pagan sin factura fiscal. Al crear un documento en Facturación, elige entre '🧾 Factura (con IVA)' y '📋 Remisión (sin IVA)'. Las remisiones sí se incluyen en los totales de cobrado/pendiente del módulo, se pueden filtrar por separado en la tabla, y se muestran con la etiqueta REM en la lista." },
+      { q: "¿Qué es el Complemento de Pagos y cuándo debo emitirlo?",
+        a: "El Complemento de Pagos 2.0 (CP) se emite cuando la factura original tiene Método de Pago PPD (Pago en Parcialidades o Diferido). Cada vez que el cliente te paga (total o parcial), debes emitir un CP que 'cierra' esa deuda ante el SAT. En Fleet Pro, las facturas PPD muestran el botón '💳 Pago' para registrar el complemento. Campos requeridos SAT: fecha de pago, forma de pago, moneda, importe pagado, saldo anterior e insoluto, y opcionalmente datos bancarios (cuentas y RFC bancarios)." },
       { q: "¿Los folios se asignan automáticamente?",
         a: "Sí. Al crear una nueva Factura, Remisión o Carta Porte, el sistema propone automáticamente el siguiente folio disponible: Facturas: 001, 002, 003... (por serie). Remisiones: REM-001, REM-002... Cartas Porte: CP-001, CP-002... Puedes cambiar el folio si lo necesitas. El folio interno es para tu control — el identificador fiscal oficial es el UUID que asigna el SAT al timbrar con FacturAPI." },
       { q: "¿Cómo creo una factura?",
@@ -11861,7 +11937,7 @@ function ClientesPage({ clientes, facturas, onAdd, onEdit, onDelete }) {
   );
 }
 
-function FacturacionPage({ facturas, clientes, viajes, onAdd, onAddRemision, onAddCartaPorte, onEdit, onDelete, onMarcarPagada, onRevertirPendiente, onPrintFactura }) {
+function FacturacionPage({ facturas, clientes, viajes, onAdd, onAddRemision, onAddCartaPorte, onEdit, onDelete, onMarcarPagada, onRevertirPendiente, onPrintFactura, onComplementoPago }) {
   const [q, setQ] = useState("");
   const [sf, setSf] = useState("TODOS");
   const [tfDoc, setTfDoc] = useState("TODOS"); // tipoDoc: TODOS/factura/remision
@@ -12002,6 +12078,7 @@ function FacturacionPage({ facturas, clientes, viajes, onAdd, onAddRemision, onA
                         <div className="acts">
                           {f.status === "PENDIENTE" && <button className="btn btn-green btn-xs" onClick={() => onMarcarPagada(f)}>✓ Pagar</button>}
                           {f.status === "PAGADA" && <button className="btn btn-ghost btn-xs" style={{fontSize:10}} onClick={() => onRevertirPendiente(f)} title="Revertir a pendiente">↩️ Pdte</button>}
+                          {f.metodoPago === "PPD" && f.status !== "PAGADA" && <button className="btn btn-cyan btn-xs" style={{fontSize:10}} onClick={() => onComplementoPago(f)} title="Registrar pago PPD">💳 Pago</button>}
                           {f.status === "VENCIDA" && <button className="btn btn-ghost btn-xs" style={{fontSize:10}} onClick={() => onMarcarPagada(f)}>✓ Cobrar</button>}
                           <button className="btn btn-ghost btn-xs" onClick={() => onPrintFactura && onPrintFactura(f)} title="Ver/Imprimir">🖨️</button>
                           <button className="btn btn-ghost btn-sm" onClick={() => onEdit(f)}>✏️</button>
@@ -12758,6 +12835,7 @@ ${fac.fechaPago ? `<div style="margin-top:14px;background:#D4F4DD;border-radius:
             onMarcarPagada={marcarPagada}
             onRevertirPendiente={revertirPendiente}
             onPrintFactura={printFactura}
+            onComplementoPago={f=>setCompPagoModal(f)}
           />}
           {tab === "gastos" && isSupervisor && <GastosPage
             gastos={gastos} proveedores={proveedores} externos={externos} maints={maints} units={units} trips={trips} branding={branding}
@@ -12899,6 +12977,7 @@ ${fac.fechaPago ? `<div style="margin-top:14px;background:#D4F4DD;border-radius:
       {modal?.type === "changeDriver" && <ChangeDriverModal unit={modal.data} drivers={drivers} onSave={u => UC.save(u)} onClose={() => setModal(null)} />}
       {modal?.type === "cliente" && <ClienteModal key={modal.data?.id || modal._ts || "new-cliente"} cliente={modal.data} onSave={c => CliC.save({ ...c, id: c.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "factura" && <FacturaModal key={modal.data?.id || "new-fact"} factura={modal.data} clientes={clientes} branding={branding} viajes={trips} onSave={f => FacC.save(f)} onClose={() => setModal(null)} />}
+      {compPagoModal && <ComplementoPagoModal factura={compPagoModal} clientes={clientes} branding={branding} onSave={f=>{FacC.save(f);setCompPagoModal(null);}} onClose={()=>setCompPagoModal(null)}/>}
       {modal?.type === "remision" && <RemisionModal key={modal.data?.id||modal._ts||"new-rem"} remision={modal.data} clientes={clientes} viajes={trips} branding={branding} remitentes={remitentes} onSave={f=>{FacC.save({...f,id:f.id||uid()});setModal(null);}} onClose={()=>setModal(null)}/>}
       {modal?.type === "cartaporte" && <CartaPorteModal key={modal.data?.id||modal._ts||"new-cp"} cartaporte={modal.data} clientes={clientes} units={units} drivers={drivers} branding={branding} onSave={f=>{FacC.save({...f,id:f.id||uid()});setModal(null);}} onClose={()=>setModal(null)}/>}
       {modal?.type === "proveedor" && <ProveedorModal key={modal.data?.id || "new-prov"} proveedor={modal.data} onSave={p => PVC.save({ ...p, id: p.id || uid() })} onClose={() => setModal(null)} />}
