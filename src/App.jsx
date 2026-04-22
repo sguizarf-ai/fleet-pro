@@ -3568,12 +3568,8 @@ function ClienteModal({ cliente, onSave, onClose }) {
 
 // ── RemisionModal ─────────────────────────────────────────────────────────────
 function RemisionModal({ remision, clientes = [], viajes = [], branding = {}, onSave, onClose }) {
-  const [f, setF] = useState(remision || {
-    clienteId: "", clienteNombre: "", viajeId: "",
-    fecha: "", folio: "",
-    conceptos: [{ descripcion: "", cantidad: 1, unidad: "E48", precioUnitario: 0 }],
-    notas: ""
-  });
+  const DEFAULTS_REM = { clienteId: "", clienteNombre: "", viajeId: "", fecha: "", folio: "", conceptos: [{ descripcion: "", cantidad: 1, unidad: "E48", precioUnitario: 0 }], notas: "" };
+  const [f, setF] = useState({ ...DEFAULTS_REM, ...(remision || {}) });
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const cliente = (clientes||[]).find(c => c.id === f.clienteId);
 
@@ -3736,24 +3732,8 @@ ${f.notas?`<div class="field" style="margin-bottom:14px"><label>Notas</label>${f
 
 // ── CartaPorteModal ────────────────────────────────────────────────────────────
 function CartaPorteModal({ cartaporte, clientes = [], units = [], drivers = [], branding = {}, onSave, onClose }) {
-  const [f, setF] = useState(cartaporte || {
-    clienteId: "", fecha: "", folio: "",
-    // Ubicaciones SAT
-    origenCP: "", origenMunicipio: "", origenEstado: "",
-    origenDireccion: "", origenFechaSalida: "",
-    destinoCP: "", destinoMunicipio: "", destinoEstado: "",
-    destinoDireccion: "", destinoFechaLlegada: "",
-    // Autotransporte
-    unidadId: "", placas: "", anioModelo: "", configVehicular: "C2",
-    polizaSeguro: "", aseguradora: "", numPermisoSCT: "", tipoCarro: "VL",
-    // Operador (Figura)
-    operador: "", rfcOperador: "", licenciaOperador: "", numLicencia: "",
-    // Mercancias
-    pesoBrutoTotal: "", unidadPeso: "KGM", numTotalMercancias: 1,
-    mercancias: [{ descripcion: "", claveSTCC: "", cantidad: 1, unidad: "KGM", peso: 0, valorMercancia: 0, moneda: "MXN", fraccionArancelaria: "" }],
-    // Financiero
-    monto: 0, notas: ""
-  });
+  const DEFAULTS_CP = { clienteId: "", fecha: "", folio: "", origenCP: "", origenMunicipio: "", origenEstado: "", origenDireccion: "", origenFechaSalida: "", destinoCP: "", destinoMunicipio: "", destinoEstado: "", destinoDireccion: "", destinoFechaLlegada: "", unidadId: "", placas: "", anioModelo: "", configVehicular: "C2", polizaSeguro: "", aseguradora: "", numPermisoSCT: "", tipoCarro: "VL", operador: "", rfcOperador: "", licenciaOperador: "", numLicencia: "", pesoBrutoTotal: "", unidadPeso: "KGM", numTotalMercancias: 1, mercancias: [{ descripcion: "", claveSTCC: "", cantidad: 1, unidad: "KGM", peso: 0, valorMercancia: 0, moneda: "MXN", fraccionArancelaria: "" }], monto: 0, notas: "" };
+  const [f, setF] = useState({ ...DEFAULTS_CP, ...(cartaporte || {}) });
 
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const cliente = (clientes||[]).find(c => c.id === f.clienteId);
@@ -4015,17 +3995,8 @@ ${f.notas?`<div class="field" style="margin-bottom:12px"><label>Instrucciones Es
 
 
 function FacturaModal({ factura, clientes, viajes, branding = {}, onSave, onClose }) {
-  const [f, setF] = useState(factura ? {
-    ...factura,
-    conceptos: factura.conceptos || [{ descripcion: factura.notas||"", cantidad: 1, unidad: "E48", precioUnitario: factura.subtotal||0, claveProducto: "78101803" }]
-  } : {
-    serie: "A", numeroFactura: "", clienteId: "",
-    fechaEmision: "", diasCredito: 30, viajeId: "",
-    formaPago: "03", metodoPago: "PUE", usoCFDI: "G03",
-    regimenFiscalReceptor: "601", moneda: "MXN", condicionesPago: "",
-    conceptos: [{ descripcion: "", cantidad: 1, unidad: "E48", precioUnitario: 0, claveProducto: "78101803" }],
-    notas: "", tipoDoc: "factura"
-  });
+  const DEFAULTS_FAC = { serie: "A", numeroFactura: "", clienteId: "", fechaEmision: "", diasCredito: 30, viajeId: "", formaPago: "03", metodoPago: "PUE", usoCFDI: "G03", regimenFiscalReceptor: "601", moneda: "MXN", condicionesPago: "", conceptos: [{ descripcion: "", cantidad: 1, unidad: "E48", precioUnitario: 0, claveProducto: "78101803" }], notas: "", tipoDoc: "factura" };
+  const [f, setF] = useState(factura ? { ...DEFAULTS_FAC, ...factura, conceptos: factura.conceptos || [{ descripcion: factura.notas||"", cantidad: 1, unidad: "E48", precioUnitario: factura.subtotal||0, claveProducto: "78101803" }] } : { ...DEFAULTS_FAC });
 
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const cliente = clientes.find(c => c.id === f.clienteId);
@@ -4296,7 +4267,7 @@ ${f.notas ? `<div class="field" style="margin-top:14px"><label>Notas / Observaci
         </div>
         <div className="mftr">
           <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-ghost btn-sm" onClick={handlePrint}>🖨️ Vista previa</button>
+          <button className="btn btn-ghost btn-sm" onClick={handlePrint} style={{border:"1px solid var(--cyan)",color:"var(--cyan)"}}>🖨️ Imprimir / Vista previa</button>
           <button className="btn btn-cyan" onClick={ok}>💾 Guardar Factura</button>
         </div>
       </div>
