@@ -1382,8 +1382,20 @@ function MaintModal({ maint, units, proveedores, onSave, onClose }) {
   );
 }
 function TripModal({ trip, units, clientes = [], rutasCatalogo = [], onSaveRuta, onSave, onClose }) {
-  const [f, setF] = useState(trip || { unidadId: "", esExterno: false, tipoViaje: "local", origen: "", destino: "", fecha: "", fechaReg: "", kmSalida: "", kmLlegada: "", carga: "", cliente: "", status: "EN RUTA", notas: "", costoOfrecido: 0, gastosExtras: 0, costoEstadias: 0, viaticos: 0, combustibleExtra: 0, casetas: 0, evidencias: [] });
+  const [f, setF] = useState(trip || { unidadId: "", esExterno: false, tipoViaje: "local", origen: "", destino: "", fecha: "", fechaReg: "", kmSalida: "", kmLlegada: "", kmExtra: 0, carga: "", cliente: "", status: "EN RUTA", notas: "", costoOfrecido: 0, gastosExtras: 0, costoEstadias: 0, casetas: 0, viaticos: 0, combustibleExtra: 0, tipoRemolque: "", evidencias: [] });
   const [uploading, setUploading] = useState(false);
+  // Auto-fill route data from catalog when origen+destino selected
+  useEffect(() => {
+    if (f.origen && f.destino && !f.id) {
+      const ruta = (rutasCatalogo||[]).find(r=>r.origen===f.origen&&r.destino===f.destino);
+      if (ruta && ruta.tipoViaje) {
+        setF(p=>({...p,
+          tipoViaje: ruta.tipoViaje||p.tipoViaje,
+          carga: p.carga||ruta.carga||"",
+        }));
+      }
+    }
+  }, [f.origen, f.destino]);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const dist = f.kmLlegada && f.kmSalida ? Number(f.kmLlegada) - Number(f.kmSalida) : null;
   const ok = (_e) => {
@@ -1391,7 +1403,7 @@ function TripModal({ trip, units, clientes = [], rutasCatalogo = [], onSaveRuta,
     // Save ruta to catalog if not already present
     if (onSaveRuta && f.origen && f.destino) {
       const exists = (rutasCatalogo||[]).some(r=>r.origen===f.origen&&r.destino===f.destino);
-      if (!exists) onSaveRuta({origen:f.origen, destino:f.destino});
+      if (!exists) onSaveRuta({origen:f.origen, destino:f.destino, tipoViaje:f.tipoViaje, kmRuta:Number(f.kmLlegada||0)-Number(f.kmSalida||0)||0, carga:f.carga||""});
     }
     onSave({ ...f, id: f.id || uid() });
   };
@@ -1447,10 +1459,12 @@ function TripModal({ trip, units, clientes = [], rutasCatalogo = [], onSaveRuta,
               )}
             </div>
             <div className="field s2"><label>Unidad *</label><select value={f.unidadId} onChange={ch("unidadId")} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}><option value="">— Seleccionar unidad —</option>{units.map(u=><option key={u.id} value={u.id}>{u.num} — {u.placas}</option>)}</select></div>
+            {(()=>{const u=(units||[]).find(u2=>u2.id===f.unidadId);const needsRemolque=!u||["TRAILER","TRACTO","TORTON","RABON"].some(t=>u.tipo?.toUpperCase().includes(t));return needsRemolque?<div className="field"><label>Tipo Remolque/Caja</label><select value={f.tipoRemolque||""} onChange={ch("tipoRemolque")} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}><option value="">— Tipo de caja/remolque —</option>{["Caja Seca","Plataforma","Lowboy/Góndola","Cama Baja","Refrigerado","Tanque","Volteo","Jaula/Ganadero","Portacontenedor","Sin remolque"].map(t=><option key={t} value={t}>{t}</option>)}</select></div>:null;})()}
             <div className="field"><label>F. Salida</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))}/></div>
             <div className="field"><label>F. Regreso</label><DatePicker value={f.fechaReg} onChange={v=>setF(p=>({...p,fechaReg:v}))}/></div>
             <div className="field"><label>KM Salida</label><input value={f.kmSalida} onChange={ch("kmSalida")} type="number"/></div>
             <div className="field"><label>KM Llegada</label><input value={f.kmLlegada} onChange={ch("kmLlegada")} type="number"/></div>
+            <div className="field"><label>KM Extra (desvíos)</label><input value={f.kmExtra||0} onChange={ch("kmExtra")} type="number" min="0" placeholder="0" title="Km adicionales por desvíos o entregas extras"/></div>
             <div className="field s2"><label>Carga / Mercancía</label><input value={f.carga} onChange={ch("carga")}/></div>
           </div>
 
@@ -1463,6 +1477,8 @@ function TripModal({ trip, units, clientes = [], rutasCatalogo = [], onSaveRuta,
           <div className="fg">
             <div className="field"><label>Precio al Cliente ($)</label><input value={f.costoOfrecido} onChange={ch("costoOfrecido")} type="number" min="0"/></div>
             <div className="field"><label>Gastos Extras ($)</label><input value={f.gastosExtras} onChange={ch("gastosExtras")} type="number" min="0"/></div>
+            <div className="field"><label>Casetas ($)</label><input value={f.casetas||0} onChange={ch("casetas")} type="number" min="0" placeholder="0"/></div>
+            <div className="field"><label>Costo Estadías ($)</label><input value={f.costoEstadias||0} onChange={ch("costoEstadias")} type="number" min="0" placeholder="0"/></div>
             {f.tipoViaje==="foraneo" && <>
               <div className="field"><label>Costo Estadías ($)</label><input value={f.costoEstadias} onChange={ch("costoEstadias")} type="number" min="0"/></div>
               <div className="field"><label>Viáticos Operador ($) <span style={{fontSize:10,color:"var(--muted)"}}>comidas</span></label><input value={f.viaticos} onChange={ch("viaticos")} type="number" min="0" placeholder="0"/></div>
@@ -1538,9 +1554,6 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
                 {(proveedores||[]).filter(p=>p.tipoProv==="Transportista Externo"||!p.tipoProv).map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
               </select>
             </div>
-            {!f.proveedorId && (
-              <div className="field s2"><label>Nombre de empresa *</label><input value={f.empresa} onChange={ch("empresa")} placeholder="Ej: Transportes García"/></div>
-            )}
             <div className="field"><label>Contacto</label><input value={f.contacto} onChange={ch("contacto")} /></div>
             <div className="field"><label>Teléfono</label><input value={f.tel} onChange={ch("tel")} /></div>
           </div>
@@ -11571,6 +11584,14 @@ const AYUDA_DATA = [
     id: "viajes", icono: "🗺️", titulo: "Viajes & Logística",
     color: "var(--blue)",
     preguntas: [
+      { q: "¿Cómo funciona el catálogo de rutas y el auto-llenado?",
+        a: "Cada vez que guardas un viaje con origen y destino nuevos, la ruta queda guardada en el catálogo. La próxima vez que escribas el mismo origen, el sistema sugerirá destinos frecuentes (↗). Al seleccionar una ruta ya registrada, se auto-llena el tipo de viaje (Local/Foráneo) y la carga usual. Los km registrados del viaje anterior también se muestran como referencia. Esto facilita registrar viajes recurrentes al mismo cliente y ruta." },
+      { q: "¿Qué es el Tipo de Remolque y cuándo aparece?",
+        a: "El selector de Tipo de Remolque aparece cuando la unidad es un trailer, tractocamión, torton o rabón — ya que estas unidades pueden usar diferentes tipos según el viaje: Caja Seca, Plataforma, Lowboy/Góndola, Cama Baja, Refrigerado, Tanque, Volteo, etc. Para camionetas o camiones con carrocería fija, el tipo ya está definido en la unidad y no necesita selector." },
+      { q: "¿Qué son los KM Extra en un viaje?",
+        a: "El campo KM Extra permite registrar kilómetros adicionales por desvíos, entregas extras o rutas alternativas durante el viaje. Se suman al kilometraje total del viaje para mantener el control exacto del rendimiento de combustible y la facturación por distancia." },
+      { q: "¿Cómo se concilia el combustible con los viajes?",
+        a: "Los viajes propios incluyen el campo Combustible Extra ($) para registrar recargas en ruta. En Gráficas & Reportes → Viajes, el costo total incluye estos combustibles adicionales. Para el rendimiento exacto por unidad, ve a Gráficas → Unidades donde se calcula el rendimiento km/litro con base en los registros del módulo de Combustible." },
       { q: "¿Cómo registro un viaje propio?",
         a: "Ve a Flota → Viajes & Logística → '➕ Nuevo Viaje'. Primero elige el tipo: Viaje Local (campos básicos: precio y gastos extra) o Viaje Foráneo (todos los campos incluyendo Viáticos, Combustible Extra, Casetas y Estadías). Selecciona unidad, origen, destino, fechas, cliente y carga. Al terminar, agrega evidencias de entrega y guarda." },
       { q: "¿Qué son los Viáticos, Combustible Extra y Casetas en un viaje?",
@@ -11588,7 +11609,7 @@ const AYUDA_DATA = [
       { q: "¿Qué es la Hoja de Instrucción y cómo la genero?",
         a: "La Hoja de Instrucción es un documento para el operador con los detalles del viaje: folio, unidad, ruta, hora de cita en origen y destino, datos del cliente, carga y notas. Se genera desde Viajes & Logística → botón '📋 Hoja de Instrucción'. Puedes seleccionar la hora de cita con un menú desplegable (intervalos de 30 minutos). Usa '🖨️ Imprimir / PDF' para abrir el diálogo de impresión y guardarla como PDF." },
       { q: "¿Puedo filtrar los viajes por período?",
-        a: "Sí. En Viajes & Logística hay una barra de filtros con dos secciones: (1) Período: Todos, Esta semana, Mes, Trimestre, Año y 📅 Personalizado — al seleccionar Personalizado aparecen dos calendarios para elegir fecha De y Hasta exactas. (2) Tipo: Todos, Propios o Externos — para ver solo un tipo de viaje. Ambos filtros se combinan y el botón Imprimir Reporte genera el PDF únicamente con los viajes filtrados." },
+        a: "Sí. En Viajes & Logística hay una barra de filtros con: (1) Período: Todos, Esta semana, Mes, Trimestre, Año o 📅 Personalizado con fechas De/Hasta exactas. (2) Tipo: Todos, Propios o Externos. El reporte de impresión respeta ambos filtros." },
       { q: "¿Cómo descargo las evidencias de un viaje?",
         a: "En la tabla de viajes, haz clic en el ícono de cámara 📷 para ver las evidencias. Cada foto tiene un botón ⬇️ que descarga directamente como JPG a tu carpeta de Descargas. También puedes usar 'Descargar todas' para bajar todas las fotos del viaje de una vez. En celular, las fotos se guardan en el carrete de fotografías." },
     ]
