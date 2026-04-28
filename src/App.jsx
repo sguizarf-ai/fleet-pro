@@ -1381,7 +1381,7 @@ function MaintModal({ maint, units, proveedores, onSave, onClose }) {
     </div>
   );
 }
-function TripModal({ trip, units, clientes = [], rutasCatalogo = [], onSaveRuta, onSave, onClose }) {
+function TripModal({ trip, units, clientes = [], rutasCatalogo = [], tiposPersonalizados = [], onSaveRuta, onSave, onClose }) {
   const [f, setF] = useState(trip || { unidadId: "", esExterno: false, tipoViaje: "local", origen: "", destino: "", fecha: "", fechaReg: "", kmSalida: "", kmLlegada: "", kmExtra: 0, carga: "", cliente: "", status: "EN RUTA", notas: "", costoOfrecido: 0, gastosExtras: 0, costoEstadias: 0, casetas: 0, viaticos: 0, combustibleExtra: 0, tipoRemolque: "", evidencias: [] });
   const [uploading, setUploading] = useState(false);
   // Auto-fill route data from catalog when origen+destino selected
@@ -1435,15 +1435,16 @@ function TripModal({ trip, units, clientes = [], rutasCatalogo = [], onSaveRuta,
             {/* Origen con catálogo */}
             <div className="field" style={{position:"relative"}}>
               <label>Origen *</label>
-              <input value={f.origen} onChange={ch("origen")} placeholder="Ciudad, Estado" list="origenes-list"/>
+              <input value={f.origen} onChange={ch("origen")} placeholder="Ej: Caterpillar Santa Catarina / Zona Industrial" list="origenes-list"/>
               <datalist id="origenes-list">
                 {[...new Set((rutasCatalogo||[]).map(r=>r.origen).filter(Boolean))].map((o,i)=><option key={i} value={o}/>)}
               </datalist>
             </div>
+            <div style={{fontSize:10,color:"var(--muted)",padding:"2px 4px"}}>💡 Usa nombre empresa + ubicación: "Caterpillar Santa Catarina", "RIASA Huinala"</div>
             {/* Destino con catálogo */}
             <div className="field" style={{position:"relative"}}>
               <label>Destino</label>
-              <input value={f.destino} onChange={ch("destino")} placeholder="Ciudad, Estado" list="destinos-list"/>
+              <input value={f.destino} onChange={ch("destino")} placeholder="Ej: RIASA Huinala / Carr. Mty-Laredo" list="destinos-list"/>
               <datalist id="destinos-list">
                 {[...new Set((rutasCatalogo||[]).map(r=>r.destino).filter(Boolean))].map((d,i)=><option key={i} value={d}/>)}
               </datalist>
@@ -1459,7 +1460,32 @@ function TripModal({ trip, units, clientes = [], rutasCatalogo = [], onSaveRuta,
               )}
             </div>
             <div className="field s2"><label>Unidad *</label><select value={f.unidadId} onChange={ch("unidadId")} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}><option value="">— Seleccionar unidad —</option>{units.map(u=><option key={u.id} value={u.id}>{u.num} — {u.placas}</option>)}</select></div>
-            {(()=>{const u=(units||[]).find(u2=>u2.id===f.unidadId);const needsRemolque=!u||["TRAILER","TRACTO","TORTON","RABON"].some(t=>u.tipo?.toUpperCase().includes(t));return needsRemolque?<div className="field"><label>Tipo Remolque/Caja</label><select value={f.tipoRemolque||""} onChange={ch("tipoRemolque")} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}><option value="">— Tipo de caja/remolque —</option>{["Caja Seca","Plataforma","Lowboy/Góndola","Cama Baja","Refrigerado","Tanque","Volteo","Jaula/Ganadero","Portacontenedor","Sin remolque"].map(t=><option key={t} value={t}>{t}</option>)}</select></div>:null;})()}
+            {(()=>{
+              const u = (units||[]).find(u2=>u2.id===f.unidadId);
+              if (!f.unidadId) return null;
+              const tipoU = u?.tipo?.toUpperCase()||"";
+              const needsSelector = ["TRAILER","TRACTO","TORTON","RABON","FULL"].some(t=>tipoU.includes(t));
+              const tipoFijo = !needsSelector && u?.tipo ? u.tipo : null;
+              // Build remolque options: from tiposPersonalizados + standard types
+              const optsCustom = (tiposPersonalizados||[]).map(t=>t.nombre||t).filter(Boolean);
+              const optsBase = ["Caja Seca","Plataforma","Lowboy/Góndola","Cama Baja","Refrigerado","Tanque","Volteo","Jaula/Ganadero","Portacontenedor"];
+              const allOpts = [...new Set([...optsBase,...optsCustom])];
+              if (tipoFijo) return (
+                <div className="field">
+                  <label>Tipo de Unidad</label>
+                  <div style={{padding:"9px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)",fontSize:13,fontWeight:600,color:"var(--cyan)"}}>{tipoFijo}</div>
+                </div>
+              );
+              return needsSelector ? (
+                <div className="field">
+                  <label>Tipo Remolque/Caja *</label>
+                  <select value={f.tipoRemolque||""} onChange={ch("tipoRemolque")} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}>
+                    <option value="">— Seleccionar tipo de remolque —</option>
+                    {allOpts.map(t=><option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              ) : null;
+            })()}
             <div className="field"><label>F. Salida</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))}/></div>
             <div className="field"><label>F. Regreso</label><DatePicker value={f.fechaReg} onChange={v=>setF(p=>({...p,fechaReg:v}))}/></div>
             <div className="field"><label>KM Salida</label><input value={f.kmSalida} onChange={ch("kmSalida")} type="number"/></div>
@@ -1477,13 +1503,15 @@ function TripModal({ trip, units, clientes = [], rutasCatalogo = [], onSaveRuta,
           <div className="fg">
             <div className="field"><label>Precio al Cliente ($)</label><input value={f.costoOfrecido} onChange={ch("costoOfrecido")} type="number" min="0"/></div>
             <div className="field"><label>Gastos Extras ($)</label><input value={f.gastosExtras} onChange={ch("gastosExtras")} type="number" min="0"/></div>
-            <div className="field"><label>Casetas ($)</label><input value={f.casetas||0} onChange={ch("casetas")} type="number" min="0" placeholder="0"/></div>
-            <div className="field"><label>Costo Estadías ($)</label><input value={f.costoEstadias||0} onChange={ch("costoEstadias")} type="number" min="0" placeholder="0"/></div>
+            {f.tipoViaje==="local" && <>
+              <div className="field"><label>Casetas y Peajes ($)</label><input value={f.casetas||0} onChange={ch("casetas")} type="number" min="0" placeholder="0"/></div>
+              <div className="field"><label>Costo Estadías ($)</label><input value={f.costoEstadias||0} onChange={ch("costoEstadias")} type="number" min="0" placeholder="0"/></div>
+            </>}
             {f.tipoViaje==="foraneo" && <>
               <div className="field"><label>Costo Estadías ($)</label><input value={f.costoEstadias} onChange={ch("costoEstadias")} type="number" min="0"/></div>
               <div className="field"><label>Viáticos Operador ($) <span style={{fontSize:10,color:"var(--muted)"}}>comidas</span></label><input value={f.viaticos} onChange={ch("viaticos")} type="number" min="0" placeholder="0"/></div>
-              <div className="field"><label>Combustible Extra ($) <span style={{fontSize:10,color:"var(--muted)"}}>en ruta</span></label><input value={f.combustibleExtra} onChange={ch("combustibleExtra")} type="number" min="0" placeholder="0"/></div>
-              <div className="field"><label>Casetas ($) <span style={{fontSize:10,color:"var(--muted)"}}>peaje</span></label><input value={f.casetas} onChange={ch("casetas")} type="number" min="0" placeholder="0"/></div>
+              <div className="field"><label>Combustible ($) <span style={{fontSize:10,color:"var(--muted)"}}>en ruta</span></label><input value={f.combustibleExtra} onChange={ch("combustibleExtra")} type="number" min="0" placeholder="0"/></div>
+              <div className="field"><label>Casetas y Peajes ($)</label><input value={f.casetas} onChange={ch("casetas")} type="number" min="0" placeholder="0"/></div>
             </>}
           </div>
 
@@ -1527,7 +1555,7 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
   const utilidad = (Number(f.precioCliente) || 0) - (Number(f.costoPagar) || 0) - (Number(f.costoEstadias) || 0);
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal xwide" onClick={e => e.stopPropagation()}>
+      <div className="modal wide" onClick={e => e.stopPropagation()}>
         <div className="mhdr"><h3>{f.id ? "✏️ Editar" : "🚚 Nuevo Viaje Externo"}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
         <div className="mbody">
 
@@ -1536,8 +1564,8 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
           <div className="fg">
             <div className="field"><label>Cliente</label><select value={f.cliente||""} onChange={e=>setF(p=>({...p,cliente:e.target.value}))} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}><option value="">— Seleccionar cliente —</option>{(clientes||[]).filter(c=>c.status==="ACTIVO"||!c.status).map(c=><option key={c.id} value={c.nombreCorto||c.nombre}>{c.nombreCorto||c.nombre}</option>)}</select></div>
             <div className="field"><label>Fecha</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))}/></div>
-            <div className="field"><label>Origen *</label><input value={f.origen} onChange={ch("origen")} placeholder="Ciudad, Estado" list="ext-origenes-list"/><datalist id="ext-origenes-list">{[...new Set((rutasCatalogo||[]).map(r=>r.origen).filter(Boolean))].map((o,i)=><option key={i} value={o}/>)}</datalist></div>
-            <div className="field"><label>Destino</label><input value={f.destino} onChange={ch("destino")} placeholder="Ciudad, Estado" list="ext-destinos-list"/><datalist id="ext-destinos-list">{[...new Set((rutasCatalogo||[]).map(r=>r.destino).filter(Boolean))].map((d,i)=><option key={i} value={d}/>)}</datalist></div>
+            <div className="field"><label>Origen *</label><input value={f.origen} onChange={ch("origen")} placeholder="Ej: Caterpillar Sta. Catarina / Av. Industrial 200" list="ext-origenes-list"/><datalist id="ext-origenes-list">{[...new Set((rutasCatalogo||[]).map(r=>r.origen).filter(Boolean))].map((o,i)=><option key={i} value={o}/>)}</datalist></div>
+            <div className="field"><label>Destino</label><input value={f.destino} onChange={ch("destino")} placeholder="Ej: RIASA Huinala / Carr. Monterrey-Laredo km 15" list="ext-destinos-list"/><datalist id="ext-destinos-list">{[...new Set((rutasCatalogo||[]).map(r=>r.destino).filter(Boolean))].map((d,i)=><option key={i} value={d}/>)}</datalist></div>
             <div className="field s2"><label>Carga / Mercancía</label><input value={f.carga} onChange={ch("carga")} placeholder="Descripción de la carga"/></div>
           </div>
 
@@ -12982,7 +13010,7 @@ ${fac.fechaPago ? `<div style="margin-top:14px;background:#D4F4DD;border-radius:
       {modal?.type === "almacen" && <AlmacenModal item={modal.data} proveedores={proveedores} onSave={d=>ALC.save({...d,id:d.id||uid()})} onClose={()=>setModal(null)}/>}
       {modal?.type === "maint" && <MaintModal key={modal.data?.id || modal._ts || "new-maint"} maint={modal.data} units={units} proveedores={proveedores} onSave={m => MC.save({ ...m, id: m.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "fuel" && <FuelModal key={modal.data?.id || modal._ts || "new-fuel"} fuel={modal.data} units={units} onSave={f => FC.save({ ...f, id: f.id || uid() })} onClose={() => setModal(null)} onUpdateUnit={UC.save} />}
-      {modal?.type === "trip" && <TripModal key={modal.data?.id || modal._ts || "new-trip"} trip={modal.data} units={units} clientes={clientes} rutasCatalogo={rutasCatalogo} onSaveRuta={r=>setRutasCatalogo(p=>[...p,r])} onSave={t => TC.save({ ...t, id: t.id || uid(), esExterno: false })} onClose={() => setModal(null)} />}
+      {modal?.type === "trip" && <TripModal key={modal.data?.id || modal._ts || "new-trip"} trip={modal.data} units={units} clientes={clientes} rutasCatalogo={rutasCatalogo} tiposPersonalizados={tiposPersonalizados} onSaveRuta={r=>setRutasCatalogo(p=>[...p,r])} onSave={t => TC.save({ ...t, id: t.id || uid(), esExterno: false })} onClose={() => setModal(null)} />}
       {modal?.type === "gasto" && <GastoModal key={modal.data?.id || modal._ts || "new-gasto"} gasto={modal.data} proveedores={proveedores} onSave={g => GC.save({ ...g, id: g.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "pagoTransp" && (
         <PagoTransportistaModal
