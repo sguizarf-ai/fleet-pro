@@ -4983,6 +4983,8 @@ function Dashboard({
   const enTaller = units.filter(u => u.estado === "EN TALLER").length;
   const alta = maints.filter(m => m.realizado === "NO" && m.prioridad === "ALTA").length;
   
+  const tripsPendFact = (trips||[]).filter(t=>(t.tipoComprobante==="factura"||t.tipoComprobante==="remision")&&!t.facturaId&&!t.remisionId);
+  const tripsPendViejos = tripsPendFact.filter(t=>{const iso=toISO(t.fecha);return iso?Math.floor((new Date()-new Date(iso))/(1000*86400))>=5:false;});
   // Alertas de documentos
   const docAlert = docs.filter(d => { 
     const dy = daysUntil(d.vence); 
@@ -11866,6 +11868,7 @@ const AYUDA_DATA = [
     id: "facturacion", icono: "🧾", titulo: "Facturación y Clientes",
     color: "var(--green)",
     preguntas: [
+      { q: "cómo veo los viajes pendientes por facturar?", a: "En el módulo de Facturación, si hay viajes con tipo de comprobante asignado (Factura o Remisión) pero sin documento emitido, aparece un banner naranja con la lista. Los viajes con más de 3 días se marcan en rojo. También aparece alerta en Dashboard si llevan 5+ días." },
       { q: "¿Cómo creo una Remisión?",
         a: "Ve a Finanzas → Facturación → '📋 Remisión'. Llena: cliente (del catálogo o escribe el nombre), fecha, folio automático (REM-001...), y agrega los conceptos del servicio con descripción, cantidad, unidad e importe. La remisión NO genera IVA y NO es CFDI — es un documento interno de cobro. El folio se propone automáticamente. Tiene botón Imprimir para generar documento profesional tamaño carta." },
       { q: "¿Cómo creo una Carta Porte?",
@@ -12150,6 +12153,7 @@ function FacturacionPage({ facturas, clientes, viajes, onAdd, onAddRemision, onA
   const [q, setQ] = useState("");
   const [sf, setSf] = useState("TODOS");
   const [tfDoc, setTfDoc] = useState("TODOS"); // tipoDoc: TODOS/factura/remision
+  const [showPendFact, setShowPendFact] = useState(false);
   const [cf, setCf] = useState("TODOS");
   const [periodoFac, setPeriodoFac] = useState("todos");
   const [mesFac, setMesFac] = useState(new Date().getMonth());
@@ -12172,6 +12176,8 @@ function FacturacionPage({ facturas, clientes, viajes, onAdd, onAddRemision, onA
     return matchQ && matchS && matchC && matchT && enRangoFac(f.fechaEmision);
   });
 
+  const viajesPendFact = (viajes||[]).filter(t => (t.tipoComprobante==="factura"||t.tipoComprobante==="remision") && !t.facturaId && !t.remisionId);
+  const viajesPendDias = viajesPendFact.filter(t => { const d=new Date()-new Date(toISO(t.fecha)||t.fecha); return d/(1000*86400) >= 3; });
   const pendientes = facturas.filter(f => f.status === "PENDIENTE");
   const vencidas = facturas.filter(f => f.status === "VENCIDA");
   const porVencer = pendientes.filter(f => { const days = daysUntil(f.fechaVencimiento); return days !== null && days >= 0 && days <= 5; });
@@ -12199,6 +12205,50 @@ function FacturacionPage({ facturas, clientes, viajes, onAdd, onAddRemision, onA
           <div className="row-gap">
             <div className="sw"><span style={{ color: "var(--muted)" }}>🔍</span><input placeholder="Buscar factura..." value={q} onChange={e => setQ(e.target.value)} /></div>
             <button className="btn btn-cyan" onClick={onAddCartaPorte}>🗺️ Carta Porte</button>
+          {viajesPendFact.length > 0 && (
+            <div style={{background:"#FFF3E0",border:"1px solid #FF9800",borderRadius:8,padding:"8px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
+              <span style={{fontSize:12,color:"#E65100",fontWeight:600}}>
+                ⚠️ {viajesPendFact.length} viaje{viajesPendFact.length>1?"s":""} pendiente{viajesPendFact.length>1?"s":""} por {viajesPendFact.filter(t=>t.tipoComprobante==="factura").length > 0 ? "facturar" : ""}{viajesPendFact.filter(t=>t.tipoComprobante==="factura").length > 0 && viajesPendFact.filter(t=>t.tipoComprobante==="remision").length > 0 ? " / " : ""}{viajesPendFact.filter(t=>t.tipoComprobante==="remision").length > 0 ? "remisionar" : ""}
+                {viajesPendDias.length > 0 && <span style={{background:"#FF5722",color:"#fff",borderRadius:20,padding:"1px 8px",marginLeft:8,fontSize:11}}>🔥 {viajesPendDias.length} con más de 3 días</span>}
+              </span>
+              <button className="btn btn-ghost btn-sm" style={{fontSize:11,borderColor:"#FF9800",color:"#E65100"}} onClick={()=>setShowPendFact(v=>!v)}>
+                {showPendFact ? "▲ Ocultar" : "▼ Ver viajes"}
+              </button>
+            </div>
+          )}
+          {showPendFact && viajesPendFact.length > 0 && (
+            <div style={{marginBottom:16,borderRadius:10,overflow:"hidden",border:"1px solid var(--border)"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <thead><tr style={{background:"var(--bg2)"}}>
+                  <th style={{padding:"7px 10px",textAlign:"left",fontSize:10,color:"var(--muted)"}}>FECHA</th>
+                  <th style={{padding:"7px 10px",textAlign:"left",fontSize:10,color:"var(--muted)"}}>ORIGEN → DESTINO</th>
+                  <th style={{padding:"7px 10px",textAlign:"left",fontSize:10,color:"var(--muted)"}}>CLIENTE</th>
+                  <th style={{padding:"7px 10px",textAlign:"left",fontSize:10,color:"var(--muted)"}}>MONTO</th>
+                  <th style={{padding:"7px 10px",textAlign:"left",fontSize:10,color:"var(--muted)"}}>COMPROBANTE</th>
+                  <th style={{padding:"7px 10px",fontSize:10,color:"var(--muted)"}}>ACCIÓN</th>
+                </tr></thead>
+                <tbody>
+                  {viajesPendFact.map(t => {
+                    const dias = Math.floor((new Date()-new Date(toISO(t.fecha)||t.fecha))/(1000*86400));
+                    return (
+                      <tr key={t.id} style={{borderBottom:"1px solid var(--border)",background:dias>=3?"rgba(255,87,34,.04)":""}}>
+                        <td style={{padding:"7px 10px"}}>{t.fecha}{dias>=3&&<span style={{marginLeft:6,background:"#FF5722",color:"#fff",borderRadius:20,padding:"1px 6px",fontSize:10}}>🔥 {dias}d</span>}</td>
+                        <td style={{padding:"7px 10px",fontSize:11}}>{t.origen} → {t.destino||"—"}</td>
+                        <td style={{padding:"7px 10px"}}>{t.cliente||"—"}</td>
+                        <td style={{padding:"7px 10px",fontWeight:700,color:"var(--cyan)"}}>${Number(t.costoOfrecido||0).toLocaleString("es-MX",{minimumFractionDigits:2})}</td>
+                        <td style={{padding:"7px 10px"}}>{t.tipoComprobante==="factura"?<span style={{background:"#E3F2FD",color:"#1565C0",padding:"2px 7px",borderRadius:20,fontWeight:700,fontSize:10}}>🧾 Factura</span>:<span style={{background:"#FFF8E1",color:"#E65100",padding:"2px 7px",borderRadius:20,fontWeight:700,fontSize:10}}>📋 Remisión</span>}</td>
+                        <td style={{padding:"7px 10px"}}>
+                          {t.tipoComprobante==="factura"
+                            ? <button className="btn btn-cyan btn-xs" onClick={()=>onAdd&&onAdd(t.id)}>+ Facturar</button>
+                            : <button className="btn btn-ghost btn-xs" onClick={()=>onAddRemision&&onAddRemision(t.id)}>+ Remisión</button>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
             <button className="btn btn-cyan" onClick={onAddRemision}>📋 Remisión</button>
             <button className="btn btn-cyan" onClick={onAdd}>+ Nueva Factura</button>
           </div>
