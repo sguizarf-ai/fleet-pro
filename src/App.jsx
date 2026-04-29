@@ -1381,8 +1381,8 @@ function MaintModal({ maint, units, proveedores, onSave, onClose }) {
     </div>
   );
 }
-function TripModal({ trip, units, clientes = [], rutasCatalogo = [], tiposPersonalizados = [], onSaveRuta, onSave, onClose }) {
-  const [f, setF] = useState(trip || { unidadId: "", esExterno: false, tipoViaje: "local", origen: "", destino: "", fecha: "", kmRuta: "", kmExtra: "", carga: "", cliente: "", status: "EN RUTA", notas: "", costoOfrecido: "", gastosExtras: "", costoEstadias: "", casetas: "", viaticos: "", combustibleViaje: "", tipoRemolque: "", evidencias: [] });
+function TripModal({ trip, units, drivers = [], clientes = [], rutasCatalogo = [], tiposPersonalizados = [], onSaveRuta, onSave, onClose }) {
+  const [f, setF] = useState(trip || { unidadId: "", esExterno: false, tipoViaje: "local", origen: "", destino: "", fecha: "", kmRuta: "", kmExtra: "", carga: "", cliente: "", status: "EN RUTA", notas: "", costoOfrecido: "", gastosExtras: "", costoEstadias: "", casetas: "", viaticos: "", combustibleViaje: "", tipoRemolque: "", operadorViaje: "", evidencias: [] });
   const [uploading, setUploading] = useState(false);
   // Auto-fill route data from catalog when origen+destino selected
   useEffect(() => {
@@ -1459,7 +1459,7 @@ function TripModal({ trip, units, clientes = [], rutasCatalogo = [], tiposPerson
                 </div>
               )}
             </div>
-            <div className="field s2"><label>Unidad *</label><select value={f.unidadId} onChange={ch("unidadId")} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}><option value="">— Seleccionar unidad —</option>{units.map(u=><option key={u.id} value={u.id}>{u.num} — {u.placas}</option>)}</select></div>
+            <div className="field s2"><label>Unidad *</label><select value={f.unidadId} onChange={e=>{const u=(units||[]).find(u2=>u2.id===e.target.value);const drv=u&&u.operador?(drivers||[]).find(d=>d.id===u.operador||d.nombre===u.operador):null;setF(p=>({...p,unidadId:e.target.value,operadorViaje:drv?.nombre||u?.operador||""}));}} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}><option value="">— Seleccionar unidad —</option>{units.map(u=><option key={u.id} value={u.id}>{u.num} — {u.placas}{u.tipo?" ("+u.tipo+")":""}</option>)}</select></div>
             <div className="field">
               <label>Tipo de Unidad / Remolque</label>
               {(() => {
@@ -1473,6 +1473,13 @@ function TripModal({ trip, units, clientes = [], rutasCatalogo = [], tiposPerson
                   {allOpts.map(t=><option key={t} value={t}>{t}</option>)}
                 </select>;
               })()}
+            </div>
+            <div className="field s2">
+              <label>Operador del Viaje</label>
+              <select value={f.operadorViaje||""} onChange={ch("operadorViaje")} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}>
+                <option value="">— Operador de la unidad (por defecto) —</option>
+                {(drivers||[]).filter(d=>d.activo!==false).map(d=><option key={d.id} value={d.nombre}>{d.nombre}{d.licencia?" · Lic. "+d.licencia:""}</option>)}
+              </select>
             </div>
             <div className="field s2"><label>Fecha del Viaje *</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))}/></div>
             <div className="field"><label>KM de la Ruta</label><input value={f.kmRuta||""} onChange={ch("kmRuta")} type="number" min="0" placeholder="Km de origen a destino" title="Kilómetros totales de esta ruta"/></div>
@@ -13019,7 +13026,7 @@ ${fac.fechaPago ? `<div style="margin-top:14px;background:#D4F4DD;border-radius:
       {modal?.type === "almacen" && <AlmacenModal item={modal.data} proveedores={proveedores} onSave={d=>ALC.save({...d,id:d.id||uid()})} onClose={()=>setModal(null)}/>}
       {modal?.type === "maint" && <MaintModal key={modal.data?.id || modal._ts || "new-maint"} maint={modal.data} units={units} proveedores={proveedores} onSave={m => MC.save({ ...m, id: m.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "fuel" && <FuelModal key={modal.data?.id || modal._ts || "new-fuel"} fuel={modal.data} units={units} onSave={f => FC.save({ ...f, id: f.id || uid() })} onClose={() => setModal(null)} onUpdateUnit={UC.save} />}
-      {modal?.type === "trip" && <TripModal key={modal.data?.id || modal._ts || "new-trip"} trip={modal.data} units={units} clientes={clientes} rutasCatalogo={rutasCatalogo} tiposPersonalizados={tiposPersonalizados} onSaveRuta={r=>setRutasCatalogo(p=>[...p,r])} onSave={t => {
+      {modal?.type === "trip" && <TripModal key={modal.data?.id || modal._ts || "new-trip"} trip={modal.data} units={units} drivers={drivers} clientes={clientes} rutasCatalogo={rutasCatalogo} tiposPersonalizados={tiposPersonalizados} onSaveRuta={r=>setRutasCatalogo(p=>[...p,r])} onSave={t => {
                 const saved = { ...t, id: t.id || uid(), esExterno: false };
                 TC.save(saved);
                 // Update unit kmActual if this is a new trip with kmTotal
