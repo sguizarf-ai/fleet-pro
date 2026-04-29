@@ -4787,7 +4787,7 @@ function printTripsReport({ trips, units, externos = [], companyLogo = "", compa
   w.document.close(); w.focus(); setTimeout(() => w.print(), 500);
 }
 
-function printTripProfit({ trip, unit, fuels, maints, externos = [] }) {
+function printTripProfit({ trip, unit, fuels, maints, externos = [], trips = [] }) {
   const w = window.open("", "_blank");
   const isExt = trip.esExterno;
   const ext = isExt ? externos.find(e => e.id === trip.unidadId) : null;
@@ -4817,40 +4817,111 @@ function printTripProfit({ trip, unit, fuels, maints, externos = [] }) {
       <p style="margin-top:16px;font-size:10px;color:#999">Generado: ${new Date().toLocaleDateString("es-MX")}</p>
     </body></html>`);
   } else {
-    const dist = Number(trip.kmTotal) || Number(trip.kmRuta) || 0;
-    const fuelTrip = fuels.filter(f => { const iso = toISO(f.fecha); const tiso = toISO(trip.fecha); return f.unidadId === trip.unidadId && iso >= tiso });
-    const costoComb = fuelTrip.reduce((a, f) => a + (Number(f.litros) || 0) * (Number(f.precio) || 0), 0);
-    const maintTrip = maints.filter(m => { const iso = toISO(m.fechaEjec); const tiso = toISO(trip.fecha); return m.unidadId === trip.unidadId && iso >= tiso && m.realizado === "SI" });
-    const costoMaint = maintTrip.reduce((a, m) => a + (Number(m.costoRef) || 0) + (Number(m.costoMO) || 0), 0);
-    const deprec = (Number(unit.deprecAnual) || 0) / 365 * 7;
-    const gastos = (Number(trip.gastosExtras) || 0) + (Number(trip.costoEstadias) || 0);
-    const costoTotal = costoComb + costoMaint + deprec + gastos;
+    const dist    = Number(trip.kmTotal) || Number(trip.kmRuta) || 0;
     const ingreso = Number(trip.costoOfrecido) || 0;
-    const utilidad = ingreso - costoTotal;
+
+    // ── Costos directos del viaje (capturados al crear el viaje) ──────────────
+    const costoComb    = Number(trip.combustibleViaje) || Number(trip.combustibleExtra) || 0;
+    const costoCasetas = Number(trip.casetas) || 0;
+    const costoEstad   = Number(trip.costoEstadias) || 0;
+    const costoViat    = Number(trip.viaticos) || 0;
+    const costoGastos  = Number(trip.gastosExtras) || 0;
+
+    // ── Comisión del operador ─────────────────────────────────────────────────
+    const comisionOp = Number(trip.comisionViaje) > 0
+      ? Number(trip.comisionViaje)
+      : ingreso * (Number(unit?.operadorPct || 10) / 100);
+    const pctCom = Number(trip.comisionViaje) > 0
+      ? `$${Number(trip.comisionViaje).toLocaleString("es-MX",{minimumFractionDigits:2})} (fija)`
+      : `${(ingreso > 0 ? (comisionOp/ingreso*100).toFixed(1) : 0)}% del ingreso`;
+
+    // ── Mantenimiento proporcional (costo total del mes / viajes del mes) ─────
+    // Usamos el costoMaint de mantenimientos recientes de la unidad
+    const maintUnit = maints.filter(m => m.unidadId === unit?.id);
+    const costoMaintTotal = maintUnit.reduce((a,m) => a+(Number(m.costoRef)||0)+(Number(m.costoMO)||0), 0);
+    const viajesUnit = trips ? trips.filter(t => t.unidadId === unit?.id && !t.esExterno).length : 1;
+    const costoMaintProp = viajesUnit > 0 ? costoMaintTotal / Math.max(viajesUnit, 1) : 0;
+
+    // ── Depreciación proporcional (anual / 365 * días estimados del viaje) ────
+    const diasViaje = trip.tipoViaje === "foraneo" ? 2 : 1;
+    const deprec    = (Number(unit?.deprecAnual) || 0) / 365 * diasViaje;
+
+    // ── Totales ───────────────────────────────────────────────────────────────
+    const costosDirectos = costoComb + costoCasetas + costoEstad + costoViat + costoGastos;
+    const costoTotal     = costosDirectos + comisionOp + costoMaintProp + deprec;
+    const utilidad       = ingreso - costoTotal;
+    const margen         = ingreso > 0 ? ((utilidad / ingreso) * 100).toFixed(1) : 0;
+    const colorUtil      = utilidad >= 0 ? "#00864E" : "#C41E3A";
+    const operadorNombre = trip.operadorViaje || unit?.operador || "—";
+
     w.document.write(`<!DOCTYPE html><html><head><title>Utilidad Viaje</title><style>
-    body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:20px;max-width:700px;margin:0 auto}
-    h1{font-size:18px;border-bottom:2px solid #0099CC;padding-bottom:6px;margin-bottom:14px;color:#0099CC}
-    .row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #ddd}
-    .total{font-weight:700;font-size:16px;background:#E8F5FA;padding:12px;margin-top:12px;border-radius:6px;border:1px solid #B3E0F2}
-    @media print{@page{size:A4;margin:12mm}}
-    </style></head><body>`);
-    w.document.write(`
-      <h1>💰 REPORTE DE UTILIDAD POR VIAJE</h1>
-      <p><strong>Unidad:</strong> ${unit.num} — ${unit.placas}</p>
-      <p><strong>Ruta:</strong> ${trip.origen} → ${trip.destino}</p>
-      <p><strong>Fecha:</strong> ${trip.fecha}</p>
-      <p><strong>Distancia:</strong> ${fmtN(dist)} km</p>
-      <hr style="margin:16px 0">
-      <h2 style="font-size:14px;margin-bottom:10px">INGRESOS</h2>
-      <div class="row"><span>Costo ofrecido al cliente</span><span>${fmt$(ingreso)}</span></div>
-      <h2 style="font-size:14px;margin:14px 0 10px">COSTOS</h2>
-      <div class="row"><span>Combustible</span><span>${fmt$(costoComb)}</span></div>
-      <div class="row"><span>Mantenimiento</span><span>${fmt$(costoMaint)}</span></div>
-      <div class="row"><span>Depreciación (7 días aprox)</span><span>${fmt$(deprec)}</span></div>
-      <div class="row"><span>Gastos extras + estadías</span><span>${fmt$(gastos)}</span></div>
-      <div class="row" style="font-weight:700;background:#fafafa"><span>Total costos</span><span>${fmt$(costoTotal)}</span></div>
-      <div class="total" style="color:${utilidad >= 0 ? "#00864E" : "#C41E3A"}"><span>UTILIDAD NETA:</span> <span style="float:right">${fmt$(utilidad)}</span></div>
-      <p style="margin-top:16px;font-size:10px;color:#999">Generado: ${new Date().toLocaleDateString("es-MX")}</p>
+    *{box-sizing:border-box}
+    body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:24px 32px;max-width:750px;margin:0 auto}
+    h1{font-size:18px;color:#0099CC;border-bottom:3px solid #0099CC;padding-bottom:8px;margin-bottom:16px}
+    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+    .info-box{background:#f5f7fa;border-radius:6px;padding:8px 12px;font-size:11px}
+    .info-box strong{display:block;color:#0099CC;font-size:9px;text-transform:uppercase;margin-bottom:2px}
+    .section{font-size:13px;font-weight:700;color:#333;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid #ddd}
+    .row{display:flex;justify-content:space-between;padding:6px 8px;border-bottom:1px solid #f0f0f0;font-size:12px}
+    .row.sub{color:#666;padding-left:20px}
+    .row.bold{font-weight:700;background:#f5f7fa}
+    .row.direct{color:#C41E3A}
+    .nota{font-size:10px;color:#999;font-style:italic;margin-left:8px}
+    .total-box{margin-top:16px;padding:16px 20px;border-radius:10px;border:2px solid ${colorUtil};background:${utilidad>=0?"#E8F8EE":"#FFECEC"}}
+    .total-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+    .total-label{font-size:14px;font-weight:700;color:${colorUtil}}
+    .total-val{font-size:26px;font-weight:800;color:${colorUtil}}
+    .margen-box{display:flex;gap:16px;margin-top:8px;padding-top:8px;border-top:1px solid ${utilidad>=0?"#b2dfdb":"#ffcdd2"}}
+    .margen-item{text-align:center;flex:1}
+    .margen-item .lbl{font-size:9px;color:#888;text-transform:uppercase}
+    .margen-item .val{font-size:18px;font-weight:800;color:${colorUtil}}
+    .aviso{margin-top:14px;padding:8px 12px;background:#FFF8E1;border-radius:6px;font-size:10px;color:#795548;border:1px solid #FFD54F}
+    footer{margin-top:20px;font-size:10px;color:#aaa;text-align:right}
+    @media print{@page{size:Letter;margin:12mm}}
+    </style></head><body>
+    <h1>💰 REPORTE DE UTILIDAD POR VIAJE</h1>
+    <div class="info-grid">
+      <div class="info-box"><strong>Unidad</strong>${unit?.num || "—"} — ${unit?.placas || "—"} (${unit?.tipo || "—"})</div>
+      <div class="info-box"><strong>Operador</strong>${operadorNombre}</div>
+      <div class="info-box"><strong>Ruta</strong>${trip.origen || "—"} → ${trip.destino || "—"}</div>
+      <div class="info-box"><strong>Fecha / Tipo</strong>${trip.fecha || "—"} · ${trip.tipoViaje === "foraneo" ? "Foráneo" : "Local"}</div>
+      <div class="info-box"><strong>Distancia</strong>${dist > 0 ? fmtN(dist) + " km" : "—"}</div>
+      <div class="info-box"><strong>Cliente</strong>${trip.cliente || "—"}</div>
+    </div>
+
+    <div class="section">📥 INGRESOS</div>
+    <div class="row bold"><span>Precio cobrado al cliente</span><span>$${ingreso.toLocaleString("es-MX",{minimumFractionDigits:2})}</span></div>
+
+    <div class="section">💸 COSTOS DIRECTOS DEL VIAJE</div>
+    <div class="row sub direct"><span>Combustible del viaje</span><span>$${costoComb.toLocaleString("es-MX",{minimumFractionDigits:2})}${costoComb===0?" ⚠️ No capturado":""}</span></div>
+    <div class="row sub direct"><span>Casetas y peajes</span><span>$${costoCasetas.toLocaleString("es-MX",{minimumFractionDigits:2})}</span></div>
+    <div class="row sub direct"><span>Estadías</span><span>$${costoEstad.toLocaleString("es-MX",{minimumFractionDigits:2})}</span></div>
+    <div class="row sub direct"><span>Viáticos del operador</span><span>$${costoViat.toLocaleString("es-MX",{minimumFractionDigits:2})}</span></div>
+    <div class="row sub direct"><span>Gastos extras</span><span>$${costoGastos.toLocaleString("es-MX",{minimumFractionDigits:2})}</span></div>
+    <div class="row bold"><span>Subtotal costos directos</span><span>$${costosDirectos.toLocaleString("es-MX",{minimumFractionDigits:2})}</span></div>
+
+    <div class="section">👷 COSTO DE OPERACIÓN</div>
+    <div class="row sub"><span>Comisión operador <span class="nota">(${pctCom})</span></span><span>$${comisionOp.toLocaleString("es-MX",{minimumFractionDigits:2})}</span></div>
+    <div class="row sub"><span>Mantenimiento proporcional <span class="nota">(total $${fmtN(costoMaintTotal)} ÷ ${viajesUnit} viajes)</span></span><span>$${costoMaintProp.toLocaleString("es-MX",{minimumFractionDigits:2})}</span></div>
+    <div class="row sub"><span>Depreciación <span class="nota">(${diasViaje} día${diasViaje>1?"s":""})</span></span><span>$${deprec.toLocaleString("es-MX",{minimumFractionDigits:2})}</span></div>
+    <div class="row bold"><span>Subtotal operación</span><span>$${(comisionOp+costoMaintProp+deprec).toLocaleString("es-MX",{minimumFractionDigits:2})}</span></div>
+
+    <div class="row bold" style="margin-top:8px;background:#e8eaf6"><span>TOTAL COSTOS</span><span>$${costoTotal.toLocaleString("es-MX",{minimumFractionDigits:2})}</span></div>
+
+    <div class="total-box">
+      <div class="total-row">
+        <span class="total-label">UTILIDAD NETA DEL VIAJE</span>
+        <span class="total-val">$${utilidad.toLocaleString("es-MX",{minimumFractionDigits:2})}</span>
+      </div>
+      <div class="margen-box">
+        <div class="margen-item"><div class="lbl">Margen %</div><div class="val">${margen}%</div></div>
+        <div class="margen-item"><div class="lbl">Ingreso</div><div class="val">$${(ingreso/1000).toFixed(1)}k</div></div>
+        <div class="margen-item"><div class="lbl">Costos</div><div class="val">$${(costoTotal/1000).toFixed(1)}k</div></div>
+        <div class="margen-item"><div class="lbl">Viajes unidad (total)</div><div class="val">${viajesUnit}</div></div>
+      </div>
+    </div>
+    ${costoComb === 0 ? `<div class="aviso">⚠️ El costo de combustible no fue capturado en este viaje. Para mayor precisión, registra el monto en el campo "Combustible del Viaje ($)" al crear el viaje.</div>` : ""}
+    <footer>Generado: ${new Date().toLocaleDateString("es-MX",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</footer>
     </body></html>`);
   }
   w.document.close(); w.focus(); setTimeout(() => w.print(), 500);
@@ -6575,7 +6646,7 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
                      : <span style={{background:"#FFE5E5",color:"#C62828",padding:"2px 7px",borderRadius:20,fontWeight:700,fontSize:10}}>⏳ Pendiente</span>}
                    </td>
                    <td>{hasEvid ? <button className="btn btn-ghost btn-xs" onClick={() => setEvidModal({ trip: t, unit: u, ext: externos.find(e => e.id === t.unidadId) })} title="Ver y enviar evidencias">📸 {t.evidencias.length}</button> : <span style={{ color: "var(--muted)" }}>—</span>}</td>
-                   {isAdmin && <td><button className="btn btn-ghost btn-xs" onClick={() => printTripProfit({ trip: t, unit: u, fuels, maints, externos })} title="Ver utilidad del viaje">💰</button></td>}
+                   {isAdmin && <td><button className="btn btn-ghost btn-xs" onClick={() => printTripProfit({ trip: t, unit: u, fuels, maints, externos, trips })} title="Ver utilidad del viaje">💰</button></td>}
                   <td><div className="acts">
                     <button className="btn btn-ghost btn-sm" onClick={() => t.tipo === "PROPIO" ? onEdit(t) : onEditExt(t)}>✏️</button>
                     {(t.tipo === "PROPIO" || t._esExternoRec) && <button className="btn btn-red btn-sm" onClick={() => t.tipo === "PROPIO" ? onDelete(t.id) : onDeleteExt(t.id)}>🗑</button>}
