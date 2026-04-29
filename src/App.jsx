@@ -1460,32 +1460,20 @@ function TripModal({ trip, units, clientes = [], rutasCatalogo = [], tiposPerson
               )}
             </div>
             <div className="field s2"><label>Unidad *</label><select value={f.unidadId} onChange={ch("unidadId")} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}><option value="">— Seleccionar unidad —</option>{units.map(u=><option key={u.id} value={u.id}>{u.num} — {u.placas}</option>)}</select></div>
-            {(()=>{
-              const u = (units||[]).find(u2=>u2.id===f.unidadId);
-              if (!f.unidadId) return null;
-              const tipoU = u?.tipo?.toUpperCase()||"";
-              const needsSelector = ["TRAILER","TRACTO","TORTON","RABON","FULL"].some(t=>tipoU.includes(t));
-              const tipoFijo = !needsSelector && u?.tipo ? u.tipo : null;
-              // Build remolque options: from tiposPersonalizados + standard types
-              const optsCustom = (tiposPersonalizados||[]).filter(t=>typeof t === "string" ? t : t?.nombre).map(t=>typeof t === "string" ? t : t.nombre);
-              const optsBase = ["Caja Seca","Plataforma","Lowboy/Góndola","Cama Baja","Refrigerado","Tanque","Volteo","Jaula/Ganadero","Portacontenedor"];
-              const allOpts = [...new Set([...optsBase,...optsCustom])];
-              if (tipoFijo) return (
-                <div className="field">
-                  <label>Tipo de Unidad</label>
-                  <div style={{padding:"9px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)",fontSize:13,fontWeight:600,color:"var(--cyan)"}}>{tipoFijo}</div>
-                </div>
-              );
-              return needsSelector ? (
-                <div className="field">
-                  <label>Tipo de Remolque/Unidad</label>
-                  <select value={f.tipoRemolque||""} onChange={ch("tipoRemolque")} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}>
-                    <option value="">— Seleccionar tipo de remolque —</option>
-                    {allOpts.map(t=><option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-              ) : null;
-            })()}
+            <div className="field">
+              <label>Tipo de Unidad / Remolque</label>
+              {(() => {
+                const u = (units||[]).find(u2=>u2.id===f.unidadId);
+                if (!f.unidadId) return <div style={{padding:"9px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)",color:"var(--muted)",fontSize:12}}>Selecciona una unidad primero</div>;
+                const esTrailer = ["TRACTOCAMIÓN","TRAILER","TRACTO","TORTON","RABÓN","FULL","RABON"].some(t=>(u?.tipo||"").toUpperCase().includes(t.toUpperCase()));
+                const allOpts = [...new Set([...TIPOS, ...(tiposPersonalizados||[]).filter(t=>typeof t==="string")])];
+                if (!esTrailer && u?.tipo) return <div style={{padding:"9px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg2)",fontWeight:600,color:"var(--cyan)"}}>{u.tipo}</div>;
+                return <select value={f.tipoRemolque||""} onChange={ch("tipoRemolque")} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}>
+                  <option value="">— Seleccionar tipo —</option>
+                  {allOpts.map(t=><option key={t} value={t}>{t}</option>)}
+                </select>;
+              })()}
+            </div>
             <div className="field s2"><label>Fecha del Viaje *</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))}/></div>
             <div className="field"><label>KM de la Ruta</label><input value={f.kmRuta||""} onChange={ch("kmRuta")} type="number" min="0" placeholder="Km de origen a destino" title="Kilómetros totales de esta ruta"/></div>
             <div className="field"><label>KM Extra (desvíos)</label><input value={f.kmExtra||""} onChange={ch("kmExtra")} type="number" min="0" placeholder="" title="Km adicionales por desvíos o entregas extras"/></div>
@@ -1587,6 +1575,16 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
 
           {/* 3. DATOS DE LA UNIDAD */}
           <div className="sec-lbl">🚛 Datos de la Unidad</div>
+          <div className="fg">
+            <div className="field s2"><label>Marca / Modelo</label><input value={f.marcaModelo||""} onChange={ch("marcaModelo")} placeholder="Ej: Kenworth T680, Freightliner Cascadia..."/></div>
+            <div className="field"><label>Año</label><input value={f.anioUnidad||""} onChange={ch("anioUnidad")} placeholder="Ej: 2017" type="number" min="1990" max="2030"/></div>
+            <div className="field"><label>Tipo de Remolque</label>
+              <select value={f.tipoRemolqueExt||""} onChange={ch("tipoRemolqueExt")} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}>
+                <option value="">— Sin remolque / No aplica —</option>
+                {[...TIPOS, ...tiposPersonalizados].map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+          </div>
           <div className="fg">
             <div className="field s2">
               <label>Tipo de Unidad</label>
@@ -13027,7 +13025,18 @@ ${fac.fechaPago ? `<div style="margin-top:14px;background:#D4F4DD;border-radius:
       {modal?.type === "almacen" && <AlmacenModal item={modal.data} proveedores={proveedores} onSave={d=>ALC.save({...d,id:d.id||uid()})} onClose={()=>setModal(null)}/>}
       {modal?.type === "maint" && <MaintModal key={modal.data?.id || modal._ts || "new-maint"} maint={modal.data} units={units} proveedores={proveedores} onSave={m => MC.save({ ...m, id: m.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "fuel" && <FuelModal key={modal.data?.id || modal._ts || "new-fuel"} fuel={modal.data} units={units} onSave={f => FC.save({ ...f, id: f.id || uid() })} onClose={() => setModal(null)} onUpdateUnit={UC.save} />}
-      {modal?.type === "trip" && <TripModal key={modal.data?.id || modal._ts || "new-trip"} trip={modal.data} units={units} clientes={clientes} rutasCatalogo={rutasCatalogo} tiposPersonalizados={tiposPersonalizados} onSaveRuta={r=>setRutasCatalogo(p=>[...p,r])} onSave={t => TC.save({ ...t, id: t.id || uid(), esExterno: false })} onClose={() => setModal(null)} />}
+      {modal?.type === "trip" && <TripModal key={modal.data?.id || modal._ts || "new-trip"} trip={modal.data} units={units} clientes={clientes} rutasCatalogo={rutasCatalogo} tiposPersonalizados={tiposPersonalizados} onSaveRuta={r=>setRutasCatalogo(p=>[...p,r])} onSave={t => {
+                const saved = { ...t, id: t.id || uid(), esExterno: false };
+                TC.save(saved);
+                // Update unit kmActual if this is a new trip with kmTotal
+                if (saved.kmTotal && saved.unidadId && !t.id) {
+                  const u = units.find(u=>u.id===saved.unidadId);
+                  if (u) {
+                    const newKm = (Number(u.kmActual)||0) + (Number(saved.kmTotal)||0);
+                    UC.save({ ...u, kmActual: newKm });
+                  }
+                }
+              }} onClose={() => setModal(null)} />}
       {modal?.type === "gasto" && <GastoModal key={modal.data?.id || modal._ts || "new-gasto"} gasto={modal.data} proveedores={proveedores} onSave={g => GC.save({ ...g, id: g.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "pagoTransp" && (
         <PagoTransportistaModal
