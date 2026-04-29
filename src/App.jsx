@@ -1578,14 +1578,8 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
           <div className="fg">
             <div className="field s2"><label>Marca / Modelo</label><input value={f.marcaModelo||""} onChange={ch("marcaModelo")} placeholder="Ej: Kenworth T680, Freightliner Cascadia..."/></div>
             <div className="field"><label>Año</label><input value={f.anioUnidad||""} onChange={ch("anioUnidad")} placeholder="Ej: 2017" type="number" min="1990" max="2030"/></div>
-            <div className="field"><label>Tipo de Remolque</label>
-              <select value={f.tipoRemolqueExt||""} onChange={ch("tipoRemolqueExt")} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}>
-                <option value="">— Sin remolque / No aplica —</option>
-                {[...TIPOS, ...tiposPersonalizados].map(t=><option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-          </div>
           <div className="fg">
+          </div>
             <div className="field s2">
               <label>Tipo de Unidad</label>
               <div style={{ display: "flex", gap: 8 }}>
