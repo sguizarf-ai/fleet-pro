@@ -1397,7 +1397,7 @@ function TripModal({ trip, units, clientes = [], rutasCatalogo = [], tiposPerson
     }
   }, [f.origen, f.destino]);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
-  const dist = f.kmRuta ? Number(f.kmRuta) : null;
+  const dist = f.kmRuta ? (Number(f.kmRuta)||0) + (Number(f.kmExtra)||0) : null;
   const ok = (_e) => {
     if (!f.unidadId || !f.origen) return alert("Unidad y origen requeridos");
     // Save ruta to catalog if not already present
