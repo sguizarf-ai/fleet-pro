@@ -1382,7 +1382,7 @@ function MaintModal({ maint, units, proveedores, onSave, onClose }) {
   );
 }
 function TripModal({ trip, units, drivers = [], clientes = [], rutasCatalogo = [], tiposPersonalizados = [], onSaveRuta, onSave, onClose }) {
-  const [f, setF] = useState(trip || { unidadId: "", esExterno: false, tipoViaje: "local", origen: "", destino: "", fecha: "", kmRuta: "", kmExtra: "", carga: "", cliente: "", status: "EN RUTA", notas: "", costoOfrecido: "", gastosExtras: "", costoEstadias: "", casetas: "", viaticos: "", combustibleViaje: "", tipoRemolque: "", operadorViaje: "", comisionViaje: "", evidencias: [] });
+  const [f, setF] = useState(trip || { unidadId: "", esExterno: false, tipoViaje: "local", origen: "", destino: "", fecha: "", kmRuta: "", kmExtra: "", carga: "", cliente: "", status: "EN RUTA", notas: "", costoOfrecido: "", gastosExtras: "", costoEstadias: "", casetas: "", viaticos: "", combustibleViaje: "", tipoRemolque: "", operadorViaje: "", comisionViaje: "", tipoComprobante: "", evidencias: [] });
   const [uploading, setUploading] = useState(false);
   // Auto-fill route data from catalog when origen+destino selected
   useEffect(() => {
@@ -1403,7 +1403,7 @@ function TripModal({ trip, units, drivers = [], clientes = [], rutasCatalogo = [
     // Save ruta to catalog if not already present
     if (onSaveRuta && f.origen && f.destino) {
       const exists = (rutasCatalogo||[]).some(r=>r.origen===f.origen&&r.destino===f.destino);
-      if (!exists) onSaveRuta({origen:f.origen, destino:f.destino, tipoViaje:f.tipoViaje, kmRuta:Number(f.kmRuta)||0, carga:f.carga||""});
+      if (!exists) onSaveRuta({origen:f.origen, destino:f.destino, tipoViaje:f.tipoViaje, kmRuta:Number(f.kmRuta)||0, carga:f.carga||"", tipoComprobante:f.tipoComprobante||""});
     }
     onSave({ ...f, id: f.id || uid() });
   };
@@ -1522,6 +1522,22 @@ function TripModal({ trip, units, drivers = [], clientes = [], rutasCatalogo = [
             </div>
           )}
 
+            <div className="field s2">
+              <label>Tipo de Comprobante</label>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {[["","— Sin comprobante —"],["factura","🧾 Factura (con IVA)"],["remision","📋 Remisión (sin IVA)"]].map(([v,lbl])=>(
+                  <button key={v} type="button" onClick={()=>setF(p=>({...p,tipoComprobante:v}))}
+                    style={{padding:"8px 14px",borderRadius:8,border:`2px solid ${f.tipoComprobante===v?"var(--cyan)":"var(--border)"}`,
+                    background:f.tipoComprobante===v?"var(--cyan)":"var(--bg0)",
+                    color:f.tipoComprobante===v?"#fff":"var(--text)",fontWeight:600,fontSize:12,cursor:"pointer",flex:1}}>
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+              {f.tipoComprobante && <div style={{fontSize:11,color:"var(--muted)",marginTop:4}}>
+                💡 Se recordará para viajes futuros en esta ruta con este cliente
+              </div>}
+            </div>
           <div className="field s2" style={{marginBottom:12}}><label>Notas</label><textarea value={f.notas} onChange={ch("notas")} rows={3} style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",resize:"vertical"}}/></div>
 
           <MultiPhotoInput values={f.evidencias || []} onChange={v => setF(p => ({ ...p, evidencias: v }))} onUploading={setUploading} label="📸 Evidencias de Entrega" />
@@ -1533,7 +1549,7 @@ function TripModal({ trip, units, drivers = [], clientes = [], rutasCatalogo = [
 }
 
 function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], proveedores = [], clientes = [], rutasCatalogo = [], onSaveRuta, onNuevoProveedor }) {
-  const [f, setF] = useState(externo || { fecha: "", empresa: "", contacto: "", tel: "", tipoUnidad: "", placas: "", color: "", eco: "", operador: "", seguroOp: "", seguroVeh: "", herramientas: [], origen: "", destino: "", cliente: "", carga: "", costoPagar: "", precioCliente: "", costoEstadias: "", status: "EN RUTA", notas: "", evidencias: [] });
+  const [f, setF] = useState(externo || { fecha: "", empresa: "", contacto: "", tel: "", tipoUnidad: "", placas: "", color: "", eco: "", operador: "", seguroOp: "", seguroVeh: "", herramientas: [], origen: "", destino: "", cliente: "", carga: "", costoPagar: "", precioCliente: "", costoEstadias: "", status: "EN RUTA", notas: "", tipoComprobante: "", evidencias: [] });
   const [uploading, setUploading] = useState(false);
   const [nuevoTipo, setNuevoTipo] = useState("");
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
@@ -1631,6 +1647,19 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
           </div>}
 
           {/* 5. NOTAS */}
+          <div className="field s2">
+            <label>Tipo de Comprobante</label>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {[["","— Sin comprobante —"],["factura","🧾 Factura (con IVA)"],["remision","📋 Remisión (sin IVA)"]].map(([v,lbl])=>(
+                <button key={v} type="button" onClick={()=>setF(p=>({...p,tipoComprobante:v}))}
+                  style={{padding:"8px 14px",borderRadius:8,border:`2px solid ${f.tipoComprobante===v?"var(--cyan)":"var(--border)"}`,
+                  background:f.tipoComprobante===v?"var(--cyan)":"var(--bg0)",
+                  color:f.tipoComprobante===v?"#fff":"var(--text)",fontWeight:600,fontSize:12,cursor:"pointer",flex:1}}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="field s2" style={{marginBottom:12}}><label>Notas</label><textarea value={f.notas} onChange={ch("notas")} rows={2} style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",resize:"vertical"}}/></div>
 
 
@@ -6641,7 +6670,17 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
                    <td style={{ fontSize: 11, color: "var(--text)" }}>{drv || "—"}</td>
                    <td style={{ fontSize: 12 }}>{t.cliente || "—"}</td>
                    <td style={{ fontSize: 11 }}>
-                     {t.facturaId ? <span style={{background:"#D4F4DD",color:"#00864E",padding:"2px 7px",borderRadius:20,fontWeight:700,fontSize:10}}>✅ Facturado</span>
+                   <td style={{ fontSize: 11 }}>
+                     {t.facturaId
+                       ? <span style={{background:"#D4F4DD",color:"#00864E",padding:"2px 7px",borderRadius:20,fontWeight:700,fontSize:10}}>✅ Facturado</span>
+                       : t.remisionId
+                         ? <span style={{background:"#FFF8E1",color:"#795548",padding:"2px 7px",borderRadius:20,fontWeight:700,fontSize:10}}>📋 Remisionado</span>
+                         : t.tipoComprobante === "factura"
+                           ? <span style={{background:"#E3F2FD",color:"#1565C0",padding:"2px 7px",borderRadius:20,fontWeight:700,fontSize:10}}>🧾 Req. Factura</span>
+                           : t.tipoComprobante === "remision"
+                             ? <span style={{background:"#FFF8E1",color:"#E65100",padding:"2px 7px",borderRadius:20,fontWeight:700,fontSize:10}}>📋 Req. Remisión</span>
+                             : <span style={{color:"var(--muted)",fontSize:10}}>—</span>}
+                   </td>
                      : t.remisionId ? <span style={{background:"#FFF8E1",color:"#795548",padding:"2px 7px",borderRadius:20,fontWeight:700,fontSize:10}}>📋 Remisión</span>
                      : <span style={{background:"#FFE5E5",color:"#C62828",padding:"2px 7px",borderRadius:20,fontWeight:700,fontSize:10}}>⏳ Pendiente</span>}
                    </td>
@@ -11716,7 +11755,7 @@ const AYUDA_DATA = [
       { q: "¿Para qué sirve el ícono 💰 en la tabla de viajes?",
         a: "El ícono 💰 abre el reporte de utilidad/rentabilidad de ese viaje específico. Muestra: precio cobrado al cliente, costos del viaje (combustible, casetas, viáticos, mantenimiento proporcional, depreciación), y la utilidad neta. Solo lo ven los administradores. Es útil para analizar qué tan rentable fue cada viaje antes de facturar." },
       { q: "¿Qué significa el estado de Facturación en cada viaje?",
-        a: "La columna Facturación muestra el estado de cobro de cada viaje: ✅ Facturado (tiene CFDI o factura vinculada), 📋 Remisión (tiene remisión de cobro), ⏳ Pendiente (aún no se ha facturado ni remisionado). Para vincular un viaje a una factura, ve a Facturación → Nueva Factura y selecciona el viaje en el campo Viaje Relacionado." },
+        a: "La columna Facturación en la tabla de viajes muestra: ✅ Facturado / 📋 Remisionado (ya se emitió el comprobante y está vinculado), 🧾 Req. Factura (el cliente pide factura, aún pendiente de emitir), 📋 Req. Remisión (el cliente pide remisión, aún pendiente), — (sin comprobante requerido). El tipo de comprobante se captura al crear el viaje con los botones '🧾 Factura', '📋 Remisión' o 'Sin comprobante'. Si la ruta es recurrente, el sistema recuerda automáticamente el tipo elegido para esa ruta." },
       { q: "¿Cómo funciona la Comisión del Operador en un viaje?",
         a: "En cada viaje propio (local o foráneo) hay un campo 'Comisión Operador ($)' en la sección Datos Financieros. Si lo dejas vacío, la nómina calculará la comisión automáticamente con el porcentaje del conductor (ej. 10% del precio al cliente). Si en ese viaje el acuerdo fue diferente (un monto fijo distinto), capturas el monto exacto ahí y la nómina usará ese valor en lugar del porcentaje automático. Esto permite manejar viajes con comisiones especiales sin cambiar el porcentaje general del conductor." },
       { q: "¿Cómo se calcula la comisión en nóminas?",
