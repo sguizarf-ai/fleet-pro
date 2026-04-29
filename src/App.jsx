@@ -1382,7 +1382,7 @@ function MaintModal({ maint, units, proveedores, onSave, onClose }) {
   );
 }
 function TripModal({ trip, units, drivers = [], clientes = [], rutasCatalogo = [], tiposPersonalizados = [], onSaveRuta, onSave, onClose }) {
-  const [f, setF] = useState(trip || { unidadId: "", esExterno: false, tipoViaje: "local", origen: "", destino: "", fecha: "", kmRuta: "", kmExtra: "", carga: "", cliente: "", status: "EN RUTA", notas: "", costoOfrecido: "", gastosExtras: "", costoEstadias: "", casetas: "", viaticos: "", combustibleViaje: "", tipoRemolque: "", operadorViaje: "", evidencias: [] });
+  const [f, setF] = useState(trip || { unidadId: "", esExterno: false, tipoViaje: "local", origen: "", destino: "", fecha: "", kmRuta: "", kmExtra: "", carga: "", cliente: "", status: "EN RUTA", notas: "", costoOfrecido: "", gastosExtras: "", costoEstadias: "", casetas: "", viaticos: "", combustibleViaje: "", tipoRemolque: "", operadorViaje: "", comisionViaje: "", evidencias: [] });
   const [uploading, setUploading] = useState(false);
   // Auto-fill route data from catalog when origen+destino selected
   useEffect(() => {
@@ -1495,6 +1495,7 @@ function TripModal({ trip, units, drivers = [], clientes = [], rutasCatalogo = [
           <div className="sec-lbl">🔒 Datos Financieros</div>
           <div className="fg">
             <div className="field"><label>Precio al Cliente ($)</label><input value={f.costoOfrecido} onChange={ch("costoOfrecido")} type="number" min="0"/></div>
+            <div className="field"><label>Comisión Operador ($)</label><input value={f.comisionViaje||""} onChange={ch("comisionViaje")} type="number" min="0" step="0.01" placeholder="Se calcula en nómina si se deja vacío" title="Deja vacío para calcular automáticamente con el % del operador en nómina, o ingresa un monto fijo"/></div>
             <div className="field"><label>Gastos Extras ($)</label><input value={f.gastosExtras} onChange={ch("gastosExtras")} type="number" min="0"/></div>
             {f.tipoViaje==="local" && <>
               <div className="field"><label>Casetas y Peajes ($)</label><input value={f.casetas||""} onChange={ch("casetas")} type="number" min="0" placeholder=""/></div>
@@ -3219,7 +3220,11 @@ function NominaModal({ driver, trips, units = [], onClose, onSaveNomina, company
     return iso >= toISO(periodo.inicio) && iso <= toISO(periodo.fin);
   });
 
-  const comisionViajes = viajesPeriodo.reduce((a, t) => a + (Number(t.costoOfrecido) || 0) * editPct / 100, 0);
+  const comisionViajes = viajesPeriodo.reduce((a, t) => {
+    const comFija = Number(t.comisionViaje);
+    const comCalc = (Number(t.costoOfrecido)||0) * editPct / 100;
+    return a + (comFija > 0 ? comFija : comCalc);
+  }, 0);
   const sueldoBase = editSueldo;
   const totalPercepciones = sueldoBase + comisionViajes + Number(bonos) + Number(estimulos) + Number(otrasPercepciones);
   const totalDeducciones = Number(deducciones);
@@ -11623,6 +11628,10 @@ const AYUDA_DATA = [
     id: "viajes", icono: "🗺️", titulo: "Viajes & Logística",
     color: "var(--blue)",
     preguntas: [
+      { q: "¿Cómo funciona la Comisión del Operador en un viaje?",
+        a: "En cada viaje propio (local o foráneo) hay un campo 'Comisión Operador ($)' en la sección Datos Financieros. Si lo dejas vacío, la nómina calculará la comisión automáticamente con el porcentaje del conductor (ej. 10% del precio al cliente). Si en ese viaje el acuerdo fue diferente (un monto fijo distinto), capturas el monto exacto ahí y la nómina usará ese valor en lugar del porcentaje automático. Esto permite manejar viajes con comisiones especiales sin cambiar el porcentaje general del conductor." },
+      { q: "¿Cómo se calcula la comisión en nóminas?",
+        a: "Al generar la nómina de un operador, el sistema revisa cada viaje del período: si el viaje tiene un campo 'Comisión Operador' con monto fijo, usa ese valor; si está vacío, calcula automáticamente costoOfrecido × porcentaje del conductor. Puedes ver en la tabla de viajes de la nómina si cada viaje usa comisión fija (badge verde) o calculada por porcentaje." },
       { q: "¿Cómo funciona el catálogo de rutas y el auto-llenado?",
         a: "Cada vez que guardas un viaje con origen y destino nuevos, la ruta queda guardada en el catálogo con: tipo de viaje, km de la ruta y carga usual. Usa nombres descriptivos: 'Caterpillar Santa Catarina' en lugar de solo 'Santa Catarina'. Al escribir el mismo origen en un viaje nuevo, el sistema sugiere destinos frecuentes (↗) y auto-llena tipo de viaje y carga. Los km registrados también sirven de referencia." },
       { q: "¿Qué es el Tipo de Remolque y cuándo aparece?",
@@ -11785,6 +11794,12 @@ const AYUDA_DATA = [
     id: "nominas", icono: "💰", titulo: "Nóminas",
     color: "var(--cyan)",
     preguntas: [
+      { q: "¿Qué pasa si un viaje tiene una comisión diferente al porcentaje del operador?",
+        a: "Al crear el viaje en Viajes Propios, puedes capturar un monto fijo en el campo 'Comisión Operador ($)'. Si ese campo tiene un valor, la nómina lo usará directamente. Si está vacío, aplica el porcentaje registrado en el perfil del conductor. Ejemplo: si el conductor tiene 10% pero en un viaje especial acordaste $1,200 fijos, capturas $1,200 en ese campo y la nómina sumará exactamente ese monto para ese viaje." },
+      { q: "¿Qué es el período de nómina y cómo funciona?",
+        a: "Al hacer clic en '💵 Generar Nómina', primero seleccionas el operador y defines las fechas de inicio y fin del período (ej. semana del 01 al 07 de abril). La nómina entonces busca todos los viajes asignados a la unidad de ese operador dentro de esas fechas, calcula la comisión por viaje (fija o por porcentaje), suma sueldo base semanal + comisiones + bonos - deducciones y muestra el neto a pagar. Puedes guardar la nómina con '💾 Guardar Nómina' para registrarla en el sistema." },
+      { q: "¿La nómina incluye viajes en estatus EN RUTA?",
+        a: "Sí. La nómina incluye todos los viajes del período sin importar su estatus (EN RUTA o COMPLETADO), para que puedas pagar la semana sin esperar a cerrar todos los viajes. Si un viaje aún no tiene costoOfrecido definido, no aportará comisión." },
       { q: "¿Por qué debo elegir el período antes de abrir la nómina?",
         a: "El período (fecha inicio a fecha fin) determina qué viajes completados se incluyen en el cálculo de comisiones del operador. Al hacer clic en '💵 Generar Nómina', primero aparece un selector de persona y período — una vez elegidos, la nómina se abre con todos los viajes de ese período ya cargados y el período pre-rellenado. No es necesario volver a capturar las fechas." },
       { q: "¿Cómo guardo una nómina generada?",
