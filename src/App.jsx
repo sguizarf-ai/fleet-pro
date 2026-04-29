@@ -1467,7 +1467,7 @@ function TripModal({ trip, units, clientes = [], rutasCatalogo = [], tiposPerson
               const needsSelector = ["TRAILER","TRACTO","TORTON","RABON","FULL"].some(t=>tipoU.includes(t));
               const tipoFijo = !needsSelector && u?.tipo ? u.tipo : null;
               // Build remolque options: from tiposPersonalizados + standard types
-              const optsCustom = (tiposPersonalizados||[]).map(t=>t.nombre||t).filter(Boolean);
+              const optsCustom = (tiposPersonalizados||[]).filter(t=>typeof t === "string" ? t : t?.nombre).map(t=>typeof t === "string" ? t : t.nombre);
               const optsBase = ["Caja Seca","Plataforma","Lowboy/Góndola","Cama Baja","Refrigerado","Tanque","Volteo","Jaula/Ganadero","Portacontenedor"];
               const allOpts = [...new Set([...optsBase,...optsCustom])];
               if (tipoFijo) return (
@@ -1478,7 +1478,7 @@ function TripModal({ trip, units, clientes = [], rutasCatalogo = [], tiposPerson
               );
               return needsSelector ? (
                 <div className="field">
-                  <label>Tipo Remolque/Caja *</label>
+                  <label>Tipo de Remolque/Unidad</label>
                   <select value={f.tipoRemolque||""} onChange={ch("tipoRemolque")} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}>
                     <option value="">— Seleccionar tipo de remolque —</option>
                     {allOpts.map(t=><option key={t} value={t}>{t}</option>)}
@@ -1575,7 +1575,7 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
               <label>Seleccionar del catálogo</label>
               <select value={f.proveedorId||""} onChange={e => {
                 const pv = (proveedores||[]).find(p=>p.id===e.target.value);
-                setF(prev => ({...prev, proveedorId:e.target.value, empresa:pv?pv.nombre:prev.empresa, contacto:pv?.tel?prev.contacto:prev.contacto}));
+                setF(prev => ({...prev, proveedorId:e.target.value, empresa:pv?pv.nombre:prev.empresa, contacto:pv?.contacto||prev.contacto, tel:pv?.tel||prev.tel}))
               }} style={{ width:"100%", padding:"9px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--bg0)", color:"var(--text)" }}>
                 <option value="">— Sin proveedor registrado —</option>
                 {(proveedores||[]).filter(p=>p.tipoProv==="Transportista Externo"||!p.tipoProv).map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
