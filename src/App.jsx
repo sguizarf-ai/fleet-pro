@@ -6775,7 +6775,7 @@ function NominaAdminModal({ persona, onSave, onClose, companyLogo, companyName, 
           </div>
           <div className="sec-lbl" style={{color:"var(--cyan)",borderColor:"var(--cyan)"}}>💼 Parámetros (editables para este recibo)</div>
           <div className="fg">
-            <div className="field"><label>Sueldo Base ($)</label><input value={f.sueldoBase} onChange={ch("sueldoBase")} type="number" min="0" step="100"/></div>
+            <div className="field"><label>Sueldo Base Semanal ($)</label><input value={f.sueldoBase} onChange={ch("sueldoBase")} type="number" min="0" step="100"/></div>
             <div className="field"><label>Bonos / Incentivos ($)</label><input value={f.bonos} onChange={ch("bonos")} type="number" min="0"/></div>
             <div className="field"><label>Otras Percepciones ($)</label><input value={f.otrasPercepciones} onChange={ch("otrasPercepciones")} type="number" min="0" placeholder="Vales, comisiones..."/></div>
             <div className="field"><label>Deducciones ($)</label><input value={f.deducciones} onChange={ch("deducciones")} type="number" min="0" placeholder="IMSS, préstamos..."/></div>
@@ -7035,6 +7035,7 @@ function NominaPage({ drivers, units, trips, onOpenNomina, nominasAdmin = [], on
           onClose={() => setModalAdmin(null)}
           companyLogo={companyLogo}
           companyName={companyName}
+          periodoInit={modalAdmin.periodo||null}
         />
       )}
 
