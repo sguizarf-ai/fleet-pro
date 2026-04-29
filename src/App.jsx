@@ -6575,6 +6575,7 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
                      : <span style={{background:"#FFE5E5",color:"#C62828",padding:"2px 7px",borderRadius:20,fontWeight:700,fontSize:10}}>⏳ Pendiente</span>}
                    </td>
                    <td>{hasEvid ? <button className="btn btn-ghost btn-xs" onClick={() => setEvidModal({ trip: t, unit: u, ext: externos.find(e => e.id === t.unidadId) })} title="Ver y enviar evidencias">📸 {t.evidencias.length}</button> : <span style={{ color: "var(--muted)" }}>—</span>}</td>
+                   {isAdmin && <td><button className="btn btn-ghost btn-xs" onClick={() => printTripProfit({ trip: t, unit: u, fuels, maints, externos })} title="Ver utilidad del viaje">💰</button></td>}
                   <td><div className="acts">
                     <button className="btn btn-ghost btn-sm" onClick={() => t.tipo === "PROPIO" ? onEdit(t) : onEditExt(t)}>✏️</button>
                     {(t.tipo === "PROPIO" || t._esExternoRec) && <button className="btn btn-red btn-sm" onClick={() => t.tipo === "PROPIO" ? onDelete(t.id) : onDeleteExt(t.id)}>🗑</button>}
