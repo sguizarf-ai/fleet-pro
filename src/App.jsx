@@ -1634,11 +1634,11 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
           <div className="field s2" style={{marginBottom:12}}><label>Notas</label><textarea value={f.notas} onChange={ch("notas")} rows={2} style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",resize:"vertical"}}/></div>
 
 
-          </div>
           <MultiPhotoInput values={f.evidencias || []} onChange={v => setF(p => ({ ...p, evidencias: v }))} onUploading={setUploading} label="📸 Evidencias de Entrega" />
         </div>
         <div className="mftr"><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-cyan" onClick={ok} disabled={uploading} style={uploading?{opacity:.6,cursor:"not-allowed"}:{}}>{uploading?"⏳ Subiendo...":"💾 Guardar"}</button></div>
       </div>
+    </div>
   );
 }
 
