@@ -4766,13 +4766,22 @@ function printTripsReport({ trips, units, externos = [], companyLogo = "", compa
   @media print{@page{size:A4 landscape;margin:10mm}}
   </style></head><body>`);
   w.document.write(`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:3px solid #0099CC;padding-bottom:8px"><div>${logoHtml}</div><div style="font-size:11px;color:#666">Reporte de Viajes · ${new Date().toLocaleDateString("es-MX")}</div></div>`);
-  w.document.write(`<h1>🗺️ REPORTE DE VIAJES — FLOTA COMPLETA</h1><table><thead><tr><th>Tipo</th><th>Unidad/Empresa</th><th>Origen</th><th>Destino</th><th>Fecha</th><th>KM</th><th>Cliente</th><th>Status</th></tr></thead><tbody>`);
+  w.document.write(`<h1>🗺️ REPORTE DE VIAJES — FLOTA COMPLETA</h1><table><thead><tr><th>Tipo</th><th>Unidad/Empresa</th><th>Origen</th><th>Destino</th><th>Fecha</th><th>KM</th><th>Operador</th><th>Cliente</th><th>Facturación</th></tr></thead><tbody>`);
   trips.forEach(t => {
     const isExt = t.esExterno;
     const u = isExt ? null : units.find(u => u.id === t.unidadId);
     const ext = isExt ? externos.find(e => e.id === t.unidadId) : null;
     const dist = t.kmLlegada && t.kmSalida ? Number(t.kmLlegada) - Number(t.kmSalida) : 0;
-    w.document.write(`<tr><td>${isExt ? "EXT" : "INT"}</td><td>${isExt ? ext?.empresa : `${u?.num} ${u?.placas}`}</td><td>${t.origen}</td><td>${t.destino || "—"}</td><td>${t.fecha}</td><td>${(t.kmTotal||t.kmRuta) ? fmtN(t.kmTotal||t.kmRuta) + " km" : "—"}</td><td>${t.cliente || "—"}</td><td>${t.status}</td></tr>`);
+    w.document.write(`<tr>
+      <td>${isExt ? "EXT" : "INT"}</td>
+      <td>${isExt ? ext?.empresa : `${u?.num} ${u?.placas}`}</td>
+      <td>${t.origen}</td><td>${t.destino || "—"}</td>
+      <td>${t.fecha}</td>
+      <td>${(t.kmTotal||t.kmRuta) ? fmtN(t.kmTotal||t.kmRuta) + " km" : "—"}</td>
+      <td>${t.operadorViaje || u?.operador || "—"}</td>
+      <td>${t.cliente || "—"}</td>
+      <td>${t.facturaId ? "Facturado" : t.remisionId ? "Remisión" : "Pendiente"}</td>
+    </tr>`);
   });
   w.document.write(`</tbody></table><p style="margin-top:16px;font-size:10px;color:#999">Total viajes: ${trips.length} | Generado: ${new Date().toLocaleDateString("es-MX", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p></body></html>`);
   w.document.close(); w.focus(); setTimeout(() => w.print(), 500);
@@ -6541,9 +6550,10 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
       <div className="card-body">
         {fil.length === 0 ? <div className="empty"><div className="empty-icon">🗺️</div><p>Sin viajes</p></div> :
           <table>
-            <thead><tr><th>Tipo</th><th>Unidad/Empresa</th><th>Origen → Destino</th><th>Fecha</th><th>KM</th><th>Cliente</th><th>Evid.</th>{isAdmin && <th>💰</th>}<th>Acciones</th></tr></thead>
+            <thead><tr><th>Tipo</th><th>Unidad/Empresa</th><th>Origen → Destino</th><th>Fecha</th><th>KM</th><th>Operador</th><th>Cliente</th><th>Facturación</th><th>Evid.</th>{isAdmin && <th title="Ver utilidad del viaje">💰</th>}<th>Acciones</th></tr></thead>
             <tbody>{fil.map(t => {
               const u = t.tipo === "PROPIO" ? units.find(u => u.id === t.unidadId) : null;
+              const drv = t.tipo === "PROPIO" ? (t.operadorViaje || u?.operador || "—") : (t._esExternoRec ? t.operador : "—");
               const ext = t._esExternoRec ? t : (t.tipo === "EXTERNO" ? externos.find(e => e.id === t.unidadId) : null);
               const dist = t.kmTotal || t.kmRuta || null;
               const hasEvid = (t.evidencias || []).length > 0;
@@ -6556,12 +6566,15 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
                   </td>
                   <td style={{ fontSize: 12 }}><span style={{ color: "var(--cyan)" }}>📍{t.origen}</span><span style={{ color: "var(--muted)", margin: "0 5px" }}>→</span><span>{t.destino || "—"}</span></td>
                   <td style={{ fontSize: 12 }}>{t.fecha || "—"}</td>
-                  <td style={{ color: "var(--cyan)", fontFamily: "var(--font-hd)", fontWeight: 700 }}>{dist ? `${fmtN(dist)} km` : "—"}</td>
-                  <td style={{ fontSize: 12 }}>{t.cliente || "—"}</td>
-                  <td>{hasEvid ? <button className="btn btn-ghost btn-xs"
-  onClick={() => setEvidModal({ trip: t, unit: u, ext: externos.find(e => e.id === t.unidadId) })}
-  title="Ver y enviar evidencias">📸 {t.evidencias.length}</button> : <span style={{ color: "var(--muted)" }}>—</span>}</td>
-                  {isAdmin && <td>{t.status === "COMPLETADO" ? <button className="btn btn-purple btn-xs" onClick={() => printTripProfit({ trip: t, unit: u, fuels, maints, externos })} title="Ver utilidad">💰</button> : <span style={{ color: "var(--muted)" }}>—</span>}</td>}
+                   <td style={{ fontSize: 12 }}>{dist ? `${fmtN(dist)} km` : "—"}</td>
+                   <td style={{ fontSize: 11, color: "var(--text)" }}>{drv || "—"}</td>
+                   <td style={{ fontSize: 12 }}>{t.cliente || "—"}</td>
+                   <td style={{ fontSize: 11 }}>
+                     {t.facturaId ? <span style={{background:"#D4F4DD",color:"#00864E",padding:"2px 7px",borderRadius:20,fontWeight:700,fontSize:10}}>✅ Facturado</span>
+                     : t.remisionId ? <span style={{background:"#FFF8E1",color:"#795548",padding:"2px 7px",borderRadius:20,fontWeight:700,fontSize:10}}>📋 Remisión</span>
+                     : <span style={{background:"#FFE5E5",color:"#C62828",padding:"2px 7px",borderRadius:20,fontWeight:700,fontSize:10}}>⏳ Pendiente</span>}
+                   </td>
+                   <td>{hasEvid ? <button className="btn btn-ghost btn-xs" onClick={() => setEvidModal({ trip: t, unit: u, ext: externos.find(e => e.id === t.unidadId) })} title="Ver y enviar evidencias">📸 {t.evidencias.length}</button> : <span style={{ color: "var(--muted)" }}>—</span>}</td>
                   <td><div className="acts">
                     <button className="btn btn-ghost btn-sm" onClick={() => t.tipo === "PROPIO" ? onEdit(t) : onEditExt(t)}>✏️</button>
                     {(t.tipo === "PROPIO" || t._esExternoRec) && <button className="btn btn-red btn-sm" onClick={() => t.tipo === "PROPIO" ? onDelete(t.id) : onDeleteExt(t.id)}>🗑</button>}
@@ -11628,6 +11641,10 @@ const AYUDA_DATA = [
     id: "viajes", icono: "🗺️", titulo: "Viajes & Logística",
     color: "var(--blue)",
     preguntas: [
+      { q: "¿Para qué sirve el ícono 💰 en la tabla de viajes?",
+        a: "El ícono 💰 abre el reporte de utilidad/rentabilidad de ese viaje específico. Muestra: precio cobrado al cliente, costos del viaje (combustible, casetas, viáticos, mantenimiento proporcional, depreciación), y la utilidad neta. Solo lo ven los administradores. Es útil para analizar qué tan rentable fue cada viaje antes de facturar." },
+      { q: "¿Qué significa el estado de Facturación en cada viaje?",
+        a: "La columna Facturación muestra el estado de cobro de cada viaje: ✅ Facturado (tiene CFDI o factura vinculada), 📋 Remisión (tiene remisión de cobro), ⏳ Pendiente (aún no se ha facturado ni remisionado). Para vincular un viaje a una factura, ve a Facturación → Nueva Factura y selecciona el viaje en el campo Viaje Relacionado." },
       { q: "¿Cómo funciona la Comisión del Operador en un viaje?",
         a: "En cada viaje propio (local o foráneo) hay un campo 'Comisión Operador ($)' en la sección Datos Financieros. Si lo dejas vacío, la nómina calculará la comisión automáticamente con el porcentaje del conductor (ej. 10% del precio al cliente). Si en ese viaje el acuerdo fue diferente (un monto fijo distinto), capturas el monto exacto ahí y la nómina usará ese valor en lugar del porcentaje automático. Esto permite manejar viajes con comisiones especiales sin cambiar el porcentaje general del conductor." },
       { q: "¿Cómo se calcula la comisión en nóminas?",
