@@ -8545,7 +8545,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
   const fGastos    = gastos.filter(g=>enRango(g.fecha));
   const fFuels     = fuels.filter(f=>enRango(f.fecha));
   const fMaints    = maints.filter(m=>enRango(m.fechaEjec));
-  const fTrips     = trips.filter(t=>t.status==="COMPLETADO"&&enRango(t.fechaReg||t.fecha));
+  const fTrips     = trips.filter(t=>!t.esExterno&&enRango(t.fecha));
   const fTripsProp = fTrips.filter(t=>!t.esExterno);
   const fTripsExt  = fTrips.filter(t=>t.esExterno);
   const fExternos  = externos.filter(e=>enRango(e.fecha));
@@ -8576,7 +8576,7 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
   const totLitros    = fFuels.reduce((a,f)=>a+(Number(f.litros)||0),0);
   const totMant      = fMaints.reduce((a,m)=>a+(Number(m.costoRef)||0)+(Number(m.costoMO)||0),0);
   const totIngresos  = fTrips.reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0);
-  const totCostoViaj = fTrips.reduce((a,t)=>a+(Number(t.gastosExtras)||0)+(Number(t.costoEstadias)||0)+(Number(t.costoPropio)||0)+(Number(t.viaticos)||0)+(Number(t.combustibleExtra)||0)+(Number(t.casetas)||0),0);
+  const totCostoViaj = fTrips.reduce((a,t)=>a+(Number(t.gastosExtras)||0)+(Number(t.costoEstadias)||0)+(Number(t.costoPropio)||0)+(Number(t.viaticos)||0)+(Number(t.combustibleViaje)||0)+(Number(t.combustibleExtra)||0)+(Number(t.casetas)||0),0);
   const totExternos  = fExternos.reduce((a,e)=>a+(Number(e.costoPagar)||0),0);
   // Utilidad real (sin IVA)
   const ingresoNeto      = subtotalFacturado;
@@ -8606,9 +8606,9 @@ function ChartsPage({ units, maints, fuels, gastos, trips, facturas, clientes, d
     const mMaint = byMes(maints,m=>m.fechaEjec).reduce((a,m)=>a+(Number(m.costoRef)||0)+(Number(m.costoMO)||0),0);
     const mGast  = byMes(gastos,g=>g.fecha).reduce((a,g)=>a+(Number(g.monto)||0),0);
     const mExtCosto = byMes(externos,e=>e.fecha).reduce((a,e)=>a+(Number(e.costoPagar)||0),0);
-    const mIng   = byMes(trips.filter(t=>t.status==="COMPLETADO"),t=>t.fechaReg||t.fecha).reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0);
+    const mIng   = byMes(trips,t=>t.fecha).reduce((a,t)=>a+(Number(t.costoOfrecido)||0),0);
     const mFact  = byMes(facturas,f=>f.fechaEmision).reduce((a,f)=>a+(Number(f.total)||0),0);
-    const mViaj  = byMes(trips.filter(t=>t.status==="COMPLETADO"&&!t.esExterno),t=>t.fechaReg||t.fecha).length;
+    const mViaj  = byMes(trips.filter(t=>!t.esExterno),t=>t.fecha).length;
     const mExtN = byMes(externos,e=>e.fecha).length;
     const mLit   = byMes(fuels,f=>f.fecha).reduce((a,f)=>a+(Number(f.litros)||0),0);
     const mMantN = byMes(maints,m=>m.fechaEjec).length;
