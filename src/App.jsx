@@ -1580,6 +1580,12 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
             <div className="field"><label>Año</label><input value={f.anioUnidad||""} onChange={ch("anioUnidad")} placeholder="Ej: 2017" type="number" min="1990" max="2030"/></div>
           <div className="fg">
           </div>
+            <div className="field"><label>Placas</label><input value={f.placas} onChange={ch("placas")} /></div>
+            <div className="field"><label>Color</label><input value={f.color} onChange={ch("color")} /></div>
+            <div className="field"><label>No. Económico</label><input value={f.eco} onChange={ch("eco")} /></div>
+            <div className="field"><label>Operador</label><input value={f.operador} onChange={ch("operador")} /></div>
+            <div className="field"><label>Seguro Operador</label><input value={f.seguroOp} onChange={ch("seguroOp")} /></div>
+            <div className="field"><label>Seguro Vehículo</label><input value={f.seguroVeh} onChange={ch("seguroVeh")} /></div>
             <div className="field s2">
               <label>Tipo de Unidad</label>
               <div style={{ display: "flex", gap: 8 }}>
@@ -1591,12 +1597,6 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
                 <button className="btn btn-green btn-sm" onClick={addTipo}>+ Agregar</button>
               </div>
             </div>
-            <div className="field"><label>Placas</label><input value={f.placas} onChange={ch("placas")} /></div>
-            <div className="field"><label>Color</label><input value={f.color} onChange={ch("color")} /></div>
-            <div className="field"><label>No. Económico</label><input value={f.eco} onChange={ch("eco")} /></div>
-            <div className="field"><label>Operador</label><input value={f.operador} onChange={ch("operador")} /></div>
-            <div className="field"><label>Seguro Operador</label><input value={f.seguroOp} onChange={ch("seguroOp")} /></div>
-            <div className="field"><label>Seguro Vehículo</label><input value={f.seguroVeh} onChange={ch("seguroVeh")} /></div>
           </div>
           <div className="field s2">
             <label>Herramientas / Equipamiento</label>
