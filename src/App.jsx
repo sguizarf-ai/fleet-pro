@@ -13087,8 +13087,8 @@ ${fac.fechaPago ? `<div style="margin-top:14px;background:#D4F4DD;border-radius:
             facturas={facturas}
             clientes={clientes}
             viajes={trips}
-            onAdd={() => setModal({ type: "factura", data: { numeroFactura: getNextFolio("factura", "A"), serie: "A" }, _ts: Date.now() })}
-            onAddRemision={() => setModal({ type: "remision", data: { folio: getNextFolio("remision") }, _ts: Date.now() })}
+            onAdd={(tripId) => setModal({ type: "factura", data: { numeroFactura: getNextFolio("factura", "A"), serie: "A", viajeId: tripId||"" }, _ts: Date.now() })}
+            onAddRemision={(tripId) => setModal({ type: "remision", data: { folio: getNextFolio("remision"), viajeId: tripId||"" }, _ts: Date.now() })}
             onAddCartaPorte={() => setModal({ type: "cartaporte", data: { folio: getNextFolio("cartaporte") }, _ts: Date.now() })}
             onEdit={f => setModal({ type: "factura", data: f })}
             onDelete={FacC.del}
