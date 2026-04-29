@@ -47,7 +47,7 @@ body{background:var(--bg0);color:var(--text);font-family:var(--font-bd);font-siz
   .sb-toggle{display:flex}
   .main{margin-left:0!important;padding:56px 12px 16px}
   .topbar{padding:10px 12px 10px 56px}
-  .modal{width:96vw!important;margin:0 auto;max-height:88vh;overflow-y:auto}
+  .modal{width:96vw!important;margin:0 auto;}
   .fg{grid-template-columns:1fr!important}
   .field.s2,.field.s3{grid-column:span 1!important}
   .sbar{display:none}
@@ -111,13 +111,13 @@ tbody tr:hover{background:var(--bg2)}
 .btn-sm{padding:5px 11px;font-size:11px}
 .btn-xs{padding:3px 9px;font-size:10px}
 .modal-ov{position:fixed;inset:0;background:rgba(26,35,50,.65);backdrop-filter:blur(6px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
-.modal{background:var(--bg1);border:1px solid var(--border);border-radius:16px;width:100%;max-width:700px;max-height:92vh;overflow-y:auto;animation:mUp .25s ease;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+.modal{background:var(--bg1);border:1px solid var(--border);border-radius:16px;width:100%;max-width:700px;animation:mUp .25s ease;box-shadow:0 20px 60px rgba(0,0,0,.15)}
 .modal.wide{max-width:920px}
 .modal.xwide{max-width:1200px}
 @keyframes mUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
 .mhdr{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--border);background:var(--bg2);position:sticky;top:0;z-index:2}
 .mhdr h3{font-family:var(--font-hd);font-size:19px;font-weight:700;color:var(--text)}
-.mbody{padding:22px}
+.mbody{padding:22px;overflow-y:auto}
 .mftr{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;background:var(--bg2);flex-shrink:0}
 .fg{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .fg .s2{grid-column:1/-1}
@@ -455,9 +455,9 @@ function Toast({ msg, type, onClose }) {
 function Confirm({ msg, onOk, onCancel }) {
   return (
     <div className="modal-ov" onClick={onCancel}>
-      <div className="modal" style={{ maxWidth: 400 }} style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: 400 }} style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr"><h3>⚠️ Confirmar</h3></div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}><p style={{ lineHeight: 1.7 }}>{msg}</p></div>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}><p style={{ lineHeight: 1.7 }}>{msg}</p></div>
         <div className="mftr"><button className="btn btn-ghost" onClick={onCancel}>Cancelar</button><button className="btn btn-red" onClick={onOk}>Eliminar</button></div>
       </div>
     </div>
@@ -795,12 +795,12 @@ function UnitModal({ unit, drivers, onSave, onClose, tiposPersonalizados = [], o
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal wide" style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal wide" style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr">
           <h3>{f.id ? "✏️ Editar Unidad" : "🚛 Nueva Unidad"}</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
         </div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           <div className="fg">
             <PhotoInput value={f.foto} onChange={v => setF(p => ({ ...p, foto: v }))} onUploading={setUploading} label="Fotografía de la Unidad" />
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -973,12 +973,12 @@ function DriverModal({ driver, units, onSave, onClose }) {
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal wide" style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal wide" style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr">
           <h3>{f.id ? "✏️ Editar Conductor" : "👨‍✈️ Nuevo Conductor"}</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
         </div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           <div className="fg">
             <PhotoInput value={f.foto} onChange={v => setF(p => ({ ...p, foto: v }))} onUploading={setUploading} label="Foto del Conductor" />
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1124,12 +1124,12 @@ function FuelModal({ fuel, units, onSave, onClose, onUpdateUnit }) {
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr">
           <h3>{f.id ? "✏️ Editar Carga" : "⛽ Nueva Carga"}</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
         </div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           <div className="fg">
             <div className="field s2">
               <label>Unidad *</label>
@@ -1255,12 +1255,12 @@ function DocModal({ doc, units, drivers, onSave, onClose }) {
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr">
           <h3>{f.id ? "✏️ Editar Documento" : "📄 Nuevo Documento"}</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
         </div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           <div className="fg">
             <div className="field s2">
               <label>Pertenece a</label>
@@ -1338,9 +1338,9 @@ function MaintModal({ maint, units, proveedores, onSave, onClose }) {
   const ok = (_e) => { if (!f.unidadId || !f.desc) return alert("Unidad y descripción requeridos"); onSave({ ...f, id: f.id || uid() }) };
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr"><h3>{f.id ? "✏️ Editar" : "🔧 Nuevo Mantenimiento"}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           <div className="fg">
             <div className="field s2"><label>Unidad *</label><select value={f.unidadId} onChange={ch("unidadId")}><option value="">— Seleccionar —</option>{units.map(u => <option key={u.id} value={u.id}>{u.num} — {u.placas}</option>)}</select></div>
             <div className="field"><label>Tipo</label><select value={f.tipo} onChange={ch("tipo")}>{SERVS.map(s => <option key={s}>{s}</option>)}</select></div>
@@ -1409,9 +1409,9 @@ function TripModal({ trip, units, clientes = [], rutasCatalogo = [], tiposPerson
   };
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr"><h3>{f.id ? "✏️ Editar Viaje" : "🗺️ Nuevo Viaje"}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           {/* Tipo de Viaje */}
           <div style={{display:"flex",gap:10,marginBottom:12}}>
             {[["local","🏙️ Viaje Local"],["foraneo","🛣️ Viaje Foráneo"]].map(([v,l])=>(
@@ -1509,7 +1509,7 @@ function TripModal({ trip, units, clientes = [], rutasCatalogo = [], tiposPerson
             {f.tipoViaje==="foraneo" && <>
               <div className="field"><label>Costo Estadías ($)</label><input value={f.costoEstadias} onChange={ch("costoEstadias")} type="number" min="0"/></div>
               <div className="field"><label>Viáticos Operador ($) <span style={{fontSize:10,color:"var(--muted)"}}>comidas</span></label><input value={f.viaticos} onChange={ch("viaticos")} type="number" min="0" placeholder=""/></div>
-              <div className="field"><label>Combustible del Viaje ($) <span style={{fontSize:10,color:"var(--muted)"}}>en ruta</span></label><input value={f.combustibleViaje} onChange={ch("combustibleViaje")} type="number" min="0" placeholder=""/></div>
+              <div className="field"><label>Combustible del Viaje ($)</label><input value={f.combustibleViaje} onChange={ch("combustibleViaje")} type="number" min="0" placeholder=""/></div>
               <div className="field"><label>Casetas y Peajes ($)</label><input value={f.casetas} onChange={ch("casetas")} type="number" min="0" placeholder=""/></div>
             </>}
           </div>
@@ -1554,9 +1554,9 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
   const utilidad = (Number(f.precioCliente) || 0) - (Number(f.costoPagar) || 0) - (Number(f.costoEstadias) || 0);
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal wide" style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal wide" style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr"><h3>{f.id ? "✏️ Editar" : "🚚 Nuevo Viaje Externo"}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
 
           {/* 1. DATOS DEL VIAJE — primero */}
           <div className="sec-lbl">📍 Datos del Viaje</div>
@@ -1708,7 +1708,7 @@ _${branding?.nombre||"Fleet Pro"} — Comprobante de liquidación_`;
           <h3>💳 {tipoServicio==="viaje"?"Pago a Transportista":"Conciliación de Pago"} — {proveedor?.nombre||externo.empresa||"Proveedor"}</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
         </div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
 
           {/* ── Resumen del servicio ── */}
           <div style={{padding:"12px 16px",background:"var(--bg2)",borderRadius:10,border:`1px solid var(--border)`,marginBottom:14}}>
@@ -1878,9 +1878,9 @@ function GastoModal({ gasto, proveedores, onSave, onClose }) {
   const selectedProv = (proveedores||[]).find(p => p.id === f.proveedorId);
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr"><h3>{f.id ? "✏️ Editar" : "💵 Nuevo Gasto General"}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           <div className="fg">
             <div className="field"><label>Fecha del Gasto</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))} /></div>
             <div className="field"><label>Fecha Factura / Documento <span style={{fontSize:10,color:"var(--muted)",fontWeight:400}}>(opcional)</span></label><DatePicker value={f.fechaFactura||""} onChange={v=>setF(p=>({...p,fechaFactura:v}))} /></div>
@@ -1946,9 +1946,9 @@ function ChangeDriverModal({ unit, drivers, onSave, onClose }) {
   const ok = () => onSave({ ...unit, operador: newOp });
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 480 }} style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: 480 }} style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr"><h3>🔄 Cambiar Operador</h3></div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           <p style={{ marginBottom: 14, fontSize: 13, lineHeight: 1.6 }}>Unidad: <strong>{unit.num} — {unit.placas}</strong></p>
           <div className="field"><label>Nuevo Operador</label><select value={newOp} onChange={e => setNewOp(e.target.value)}><option value="">— Sin asignar —</option>{drivers.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}</select></div>
         </div>
@@ -2181,7 +2181,7 @@ function UsuariosModal({ usuarios, roles, onSave, onSaveRoles, onClose }) {
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal wide" style={{ maxWidth:820 }} style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal wide" style={{ maxWidth:820 }} style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr" style={{ borderBottom:"3px solid var(--cyan)" }}>
           <h3>👥 Gestión de Usuarios y Roles</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
@@ -2196,7 +2196,7 @@ function UsuariosModal({ usuarios, roles, onSave, onSaveRoles, onClose }) {
           </div>
         </div>
 
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
 
           {/* ══ TAB: LISTA USUARIOS ══════════════════════════════════════════ */}
           {vistaTab === "lista" && (
@@ -2680,12 +2680,12 @@ function FacturapiModal({ factura, cliente, viaje, unit, driver, apiKey, onSucce
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" style={{ maxWidth:560 }} style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth:560 }} style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr" style={{ borderBottom:"3px solid var(--cyan)" }}>
           <h3>🧾 Timbrar con Facturapi — CFDI 4.0 + Carta Porte 3.1</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
         </div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
 
           {/* API Key */}
           <div className="sec-lbl" style={{ color:"var(--cyan)", borderColor:"var(--cyan)" }}>🔑 API Key de Facturapi</div>
@@ -2785,12 +2785,12 @@ function BrandingModal({ branding, onSave, onClose }) {
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 520 }} style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: 520 }} style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr">
           <h3>🏢 Configuración de Empresa</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
         </div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           {/* Logo preview + upload */}
           <div style={{
             display: "flex",
@@ -2912,9 +2912,9 @@ function ProveedorModal({ proveedor, onSave, onClose }) {
   const creditoVencido = diasUsados != null && (f.diasCredito||0) > 0 && diasUsados > (f.diasCredito || 0);
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal wide" style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal wide" style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr"><h3>{f.id ? "✏️ Editar Proveedor" : "🏪 Nuevo Proveedor"}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           <div className="sec-lbl">📋 Datos Generales</div>
           <div className="fg">
             <div className="field s2"><label>Nombre *</label><input value={f.nombre} onChange={ch("nombre")} placeholder="Nombre del proveedor" /></div>
@@ -3111,9 +3111,9 @@ function HojaViajeModal({ units, drivers, remitentes, onClose, companyLogo, comp
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal wide" style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal wide" style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr"><h3>📋 Hoja de Instrucciones de Viaje</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           <div className="fg">
             <div className="field"><label>Folio</label><input value={f.folio} onChange={ch("folio")} placeholder="HV-001" /></div>
             <div className="field"><label>Fecha</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))} /></div>
@@ -3289,9 +3289,9 @@ function NominaModal({ driver, trips, units = [], onClose, onSaveNomina, company
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal wide" style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal wide" style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr"><h3>💵 Recibo de Nómina — {driver.nombre}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
 
           {/* Info del operador */}
           <div style={{ padding: "10px 14px", background: "var(--bg2)", borderRadius: 8, marginBottom: 14, display: "flex", gap: 16, alignItems: "center" }}>
@@ -3457,12 +3457,12 @@ function ClienteModal({ cliente, onSave, onClose }) {
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal wide" style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal wide" style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr">
           <h3>{f.id ? "✏️ Editar Cliente" : "👤 Nuevo Cliente"}</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
         </div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
 
           {/* Nombre + código */}
           <div className="fg" style={{marginBottom:12}}>
@@ -3660,12 +3660,12 @@ function ComplementoPagoModal({ factura, clientes = [], branding = {}, onSave, o
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr">
           <h3>💳 Complemento de Pagos 2.0</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
         </div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           <div style={{background:"#E8F5FA",border:"1px solid var(--cyan)",borderRadius:8,padding:"8px 14px",marginBottom:12,fontSize:12}}>
             💳 El <strong>Complemento de Pagos 2.0</strong> se emite cuando el método de pago es <strong>PPD</strong> (diferido/parcialidades). Se timbra por cada pago recibido y "cierra" la deuda.
           </div>
@@ -3812,9 +3812,9 @@ ${f.notas?`<div class="field" style="margin-bottom:14px"><label>Notas</label>${f
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal wide" style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal wide" style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr"><h3>{f.id?"✏️ Editar Remisión":"📋 Nueva Remisión"}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           <div style={{background:"#FFF8E1",border:"1px solid #FFD54F",borderRadius:8,padding:"8px 14px",marginBottom:12,fontSize:12,color:"#795548"}}>
             📋 <strong>Remisión:</strong> Documento de cobro <strong>sin IVA</strong>, no timbrable. Útil para clientes que pagan sin factura fiscal.
           </div>
@@ -3992,9 +3992,9 @@ ${f.notas?`<div class="f" style="margin-bottom:10px"><label>Notas</label>${f.not
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal wide" style={{maxWidth:860}} style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal wide" style={{maxWidth:860}} style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr"><h3>{f.id?"✏️ Editar Carta Porte":"🗺️ Nueva Carta Porte — CP 3.1"}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           <div style={{background:"#E8F5FA",border:"1px solid var(--cyan)",borderRadius:8,padding:"8px 14px",marginBottom:12,fontSize:12}}>🗺️ <strong>Complemento Carta Porte 3.1 SAT.</strong> Campos <strong style={{color:"var(--cyan)"}}>* requeridos</strong> para timbrado.</div>
 
           <div className="sec-lbl">📋 Datos del Servicio</div>
@@ -4298,9 +4298,9 @@ ${f.notas ? `<div class="field" style="margin-top:14px"><label>Notas / Observaci
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal wide" style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal wide" style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr"><h3>{f.id ? "✏️ Editar Factura" : "🧾 Nueva Factura"}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
 
           <div className="sec-lbl">📋 Receptor</div>
           <div className="fg">
@@ -5817,7 +5817,7 @@ function RemitentesModal({ remitentes, onSave, onClose }) {
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" style={{ maxWidth:540 }} style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth:540 }} style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr">
           <h3>📱 Remitentes WhatsApp</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
@@ -6617,7 +6617,7 @@ function SelectorNominaModal({ tipo, personas, preselId, onConfirm, onClose }) {
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 440 }} style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: 440 }} style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr">
           <h3>{esAdmin ? "💼" : "🚛"} Nueva Nómina — {esAdmin ? "Administrativo" : "Operador"}</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
@@ -6765,9 +6765,9 @@ function NominaAdminModal({ persona, onSave, onClose, companyLogo, companyName, 
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal wide" style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal wide" style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr"><h3>💼 Nómina Administrativa — {f.nombre}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           <div className="sec-lbl">📅 Período</div>
           <div className="fg">
             <div className="field"><label>Inicio</label><DatePicker value={periodo.inicio} onChange={v=>setPeriodo(p=>({...p,inicio:v}))} /></div>
@@ -6807,9 +6807,9 @@ function EmpleadoAdminModal({ persona, onSave, onClose }) {
   };
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr"><h3>{f.id ? "✏️ Editar Empleado" : "➕ Nuevo Empleado Administrativo"}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           <div className="fg">
             <div className="field"><label>Nombre Completo *</label><input value={f.nombre} onChange={ch("nombre")} placeholder="Ana Martínez López" autoFocus/></div>
             <div className="field"><label>Puesto / Cargo</label><input value={f.puesto} onChange={ch("puesto")} placeholder="Ej: Secretaria, Gerente, Contador..."/></div>
@@ -7157,7 +7157,7 @@ _${branding?.nombre||"Fleet Pro"} — Comprobante_`;
           <h3>{tipoIcon} Conciliar Pago — {proveedor?.nombre||"Proveedor"}</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
         </div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           {/* Resumen */}
           <div style={{padding:"12px 16px",background:"var(--bg2)",borderRadius:10,border:"1px solid var(--border)",marginBottom:14}}>
             <div style={{fontWeight:700,fontSize:13,marginBottom:6}}>{tipoIcon} {tipoLbl}</div>
@@ -7656,7 +7656,7 @@ function ProveedoresPage({ proveedores, maints, gastos, externos = [], trips = [
             <div className="mhdr"><h3>📎 Archivos del Pago ({compModal.length})</h3>
               <button className="btn btn-ghost btn-sm" onClick={()=>setCompModal(null)}>✕</button>
             </div>
-            <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+            <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
               <div style={{display:"flex",flexWrap:"wrap",gap:12,padding:8}}>
                 {compModal.map((src,i) => (
                   <div key={i} style={{display:"flex",flexDirection:"column",gap:4,alignItems:"center"}}>
@@ -8116,7 +8116,7 @@ function AlmacenModal({ item, proveedores = [], onSave, onClose }) {
           <h3>{f.id?"✏️ Editar Artículo":"📦 Nuevo Artículo"}</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
         </div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           <div className="fg">
             <PhotoInput value={f.foto} onChange={v=>setF(p=>({...p,foto:v}))} onUploading={setUploading} label="Foto del Artículo"/>
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -8188,7 +8188,7 @@ function MovimientoModal({ item, almacen, onSave, onClose }) {
           <h3>📋 Registrar Movimiento</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
         </div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           <div className="fg">
             <div className="field s2"><label>Artículo *</label>
               <select value={f.articuloId} onChange={ch("articuloId")}>
@@ -9942,12 +9942,12 @@ function GeocercaModal({ geocerca, devices, onSave, onClose }) {
   };
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 500 }} style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: 500 }} style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr">
           <h3>🛡️ {geocerca ? "Editar" : "Nueva"} Geocerca</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
         </div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           <div className="fg">
             <div className="field s2">
               <label>Nombre de la zona</label>
@@ -10037,12 +10037,12 @@ function TraccarConfigModal({ config, onSave, onClose }) {
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 520 }} style={{display:"flex",flexDirection:"column",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: 520 }} style={{display:"flex",flexDirection:"column",height:"100%",maxHeight:"92vh"}} onClick={e => e.stopPropagation()}>
         <div className="mhdr">
           <h3>⚙️ Configurar Conexión GPS — Traccar</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
         </div>
-        <div className="mbody" style={{flex:1,overflowY:"auto"}}>
+        <div className="mbody" style={{flex:1,overflowY:"auto",minHeight:0}}>
           <div className="fg">
             <div className="field s2">
               <label>URL del servidor Traccar</label>
