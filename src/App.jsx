@@ -1039,7 +1039,7 @@ function DriverModal({ driver, units, onSave, onClose }) {
           <div className="sec-lbl" style={{ color: "var(--cyan)", borderColor: "var(--cyan)", background: "rgba(0,153,204,.08)", padding: "6px 12px", borderRadius: 6 }}>💵 Nómina — Sueldo y Comisión por Viaje</div>
           <div className="fg">
             <div className="field">
-              <label>Sueldo Base Mensual ($)</label>
+              <label>Sueldo Base Semanal ($)</label>
               <input 
                 value={f.sueldoBase} 
                 onChange={ch("sueldoBase")} 
@@ -1071,7 +1071,7 @@ function DriverModal({ driver, units, onSave, onClose }) {
               }}>
                 <strong style={{ color: "var(--cyan)" }}>ℹ️ Nómina:</strong>
                 <div style={{ marginTop: 6, color: "var(--muted)", lineHeight: 1.6 }}>
-                  Sueldo base: <strong>{fmt$(Number(f.sueldoBase) || 0)}</strong>/mes<br/>
+                  Sueldo base: <strong>{fmt$(Number(f.sueldoBase) || 0)}</strong>/sem<br/>
                   Comisión por viaje: <strong>{f.porcentajeViaje}%</strong> sobre el costo (antes de IVA)
                 </div>
               </div>
@@ -3320,7 +3320,7 @@ function NominaModal({ driver, trips, units = [], onClose, onSaveNomina, company
           <div className="sec-lbl" style={{ color: "var(--cyan)", borderColor: "var(--cyan)" }}>💼 Parámetros de Pago (editables para este recibo)</div>
           <div className="fg">
             <div className="field">
-              <label>Sueldo Base Mensual ($)</label>
+              <label>Sueldo Base Semanal ($)</label>
               <input value={editSueldo} onChange={e => setEditSueldo(Number(e.target.value) || 0)} type="number" min="0" step="100" placeholder="" />
               <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 3 }}>Base guardada: {fmt$(Number(driver.sueldoBase) || 0)}</div>
             </div>
@@ -6812,7 +6812,7 @@ function EmpleadoAdminModal({ persona, onSave, onClose }) {
           <div className="fg">
             <div className="field"><label>Nombre Completo *</label><input value={f.nombre} onChange={ch("nombre")} placeholder="Ana Martínez López" autoFocus/></div>
             <div className="field"><label>Puesto / Cargo</label><input value={f.puesto} onChange={ch("puesto")} placeholder="Ej: Secretaria, Gerente, Contador..."/></div>
-            <div className="field"><label>Sueldo Base Mensual ($)</label><input value={f.sueldoBase} onChange={ch("sueldoBase")} type="number" min="0" step="100" placeholder="15000"/></div>
+            <div className="field"><label>Sueldo Base Semanal ($)</label><input value={f.sueldoBase} onChange={ch("sueldoBase")} type="number" min="0" step="100" placeholder="15000"/></div>
             <div className="field"><label>Deducciones Fijas ($)</label><input value={f.deducciones} onChange={ch("deducciones")} type="number" min="0" placeholder="IMSS, crédito Infonavit..."/></div>
             <div className="field"><label>Descripción de Deducciones</label><input value={f.descripcionDeducciones||""} onChange={ch("descripcionDeducciones")} placeholder="Ej: IMSS + Infonavit"/></div>
             <div className="field"><label>Bonos Recurrentes ($)</label><input value={f.bonos} onChange={ch("bonos")} type="number" min="0" placeholder=""/></div>
@@ -6825,7 +6825,7 @@ function EmpleadoAdminModal({ persona, onSave, onClose }) {
             <span style={{color:"var(--cyan)",fontWeight:700,fontFamily:"var(--font-hd)",fontSize:15}}>
               {fmt$((Number(f.sueldoBase)||0)+(Number(f.bonos)||0)+(Number(f.otrasPercepciones)||0)-(Number(f.deducciones)||0))}
             </span>
-            /mes
+            /sem
           </div>
         </div>
         <div className="mftr">
