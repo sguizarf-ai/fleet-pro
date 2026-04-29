@@ -1382,7 +1382,7 @@ function MaintModal({ maint, units, proveedores, onSave, onClose }) {
   );
 }
 function TripModal({ trip, units, clientes = [], rutasCatalogo = [], tiposPersonalizados = [], onSaveRuta, onSave, onClose }) {
-  const [f, setF] = useState(trip || { unidadId: "", esExterno: false, tipoViaje: "local", origen: "", destino: "", fecha: "", fechaReg: "", kmSalida: "", kmLlegada: "", kmExtra: 0, carga: "", cliente: "", status: "EN RUTA", notas: "", costoOfrecido: 0, gastosExtras: 0, costoEstadias: 0, casetas: 0, viaticos: 0, combustibleExtra: 0, tipoRemolque: "", evidencias: [] });
+  const [f, setF] = useState(trip || { unidadId: "", esExterno: false, tipoViaje: "local", origen: "", destino: "", fecha: "", kmRuta: "", kmExtra: 0, carga: "", cliente: "", status: "EN RUTA", notas: "", costoOfrecido: 0, gastosExtras: 0, costoEstadias: 0, casetas: 0, viaticos: 0, combustibleViaje: 0, tipoRemolque: "", evidencias: [] });
   const [uploading, setUploading] = useState(false);
   // Auto-fill route data from catalog when origen+destino selected
   useEffect(() => {
@@ -1403,7 +1403,7 @@ function TripModal({ trip, units, clientes = [], rutasCatalogo = [], tiposPerson
     // Save ruta to catalog if not already present
     if (onSaveRuta && f.origen && f.destino) {
       const exists = (rutasCatalogo||[]).some(r=>r.origen===f.origen&&r.destino===f.destino);
-      if (!exists) onSaveRuta({origen:f.origen, destino:f.destino, tipoViaje:f.tipoViaje, kmRuta:Number(f.kmLlegada||0)-Number(f.kmSalida||0)||0, carga:f.carga||""});
+      if (!exists) onSaveRuta({origen:f.origen, destino:f.destino, tipoViaje:f.tipoViaje, kmRuta:Number(f.kmRuta)||0, carga:f.carga||""});
     }
     onSave({ ...f, id: f.id || uid() });
   };
@@ -1486,10 +1486,8 @@ function TripModal({ trip, units, clientes = [], rutasCatalogo = [], tiposPerson
                 </div>
               ) : null;
             })()}
-            <div className="field"><label>F. Salida</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))}/></div>
-            <div className="field"><label>F. Regreso</label><DatePicker value={f.fechaReg} onChange={v=>setF(p=>({...p,fechaReg:v}))}/></div>
-            <div className="field"><label>KM Salida</label><input value={f.kmSalida} onChange={ch("kmSalida")} type="number"/></div>
-            <div className="field"><label>KM Llegada</label><input value={f.kmLlegada} onChange={ch("kmLlegada")} type="number"/></div>
+            <div className="field s2"><label>Fecha del Viaje *</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))}/></div>
+            <div className="field"><label>KM de la Ruta</label><input value={f.kmRuta||""} onChange={ch("kmRuta")} type="number" min="0" placeholder="Km de origen a destino" title="Kilómetros totales de esta ruta"/></div>
             <div className="field"><label>KM Extra (desvíos)</label><input value={f.kmExtra||0} onChange={ch("kmExtra")} type="number" min="0" placeholder="0" title="Km adicionales por desvíos o entregas extras"/></div>
             <div className="field s2"><label>Carga / Mercancía</label><input value={f.carga} onChange={ch("carga")}/></div>
           </div>
@@ -1505,25 +1503,26 @@ function TripModal({ trip, units, clientes = [], rutasCatalogo = [], tiposPerson
             <div className="field"><label>Gastos Extras ($)</label><input value={f.gastosExtras} onChange={ch("gastosExtras")} type="number" min="0"/></div>
             {f.tipoViaje==="local" && <>
               <div className="field"><label>Casetas y Peajes ($)</label><input value={f.casetas||0} onChange={ch("casetas")} type="number" min="0" placeholder="0"/></div>
+              <div className="field"><label>Combustible del Viaje ($)</label><input value={f.combustibleViaje||0} onChange={ch("combustibleViaje")} type="number" min="0" placeholder="Costo combustible usado en este viaje"/></div>
               <div className="field"><label>Costo Estadías ($)</label><input value={f.costoEstadias||0} onChange={ch("costoEstadias")} type="number" min="0" placeholder="0"/></div>
             </>}
             {f.tipoViaje==="foraneo" && <>
               <div className="field"><label>Costo Estadías ($)</label><input value={f.costoEstadias} onChange={ch("costoEstadias")} type="number" min="0"/></div>
               <div className="field"><label>Viáticos Operador ($) <span style={{fontSize:10,color:"var(--muted)"}}>comidas</span></label><input value={f.viaticos} onChange={ch("viaticos")} type="number" min="0" placeholder="0"/></div>
-              <div className="field"><label>Combustible ($) <span style={{fontSize:10,color:"var(--muted)"}}>en ruta</span></label><input value={f.combustibleExtra} onChange={ch("combustibleExtra")} type="number" min="0" placeholder="0"/></div>
+              <div className="field"><label>Combustible del Viaje ($) <span style={{fontSize:10,color:"var(--muted)"}}>en ruta</span></label><input value={f.combustibleViaje} onChange={ch("combustibleViaje")} type="number" min="0" placeholder="0"/></div>
               <div className="field"><label>Casetas y Peajes ($)</label><input value={f.casetas} onChange={ch("casetas")} type="number" min="0" placeholder="0"/></div>
             </>}
           </div>
 
-          {(Number(f.viaticos)||0)+(Number(f.combustibleExtra)||0)+(Number(f.casetas)||0)+(Number(f.gastosExtras)||0)+(Number(f.costoEstadias)||0) > 0 && (
+          {(Number(f.viaticos)||0)+(Number(f.combustibleViaje)||0)+(Number(f.casetas)||0)+(Number(f.gastosExtras)||0)+(Number(f.costoEstadias)||0) > 0 && (
             <div style={{marginBottom:10,padding:"8px 14px",background:"var(--bg2)",borderRadius:8,display:"flex",gap:12,flexWrap:"wrap",fontSize:12}}>
               <span style={{color:"var(--muted)",fontWeight:700}}>💰 Costos:</span>
               {Number(f.gastosExtras)>0&&<span>Extras: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.gastosExtras).toLocaleString("es-MX")}</strong></span>}
               {Number(f.costoEstadias)>0&&<span>Estadías: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.costoEstadias).toLocaleString("es-MX")}</strong></span>}
               {Number(f.viaticos)>0&&<span>Viáticos: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.viaticos).toLocaleString("es-MX")}</strong></span>}
-              {Number(f.combustibleExtra)>0&&<span>Combustible: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.combustibleExtra).toLocaleString("es-MX")}</strong></span>}
+              {Number(f.combustibleViaje)>0&&<span>Combustible: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.combustibleViaje).toLocaleString("es-MX")}</strong></span>}
               {Number(f.casetas)>0&&<span>Casetas: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.casetas).toLocaleString("es-MX")}</strong></span>}
-              <span style={{marginLeft:"auto",fontWeight:700}}>Total: <strong style={{color:"var(--red)"}}>{"$"+((Number(f.viaticos)||0)+(Number(f.combustibleExtra)||0)+(Number(f.casetas)||0)+(Number(f.gastosExtras)||0)+(Number(f.costoEstadias)||0)).toLocaleString("es-MX")}</strong></span>
+              <span style={{marginLeft:"auto",fontWeight:700}}>Total: <strong style={{color:"var(--red)"}}>{"$"+((Number(f.viaticos)||0)+(Number(f.combustibleViaje)||0)+(Number(f.casetas)||0)+(Number(f.gastosExtras)||0)+(Number(f.costoEstadias)||0)).toLocaleString("es-MX")}</strong></span>
             </div>
           )}
 
@@ -3193,7 +3192,7 @@ function HojaViajeModal({ units, drivers, remitentes, onClose, companyLogo, comp
   );
 }
 
-function NominaModal({ driver, trips, units = [], onClose, companyLogo, companyName, periodoInit = null }) {
+function NominaModal({ driver, trips, units = [], onClose, onSaveNomina, companyLogo, companyName, periodoInit = null }) {
   const [periodo, setPeriodo] = useState(periodoInit || { inicio: "", fin: "" });
   const [bonos, setBonos] = useState(0);
   const [estimulos, setEstimulos] = useState(0);
@@ -3227,6 +3226,19 @@ function NominaModal({ driver, trips, units = [], onClose, companyLogo, companyN
   const totalDeducciones = Number(deducciones);
   const totalNeto = totalPercepciones - totalDeducciones;
 
+  const doSave = () => {
+    if (!periodo.inicio || !periodo.fin) return alert("Define el período de la nómina");
+    const nomRec = {
+      id: uid(), driverId: driver.id, driverNombre: driver.nombre,
+      periodo: { ...periodo }, sueldoBase: editSueldo, comisionPct: editPct,
+      comisionViajes, bonos: Number(bonos), estimulos: Number(estimulos),
+      otrasPercepciones: Number(otrasPercepciones), deducciones: Number(deducciones),
+      notasDed, totalPercepciones, totalDeducciones, totalNeto,
+      viajesCount: viajesPeriodo.length, fecha: new Date().toLocaleDateString("es-MX"),
+      status: "pagada"
+    };
+    if (onSaveNomina) onSaveNomina(nomRec);
+  };
   const doPrint = () => {
     const logoHtml = companyLogo ? `<img src="${companyLogo}" style="height:50px;object-fit:contain" alt="Logo"/>` : `<div style="font-size:18px;font-weight:700;color:#0099CC">${companyName || "FLEET PRO"}</div>`;
     const w = window.open("", "_blank");
@@ -3361,6 +3373,7 @@ function NominaModal({ driver, trips, units = [], onClose, companyLogo, companyN
         </div>
         <div className="mftr">
           <button className="btn btn-ghost" onClick={onClose}>Cerrar</button>
+          <button className="btn btn-ghost btn-sm" onClick={doSave}>💾 Guardar Nómina</button>
           <button className="btn btn-cyan" onClick={doPrint}>🖨️ Imprimir Recibo</button>
         </div>
       </div>
@@ -6840,9 +6853,10 @@ function NominaPage({ drivers, units, trips, onOpenNomina, nominasAdmin = [], on
   );
 
   const getDriverStats = (driver) => {
-    const unit = units.find(u => u.operador === driver.id);
-    const viajesComp = trips.filter(t => !t.esExterno && t.status === "COMPLETADO");
-    const viajesOp = unit ? viajesComp.filter(t => t.unidadId === unit.id) : [];
+    const unit = units.find(u => u.operador === driver?.id);
+    const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate()-30);
+    const isoAgo = thirtyDaysAgo.toISOString().slice(0,10);
+    const viajesComp = trips.filter(t => !t.esExterno && t.status === "COMPLETADO" && toISO(t.fecha||"") >= isoAgo);
     const totalViajes = viajesOp.reduce((a, t) => a + (Number(t.costoOfrecido) || 0), 0);
     const comisionCalc = totalViajes * (Number(driver.porcentajeViaje) || 0) / 100;
     return { viajesCount: viajesOp.length, totalViajes, comisionCalc, unit };
@@ -11613,13 +11627,13 @@ const AYUDA_DATA = [
     color: "var(--blue)",
     preguntas: [
       { q: "¿Cómo funciona el catálogo de rutas y el auto-llenado?",
-        a: "Cada vez que guardas un viaje con origen y destino nuevos, la ruta queda guardada en el catálogo. La próxima vez que escribas el mismo origen, el sistema sugerirá destinos frecuentes (↗). Al seleccionar una ruta ya registrada, se auto-llena el tipo de viaje (Local/Foráneo) y la carga usual. Los km registrados del viaje anterior también se muestran como referencia. Esto facilita registrar viajes recurrentes al mismo cliente y ruta." },
+        a: "Cada vez que guardas un viaje con origen y destino nuevos, la ruta queda guardada en el catálogo con: tipo de viaje, km de la ruta y carga usual. Usa nombres descriptivos: 'Caterpillar Santa Catarina' en lugar de solo 'Santa Catarina'. Al escribir el mismo origen en un viaje nuevo, el sistema sugiere destinos frecuentes (↗) y auto-llena tipo de viaje y carga. Los km registrados también sirven de referencia." },
       { q: "¿Qué es el Tipo de Remolque y cuándo aparece?",
         a: "El selector de Tipo de Remolque aparece cuando la unidad es un trailer, tractocamión, torton o rabón — ya que estas unidades pueden usar diferentes tipos según el viaje: Caja Seca, Plataforma, Lowboy/Góndola, Cama Baja, Refrigerado, Tanque, Volteo, etc. Para camionetas o camiones con carrocería fija, el tipo ya está definido en la unidad y no necesita selector." },
       { q: "¿Qué son los KM Extra en un viaje?",
-        a: "El campo KM Extra permite registrar kilómetros adicionales por desvíos, entregas extras o rutas alternativas durante el viaje. Se suman al kilometraje total del viaje para mantener el control exacto del rendimiento de combustible y la facturación por distancia." },
+        a: "El campo KM Extra permite registrar kilómetros adicionales por desvíos o entregas extras. Se suman automáticamente a los KM de la Ruta para calcular el KM Total del viaje (KM Ruta + KM Extra = KM Total). El KM Total se descuenta del odómetro de la unidad para el control de mantenimientos y para los reportes de rendimiento." },
       { q: "¿Cómo se concilia el combustible con los viajes?",
-        a: "Los viajes propios incluyen el campo Combustible Extra ($) para registrar recargas en ruta. En Gráficas & Reportes → Viajes, el costo total incluye estos combustibles adicionales. Para el rendimiento exacto por unidad, ve a Gráficas → Unidades donde se calcula el rendimiento km/litro con base en los registros del módulo de Combustible." },
+        a: "Cada viaje propio (local y foráneo) tiene el campo 'Combustible del Viaje ($)' para registrar el costo del combustible usado en esa ruta específica. Este dato aparece en los reportes de costo por viaje. Adicionalmente, el módulo de Combustible registra las cargas físicas con litros, precio/litro y odómetro de la unidad — estos registros sirven para calcular el rendimiento km/litro por unidad en Gráficas → Unidades." },
       { q: "¿Cómo registro un viaje propio?",
         a: "Ve a Flota → Viajes & Logística → '➕ Nuevo Viaje'. Primero elige el tipo: Viaje Local (campos básicos: precio y gastos extra) o Viaje Foráneo (todos los campos incluyendo Viáticos, Combustible Extra, Casetas y Estadías). Selecciona unidad, origen, destino, fechas, cliente y carga. Al terminar, agrega evidencias de entrega y guarda." },
       { q: "¿Qué son los Viáticos, Combustible Extra y Casetas en un viaje?",
@@ -11637,7 +11651,7 @@ const AYUDA_DATA = [
       { q: "¿Qué es la Hoja de Instrucción y cómo la genero?",
         a: "La Hoja de Instrucción es un documento para el operador con los detalles del viaje: folio, unidad, ruta, hora de cita en origen y destino, datos del cliente, carga y notas. Se genera desde Viajes & Logística → botón '📋 Hoja de Instrucción'. Puedes seleccionar la hora de cita con un menú desplegable (intervalos de 30 minutos). Usa '🖨️ Imprimir / PDF' para abrir el diálogo de impresión y guardarla como PDF." },
       { q: "¿Puedo filtrar los viajes por período?",
-        a: "Sí. En Viajes & Logística hay una barra de filtros con: (1) Período: Todos, Esta semana, Mes, Trimestre, Año o 📅 Personalizado con fechas De/Hasta exactas. (2) Tipo: Todos, Propios o Externos. El reporte de impresión respeta ambos filtros." },
+        a: "En Viajes & Logística hay una barra de filtros con: Período (Todos, Esta semana, Mes, Trimestre, Año o Personalizado) y Tipo (Todos, Propios, Externos). El reporte de impresión respeta ambos filtros." },
       { q: "¿Cómo descargo las evidencias de un viaje?",
         a: "En la tabla de viajes, haz clic en el ícono de cámara 📷 para ver las evidencias. Cada foto tiene un botón ⬇️ que descarga directamente como JPG a tu carpeta de Descargas. También puedes usar 'Descargar todas' para bajar todas las fotos del viaje de una vez. En celular, las fotos se guardan en el carrete de fotografías." },
     ]
@@ -11774,6 +11788,12 @@ const AYUDA_DATA = [
     id: "nominas", icono: "💰", titulo: "Nóminas",
     color: "var(--cyan)",
     preguntas: [
+      { q: "¿Por qué debo elegir el período antes de abrir la nómina?",
+        a: "El período (fecha inicio a fecha fin) determina qué viajes completados se incluyen en el cálculo de comisiones del operador. Al hacer clic en '💵 Generar Nómina', primero aparece un selector de persona y período — una vez elegidos, la nómina se abre con todos los viajes de ese período ya cargados y el período pre-rellenado. No es necesario volver a capturar las fechas." },
+      { q: "¿Cómo guardo una nómina generada?",
+        a: "Al abrir la nómina de un operador, ajusta los valores (sueldo base, bonos, deducciones) y haz clic en '💾 Guardar Nómina'. Esto registra el recibo en el sistema con fecha, período, viajes incluidos y totales. También puedes imprimir con '🖨️ Imprimir Recibo'. Las nóminas guardadas se almacenan en Firebase." },
+      { q: "¿Cómo se calculan los viajes en la nómina del operador?",
+        a: "El sistema busca la unidad asignada al operador (módulo Unidades → campo Operador). Luego filtra los viajes PROPIOS con status COMPLETADO dentro del período seleccionado que correspondan a esa unidad. La comisión se calcula como: Viajes del período × % de comisión configurado en el perfil del conductor." },
       { q: "¿Cómo funciona la nómina de operadores?",
         a: "Ve a Finanzas → Nóminas → pestaña Operadores. Haz clic en '💵 Nómina' para generar el recibo de un operador, o en '✏️' para editarlo directamente. El sistema calcula sueldo base más comisión por viajes completados (según % configurado en el perfil). Puedes editar los montos antes de imprimir." },
       { q: "¿Qué es la nómina administrativa?",
@@ -13032,7 +13052,7 @@ ${fac.fechaPago ? `<div style="margin-top:14px;background:#D4F4DD;border-radius:
       {modal?.type === "cartaporte" && <CartaPorteModal key={modal.data?.id||modal._ts||"new-cp"} cartaporte={modal.data} clientes={clientes} units={units} drivers={drivers} branding={branding} onSave={f=>{FacC.save({...f,id:f.id||uid()});setModal(null);}} onClose={()=>setModal(null)}/>}
       {modal?.type === "proveedor" && <ProveedorModal key={modal.data?.id || "new-prov"} proveedor={modal.data} onSave={p => PVC.save({ ...p, id: p.id || uid() })} onClose={() => setModal(null)} />}
       {modal?.type === "hojaViaje" && <HojaViajeModal units={units} drivers={drivers} remitentes={remitentes} onClose={() => setModal(null)} companyLogo={branding.logo} companyName={branding.nombre} />}
-      {modal?.type === "nomina" && <NominaModal driver={modal.data} trips={trips} units={units} onClose={() => setModal(null)} companyLogo={branding.logo} companyName={branding.nombre} />}
+      {modal?.type === "nomina" && <NominaModal driver={modal.data} trips={trips} units={units} onClose={() => setModal(null)} companyLogo={branding.logo} companyName={branding.nombre} periodoInit={modal.periodo||null} onSaveNomina={async n=>{const list=[...(nominasAdmin||[]),n];await sv("fp6:nominasAdmin",list);setNominasAdmin(list);}}/>}
       {confirm && <Confirm msg={confirm.msg} onOk={confirm.onOk} onCancel={() => setConfirm(null)} />}
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
     </>
