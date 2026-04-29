@@ -1397,7 +1397,7 @@ function TripModal({ trip, units, clientes = [], rutasCatalogo = [], tiposPerson
     }
   }, [f.origen, f.destino]);
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
-  const dist = f.kmLlegada && f.kmSalida ? Number(f.kmLlegada) - Number(f.kmSalida) : null;
+  const dist = f.kmRuta ? Number(f.kmRuta) : null;
   const ok = (_e) => {
     if (!f.unidadId || !f.origen) return alert("Unidad y origen requeridos");
     // Save ruta to catalog if not already present
@@ -3207,7 +3207,7 @@ function NominaModal({ driver, trips, units = [], onClose, onSaveNomina, company
 
   const viajesOp = trips.filter(t =>
     !t.esExterno &&
-    t.status === "COMPLETADO" &&
+    (t.status === "COMPLETADO" || t.status === "EN RUTA") &&
     unitDelDriver &&
     t.unidadId === unitDelDriver.id
   );
@@ -3215,7 +3215,7 @@ function NominaModal({ driver, trips, units = [], onClose, onSaveNomina, company
   // Filter trips in period
   const viajesPeriodo = viajesOp.filter(t => {
     if (!periodo.inicio || !periodo.fin) return true;
-    const iso = toISO(t.fechaReg || t.fecha);
+    const iso = toISO(t.fecha);
     if (!iso) return false;
     return iso >= toISO(periodo.inicio) && iso <= toISO(periodo.fin);
   });
@@ -4762,13 +4762,13 @@ function printTripsReport({ trips, units, externos = [], companyLogo = "", compa
   @media print{@page{size:A4 landscape;margin:10mm}}
   </style></head><body>`);
   w.document.write(`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:3px solid #0099CC;padding-bottom:8px"><div>${logoHtml}</div><div style="font-size:11px;color:#666">Reporte de Viajes · ${new Date().toLocaleDateString("es-MX")}</div></div>`);
-  w.document.write(`<h1>🗺️ REPORTE DE VIAJES — FLOTA COMPLETA</h1><table><thead><tr><th>Tipo</th><th>Unidad/Empresa</th><th>Origen</th><th>Destino</th><th>Salida</th><th>Regreso</th><th>KM</th><th>Cliente</th><th>Status</th></tr></thead><tbody>`);
+  w.document.write(`<h1>🗺️ REPORTE DE VIAJES — FLOTA COMPLETA</h1><table><thead><tr><th>Tipo</th><th>Unidad/Empresa</th><th>Origen</th><th>Destino</th><th>Fecha</th><th>KM</th><th>Cliente</th><th>Status</th></tr></thead><tbody>`);
   trips.forEach(t => {
     const isExt = t.esExterno;
     const u = isExt ? null : units.find(u => u.id === t.unidadId);
     const ext = isExt ? externos.find(e => e.id === t.unidadId) : null;
     const dist = t.kmLlegada && t.kmSalida ? Number(t.kmLlegada) - Number(t.kmSalida) : 0;
-    w.document.write(`<tr><td>${isExt ? "EXT" : "INT"}</td><td>${isExt ? ext?.empresa : `${u?.num} ${u?.placas}`}</td><td>${t.origen}</td><td>${t.destino || "—"}</td><td>${t.fecha}</td><td>${t.fechaReg || "Pendiente"}</td><td>${dist ? fmtN(dist) + " km" : "—"}</td><td>${t.cliente || "—"}</td><td>${t.status}</td></tr>`);
+    w.document.write(`<tr><td>${isExt ? "EXT" : "INT"}</td><td>${isExt ? ext?.empresa : `${u?.num} ${u?.placas}`}</td><td>${t.origen}</td><td>${t.destino || "—"}</td><td>${t.fecha}</td><td>${(t.kmTotal||t.kmRuta) ? fmtN(t.kmTotal||t.kmRuta) + " km" : "—"}</td><td>${t.cliente || "—"}</td><td>${t.status}</td></tr>`);
   });
   w.document.write(`</tbody></table><p style="margin-top:16px;font-size:10px;color:#999">Total viajes: ${trips.length} | Generado: ${new Date().toLocaleDateString("es-MX", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p></body></html>`);
   w.document.close(); w.focus(); setTimeout(() => w.print(), 500);
@@ -4804,7 +4804,7 @@ function printTripProfit({ trip, unit, fuels, maints, externos = [] }) {
       <p style="margin-top:16px;font-size:10px;color:#999">Generado: ${new Date().toLocaleDateString("es-MX")}</p>
     </body></html>`);
   } else {
-    const dist = (Number(trip.kmLlegada) || 0) - (Number(trip.kmSalida) || 0);
+    const dist = Number(trip.kmTotal) || Number(trip.kmRuta) || 0;
     const fuelTrip = fuels.filter(f => { const iso = toISO(f.fecha); const tiso = toISO(trip.fecha); return f.unidadId === trip.unidadId && iso >= tiso });
     const costoComb = fuelTrip.reduce((a, f) => a + (Number(f.litros) || 0) * (Number(f.precio) || 0), 0);
     const maintTrip = maints.filter(m => { const iso = toISO(m.fechaEjec); const tiso = toISO(trip.fecha); return m.unidadId === trip.unidadId && iso >= tiso && m.realizado === "SI" });
@@ -6537,11 +6537,11 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
       <div className="card-body">
         {fil.length === 0 ? <div className="empty"><div className="empty-icon">🗺️</div><p>Sin viajes</p></div> :
           <table>
-            <thead><tr><th>Tipo</th><th>Unidad/Empresa</th><th>Origen → Destino</th><th>Salida</th><th>Regreso</th><th>KM</th><th>Cliente</th><th>Evid.</th>{isAdmin && <th>💰</th>}<th>Acciones</th></tr></thead>
+            <thead><tr><th>Tipo</th><th>Unidad/Empresa</th><th>Origen → Destino</th><th>Fecha</th><th>KM</th><th>Cliente</th><th>Evid.</th>{isAdmin && <th>💰</th>}<th>Acciones</th></tr></thead>
             <tbody>{fil.map(t => {
               const u = t.tipo === "PROPIO" ? units.find(u => u.id === t.unidadId) : null;
               const ext = t._esExternoRec ? t : (t.tipo === "EXTERNO" ? externos.find(e => e.id === t.unidadId) : null);
-              const dist = t.kmLlegada && t.kmSalida ? Number(t.kmLlegada) - Number(t.kmSalida) : null;
+              const dist = t.kmTotal || t.kmRuta || null;
               const hasEvid = (t.evidencias || []).length > 0;
               return (
                 <tr key={t.id} style={{background: t._esExternoRec ? "rgba(130,80,255,.04)" : ""}}>
@@ -6552,7 +6552,6 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
                   </td>
                   <td style={{ fontSize: 12 }}><span style={{ color: "var(--cyan)" }}>📍{t.origen}</span><span style={{ color: "var(--muted)", margin: "0 5px" }}>→</span><span>{t.destino || "—"}</span></td>
                   <td style={{ fontSize: 12 }}>{t.fecha || "—"}</td>
-                  <td style={{ fontSize: 12, color: t.fechaReg ? "var(--text)" : "var(--muted)" }}>{t.fechaReg || "Pendiente"}</td>
                   <td style={{ color: "var(--cyan)", fontFamily: "var(--font-hd)", fontWeight: 700 }}>{dist ? `${fmtN(dist)} km` : "—"}</td>
                   <td style={{ fontSize: 12 }}>{t.cliente || "—"}</td>
                   <td>{hasEvid ? <button className="btn btn-ghost btn-xs"
@@ -6854,9 +6853,7 @@ function NominaPage({ drivers, units, trips, onOpenNomina, nominasAdmin = [], on
 
   const getDriverStats = (driver) => {
     const unit = units.find(u => u.operador === driver?.id);
-    const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate()-30);
-    const isoAgo = thirtyDaysAgo.toISOString().slice(0,10);
-    const viajesComp = trips.filter(t => !t.esExterno && t.status === "COMPLETADO" && toISO(t.fecha||"") >= isoAgo);
+    const viajesOp = unit ? trips.filter(t => !t.esExterno && t.unidadId === unit.id) : [];
     const totalViajes = viajesOp.reduce((a, t) => a + (Number(t.costoOfrecido) || 0), 0);
     const comisionCalc = totalViajes * (Number(driver.porcentajeViaje) || 0) / 100;
     return { viajesCount: viajesOp.length, totalViajes, comisionCalc, unit };
