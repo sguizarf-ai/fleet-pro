@@ -4178,7 +4178,30 @@ function FacturaModal({ factura, clientes, viajes, branding = {}, onSave, onClos
       emailReceptor: cli.email || p.emailReceptor || "",
     }));
   };
-  useEffect(() => { if (!f.viajeId) return; const v=(viajes||[]).find(vj=>vj.id===f.viajeId); if(!v) return; const cb={descripcion:"Flete "+(v.origen||"")+" -> "+(v.destino||""),cantidad:1,unidad:"E48",claveSAT:"78101800",precioUnit:Number(v.costoOfrecido)||0,importe:Number(v.costoOfrecido)||0,precioUnitario:Number(v.costoOfrecido)||0}; setF(p=>({...p,conceptos:p.conceptos&&p.conceptos.length&&p.conceptos[0].descripcion?p.conceptos:[cb]})); const cliId=v.clienteId||(clientes||[]).find(c=>c.nombre===v.cliente)?.id; if(cliId) { const cli=(clientes||[]).find(c=>c.id===cliId); if(cli) setF(p=>({...p,clienteId:cliId,rfcReceptor:cli.rfc||"",nombreReceptor:cli.nombre||"",regimenFiscalReceptor:cli.regimenFiscal||"601",usoCFDI:cli.usoCFDI||"G03",formaPago:cli.formaPago||"03",metodoPago:cli.metodoPago||"PUE",diasCredito:cli.diasCreditoDefault||30,cpReceptor:cli.codigoPostal||"",emailReceptor:cli.email||""})); } }, []);
+  useEffect(() => {
+    if (!f.viajeId || !(clientes||[]).length) return;
+    const v = (viajes||[]).find(vj => vj.id === f.viajeId);
+    if (!v) return;
+    const cliId = v.clienteId || (clientes||[]).find(c => c.nombre === v.cliente)?.id || (clientes||[]).find(c => c.nombreCorto === v.cliente)?.id;
+    const cli = cliId ? (clientes||[]).find(c => c.id === cliId) : null;
+    const cb = { descripcion: "Flete " + (v.origen||"") + " hacia " + (v.destino||""), cantidad: 1, unidad: "E48", claveSAT: "78101800", precioUnitario: Number(v.costoOfrecido)||0, importe: Number(v.costoOfrecido)||0 };
+    setF(p => ({
+      ...p,
+      conceptos: p.conceptos && p.conceptos.length && p.conceptos[0].descripcion ? p.conceptos : [cb],
+      ...(cli ? {
+        clienteId: cliId,
+        nombreReceptor: cli.nombre || "",
+        rfcReceptor: cli.rfc || "",
+        regimenFiscalReceptor: cli.regimenFiscal || "601",
+        usoCFDI: cli.usoCFDI || "G03",
+        formaPago: cli.formaPago || "03",
+        metodoPago: cli.metodoPago || "PUE",
+        diasCredito: cli.diasCreditoDefault || 30,
+        cpReceptor: cli.codigoPostal || "",
+        emailReceptor: cli.email || "",
+      } : {}),
+    }));
+  }, [f.viajeId, (clientes||[]).length]);
 
   const updConcepto = (idx, k, val) => setF(p => ({ ...p, conceptos: p.conceptos.map((c,i) => i===idx ? {...c,[k]:val} : c) }));
   const addConcepto = () => setF(p => ({ ...p, conceptos: [...p.conceptos, { descripcion: "", cantidad: 1, unidad: "E48", precioUnitario: 0, claveProducto: "78101803" }] }));
