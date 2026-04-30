@@ -1382,7 +1382,7 @@ function MaintModal({ maint, units, proveedores, onSave, onClose }) {
   );
 }
 function TripModal({ trip, units, drivers = [], clientes = [], rutasCatalogo = [], tiposPersonalizados = [], onSaveRuta, onSave, onClose }) {
-  const [f, setF] = useState(trip || { unidadId: "", esExterno: false, tipoViaje: "local", origen: "", destino: "", fecha: "", kmRuta: "", kmExtra: "", carga: "", cliente: "", status: "EN RUTA", notas: "", costoOfrecido: "", gastosExtras: "", costoEstadias: "", casetas: "", viaticos: "", combustibleViaje: "", tipoRemolque: "", operadorViaje: "", comisionViaje: "", tipoComprobante: "", evidencias: [] });
+  const [f, setF] = useState(trip || { unidadId: "", esExterno: false, tipoViaje: "local", origen: "", destino: "", fecha: "", kmRuta: "", kmExtra: "", carga: "", cliente: "", clienteId: "", status: "EN RUTA", notas: "", costoOfrecido: "", gastosExtras: "", costoEstadias: "", casetas: "", viaticos: "", combustibleViaje: "", tipoRemolque: "", operadorViaje: "", comisionViaje: "", tipoComprobante: "", evidencias: [] });
   const [uploading, setUploading] = useState(false);
   // Auto-fill route data from catalog when origen+destino selected
   useEffect(() => {
@@ -1427,7 +1427,7 @@ function TripModal({ trip, units, drivers = [], clientes = [], rutasCatalogo = [
             {/* Cliente con selector */}
             <div className="field s2">
               <label>Cliente</label>
-              <select value={f.cliente||""} onChange={e=>setF(p=>({...p,cliente:e.target.value}))} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}>
+              <select value={f.cliente||""} onChange={e=>{const cli=(clientes||[]).find(c=>c.nombre===e.target.value);setF(p=>({...p,cliente:e.target.value,clienteId:cli?.id||""}));}} style={{background:"var(--bg0)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",width:"100%"}}>
                 <option value="">— Seleccionar cliente —</option>
                 {(clientes||[]).filter(c=>c.status==="ACTIVO"||!c.status).map(c=><option key={c.id} value={c.nombreCorto||c.nombre}>{c.nombreCorto||c.nombre}</option>)}
               </select>
@@ -4163,26 +4163,22 @@ function FacturaModal({ factura, clientes, viajes, branding = {}, onSave, onClos
   const cliente = clientes.find(c => c.id === f.clienteId);
 
   const handleClienteChange = (clienteId) => {
-    const cli = clientes.find(c => c.id === clienteId);
-    setF(p => ({ ...p, clienteId,
-      diasCredito: cli?.diasCreditoDefault || 30,
-      usoCFDI: cli?.usoCFDI || p.usoCFDI,
-      formaPago: cli?.formaPago || p.formaPago,
-      metodoPago: cli?.metodoPago || p.metodoPago,
-      regimenFiscalReceptor: cli?.regimenFiscal || p.regimenFiscalReceptor,
+    const cli = (clientes||[]).find(c => c.id === clienteId);
+    if (!cli) return setF(p => ({ ...p, clienteId }));
+    setF(p => ({ ...p,
+      clienteId,
+      rfcReceptor: cli.rfc || p.rfcReceptor || "",
+      nombreReceptor: cli.nombre || p.nombreReceptor || "",
+      regimenFiscalReceptor: cli.regimenFiscal || p.regimenFiscalReceptor || "601",
+      usoCFDI: cli.usoCFDI || p.usoCFDI || "G03",
+      formaPago: cli.formaPago || p.formaPago || "01",
+      metodoPago: cli.metodoPago || p.metodoPago || "PUE",
+      diasCredito: cli.diasCreditoDefault || p.diasCredito || 30,
+      cpReceptor: cli.codigoPostal || p.cpReceptor || "",
+      emailReceptor: cli.email || p.emailReceptor || "",
     }));
   };
-
-  useEffect(() => {
-    if (f.viajeId) {
-      const v = (viajes||[]).find(vj => vj.id === f.viajeId);
-      if (v && v.costoOfrecido) {
-        setF(p => ({ ...p,
-          conceptos: [{ descripcion: `Servicio de flete ${v.origen||""} → ${v.destino||""}`, cantidad: 1, unidad: "E48", precioUnitario: v.costoOfrecido, claveProducto: "78101803" }]
-        }));
-      }
-    }
-  }, [f.viajeId]);
+  useEffect(() => { if (f.viajeId) { const v=(viajes||[]).find(vj=>vj.id===f.viajeId); if(v){const cb={descripcion:"Flete "+(v.origen||"")+" -> "+(v.destino||""),cantidad:1,unidad:"E48",claveSAT:"78101800",precioUnit:Number(v.costoOfrecido)||0,importe:Number(v.costoOfrecido)||0}; setF(p=>({...p,conceptos:p.conceptos&&p.conceptos.length&&p.conceptos[0].descripcion?p.conceptos:[cb]})); const cliId=v.clienteId||(clientes||[]).find(c=>c.nombre===v.cliente)?.id; if(cliId&&cliId!==f.clienteId)handleClienteChange(cliId);} } }, [f.viajeId]);
 
   const updConcepto = (idx, k, val) => setF(p => ({ ...p, conceptos: p.conceptos.map((c,i) => i===idx ? {...c,[k]:val} : c) }));
   const addConcepto = () => setF(p => ({ ...p, conceptos: [...p.conceptos, { descripcion: "", cantidad: 1, unidad: "E48", precioUnitario: 0, claveProducto: "78101803" }] }));
