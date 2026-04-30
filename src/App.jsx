@@ -4156,7 +4156,7 @@ ${f.notas?`<div class="f" style="margin-bottom:10px"><label>Notas</label>${f.not
 }
 
 function FacturaModal({ factura, clientes, viajes, branding = {}, onSave, onClose }) {
-  const DEFAULTS_FAC = { serie: "A", numeroFactura: "", clienteId: "", fechaEmision: "", diasCredito: 30, viajeId: "", formaPago: "03", metodoPago: "PUE", usoCFDI: "G03", regimenFiscalReceptor: "601", moneda: "MXN", condicionesPago: "", conceptos: [{ descripcion: "", cantidad: 1, unidad: "E48", precioUnitario: 0, claveProducto: "78101803" }], notas: "", tipoDoc: "factura" };
+  const DEFAULTS_FAC = { serie: "A", numeroFactura: "", clienteId: "", nombreReceptor: "", rfcReceptor: "", cpReceptor: "", emailReceptor: "", fechaEmision: "", diasCredito: 30, viajeId: "", formaPago: "03", metodoPago: "PUE", usoCFDI: "G03", regimenFiscalReceptor: "601", moneda: "MXN", condicionesPago: "", conceptos: [{ descripcion: "", cantidad: 1, unidad: "E48", precioUnitario: 0, claveProducto: "78101803" }], notas: "", tipoDoc: "factura" };
   const [f, setF] = useState(factura ? { ...DEFAULTS_FAC, ...factura, conceptos: factura.conceptos || [{ descripcion: factura.notas||"", cantidad: 1, unidad: "E48", precioUnitario: factura.subtotal||0, claveProducto: "78101803" }] } : { ...DEFAULTS_FAC });
 
   const ch = k => e => setF(p => ({ ...p, [k]: e.target.value }));
@@ -4346,6 +4346,20 @@ ${f.notas ? `<div class="field" style="margin-top:14px"><label>Notas / Observaci
                 <div><strong>CP:</strong> {cliente.codigoPostal||"—"}</div><div><strong>Email:</strong> {cliente.email||"—"}</div>
               </div>
             </div>}
+            <div className="fg" style={{marginTop:8}}>
+              <div className="field s2">
+                <label>Razón Social del Receptor *</label>
+                <input value={f.nombreReceptor||cliente?.nombre||""} onChange={ch("nombreReceptor")} placeholder="Nombre o Razón Social del cliente" style={{fontWeight:600}}/>
+              </div>
+              <div className="field">
+                <label>RFC Receptor *</label>
+                <input value={f.rfcReceptor||cliente?.rfc||""} onChange={ch("rfcReceptor")} placeholder="RFC del receptor" style={{textTransform:"uppercase"}}/>
+              </div>
+              <div className="field">
+                <label>CP Fiscal Receptor *</label>
+                <input value={f.cpReceptor||cliente?.codigoPostal||""} onChange={ch("cpReceptor")} placeholder="Código Postal fiscal"/>
+              </div>
+            </div>
             <div className="field">
               <label>Régimen Fiscal Receptor</label>
               <select value={f.regimenFiscalReceptor||"601"} onChange={ch("regimenFiscalReceptor")} style={selStyle}>
@@ -4374,7 +4388,7 @@ ${f.notas ? `<div class="field" style="margin-top:14px"><label>Notas / Observaci
               <label>Viaje relacionado (opcional — auto-llena conceptos)</label>
               <select value={f.viajeId} onChange={ch("viajeId")} style={selStyle}>
                 <option value="">— Sin relacionar —</option>
-                {(viajes||[]).filter(v=>v.status==="COMPLETADO").map(v=><option key={v.id} value={v.id}>{v.fecha} · {v.origen} → {v.destino} · ${Number(v.costoOfrecido||0).toLocaleString("es-MX")}</option>)}
+                {(viajes||[]).map(v=><option key={v.id} value={v.id}>{v.fecha} · {v.origen} → {v.destino} · ${Number(v.costoOfrecido||0).toLocaleString("es-MX")}</option>)}
               </select>
             </div>
           </div>
