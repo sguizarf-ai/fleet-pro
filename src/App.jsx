@@ -1506,20 +1506,16 @@ function TripModal({ trip, units, drivers = [], clientes = [], rutasCatalogo = [
             <div className="field"><label>Comisión Operador ($)</label><input value={f.comisionViaje||""} onChange={ch("comisionViaje")} type="number" min="0" step="0.01" placeholder="Se calcula en nómina si se deja vacío" title="Deja vacío para calcular automáticamente con el % del operador en nómina, o ingresa un monto fijo"/></div>
             <div className="field"><label>Casetas y Peajes ($)</label><input value={f.casetas||""} onChange={ch("casetas")} type="number" min="0" placeholder=""/></div>
             <div className="field"><label>Costo Estadías ($)</label><input value={f.costoEstadias||""} onChange={ch("costoEstadias")} type="number" min="0" placeholder=""/></div>
-            {f.tipoViaje==="foraneo" && <>
+            {f.tipoViaje==="foraneo" && (
               <div className="field"><label>Viáticos Operador ($) <span style={{fontSize:10,color:"var(--muted)"}}>comidas</span></label><input value={f.viaticos} onChange={ch("viaticos")} type="number" min="0" placeholder=""/></div>
-            </>}
+            )}
             <div className="field"><label>Gastos Extras ($)</label><input value={f.gastosExtras} onChange={ch("gastosExtras")} type="number" min="0"/></div>
           </div>
 
-          {(Number(f.costoOfrecido) > 0) && <div style={{ marginTop:6, marginBottom:10, padding:"12px 16px", background: utilidadPropio >= 0 ? "#e8f8ee" : "#fdecea", borderRadius:10, border:`1px solid ${utilidadPropio>=0?"var(--green)":"var(--red)"}` }}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
-              <div>
-                <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700 }}>📊 UTILIDAD ESTIMADA: </span>
-                <span style={{ fontFamily: "var(--font-hd)", fontSize: 24, fontWeight: 700, color: utilidadPropio >= 0 ? "var(--green)" : "var(--red)" }}>{fmt$(utilidadPropio)}</span>
-                <div style={{fontSize:10,color:"var(--muted)",marginTop:2}}>ℹ️ Informativo — precio menos costos capturados (no incluye mantenimientos ni depreciación)</div>
-              </div>
-            </div>
+          {Number(f.costoOfrecido) > 0 && <div style={{marginTop:6,marginBottom:10,padding:"12px 16px",background:utilidadPropio>=0?"#e8f8ee":"#fdecea",borderRadius:10,border:`1px solid ${utilidadPropio>=0?"var(--green)":"var(--red)"}`}}>
+            <span style={{fontSize:11,color:"var(--muted)",fontWeight:700}}>📊 UTILIDAD ESTIMADA: </span>
+            <span style={{fontFamily:"var(--font-hd)",fontSize:24,fontWeight:700,color:utilidadPropio>=0?"var(--green)":"var(--red)"}}>{fmt$(utilidadPropio)}</span>
+            <div style={{fontSize:10,color:"var(--muted)",marginTop:2}}>ℹ️ Informativo — precio menos costos capturados (no incluye mantenimientos ni depreciación)</div>
           </div>}
 
           {(Number(f.viaticos)||0)+(Number(f.combustibleViaje)||0)+(Number(f.casetas)||0)+(Number(f.gastosExtras)||0)+(Number(f.costoEstadias)||0) > 0 && (
@@ -1661,17 +1657,12 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
             <div className="field"><label>Gastos Extras ($)</label><input value={f.gastosExtrasExt||""} onChange={ch("gastosExtrasExt")} type="number" min="0"/></div>
           </div>
           {(Number(f.precioCliente) > 0 || Number(f.costoPagar) > 0) && <div style={{ marginTop:6, marginBottom:10, padding:"12px 16px", background: utilidad >= 0 ? "#e8f8ee" : "#fdecea", borderRadius:10, border:`1px solid ${utilidad>=0?"var(--green)":"var(--red)"}` }}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
-              <div>
-                <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700 }}>📊 UTILIDAD ESTIMADA: </span>
-                <span style={{ fontFamily: "var(--font-hd)", fontSize: 24, fontWeight: 700, color: utilidad >= 0 ? "var(--green)" : "var(--red)" }}>{fmt$(utilidad)}</span>
-                <div style={{fontSize:10,color:"var(--muted)",marginTop:2}}>ℹ️ Informativo — precio al cliente menos costos del viaje (no incluye mantenimientos ni depreciación)</div>
-              </div>
-              <button className="btn btn-ghost btn-sm" style={{fontSize:11}} onClick={()=>window.printTripProfitExt&&window.printTripProfitExt({trip:f,costos:{costoPagar:Number(f.costoPagar)||0,costoEstadias:Number(f.costoEstadias)||0,gastosExtras:Number(f.gastosExtrasExt)||0}})}>🖨️ Imprimir</button>
-            </div>
+            <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700 }}>📊 UTILIDAD ESTIMADA: </span>
+            <span style={{ fontFamily: "var(--font-hd)", fontSize: 24, fontWeight: 700, color: utilidad >= 0 ? "var(--green)" : "var(--red)" }}>{fmt$(utilidad)}</span>
+            <div style={{fontSize:10,color:"var(--muted)",marginTop:2}}>ℹ️ Informativo — precio al cliente menos costos del viaje (no incluye mantenimientos ni depreciación)</div>
           </div>}
 
-          {/* 5. NOTAS */}
+          {/* 5. TIPO COMPROBANTE Y NOTAS */}
           <div className="field s2">
             <label>Tipo de Comprobante * <span style={{fontSize:10,color:"var(--orange)",fontWeight:400}}>— Obligatorio</span></label>
             <div style={{display:"flex",gap:8,flexWrap:"wrap",padding:"8px",borderRadius:8,border:`2px solid ${!f.tipoComprobante?"var(--orange)":"var(--border)"}`,background:"var(--bg0)"}}>
@@ -11815,11 +11806,11 @@ const AYUDA_DATA = [
       { q: "¿Qué significa el estado de Facturación en cada viaje?",
         a: "La columna Facturación en la tabla de viajes muestra: ✅ Facturado / 📋 Remisionado (ya se emitió el comprobante y está vinculado), 🧾 Req. Factura (el cliente pide factura, aún pendiente de emitir), 📋 Req. Remisión (el cliente pide remisión, aún pendiente), — (sin comprobante requerido). El tipo de comprobante se captura al crear el viaje con los botones '🧾 Factura', '📋 Remisión' o 'Sin comprobante'. Si la ruta es recurrente, el sistema recuerda automáticamente el tipo elegido para esa ruta." },
       { q: "¿Puedo ver el número de cada viaje en la tabla?",
-        a: "Sí. La primera columna de la tabla de viajes muestra un número de fila (#) que indica la posición del viaje dentro del filtro activo. Sirve para referenciar viajes durante la operación diaria. El número cambia si aplicas distintos filtros." },
+        a: "Sí. La primera columna de la tabla de viajes muestra un número (#) que indica la posición del viaje dentro del filtro activo. Sirve para referenciar viajes durante la operación diaria." },
       { q: "¿Qué campos son obligatorios al crear un viaje?",
-        a: "Los campos obligatorios (marcados con *) son: Cliente, Origen, Destino, Fecha, Carga / Mercancía, y Tipo de Comprobante. Este último debe seleccionarse siempre — si el cliente no requiere comprobante, elige '— Sin comprobante —'. El sistema no permitirá guardar el viaje si falta alguno de estos datos." },
+        a: "Los campos obligatorios (marcados con *) son: Cliente, Origen, Destino, Fecha, Carga / Mercancía, y Tipo de Comprobante. El Tipo de Comprobante debe seleccionarse siempre — si el cliente no requiere comprobante, elige '— Sin comprobante —'. El sistema no permitirá guardar el viaje si falta alguno de estos datos." },
       { q: "¿Cómo se muestra la utilidad estimada de un viaje?",
-        a: "Al capturar el precio al cliente y los costos del viaje (combustible, comisión del operador, casetas, viáticos si es foráneo, estadías, gastos extras), aparece automáticamente un recuadro verde o rojo con la Utilidad Estimada. Es informativo — no toma en cuenta mantenimientos, depreciación ni costos fijos de la empresa. Sirve para tener un estimado rápido antes de comprometerse con el viaje." }
+        a: "Al capturar el precio al cliente y los costos (combustible, comisión del operador, casetas, viáticos si es foráneo, estadías, gastos extras), aparece automáticamente un recuadro verde o rojo con la Utilidad Estimada. Es solo informativo — no incluye mantenimientos, depreciación ni costos fijos." },
       { q: "¿Cómo funciona la Comisión del Operador en un viaje?",
         a: "En cada viaje propio (local o foráneo) hay un campo 'Comisión Operador ($)' en la sección Datos Financieros. Si lo dejas vacío, la nómina calculará la comisión automáticamente con el porcentaje del conductor (ej. 10% del precio al cliente). Si en ese viaje el acuerdo fue diferente (un monto fijo distinto), capturas el monto exacto ahí y la nómina usará ese valor en lugar del porcentaje automático. Esto permite manejar viajes con comisiones especiales sin cambiar el porcentaje general del conductor." },
       { q: "¿Cómo se calcula la comisión en nóminas?",
