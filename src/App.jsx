@@ -1405,7 +1405,7 @@ function TripModal({ trip, units, drivers = [], clientes = [], rutasCatalogo = [
     if (!f.destino) return alert("⚠️ El campo Destino es obligatorio (*)");
     if (!f.fecha) return alert("⚠️ El campo Fecha es obligatorio (*)");
     if (!f.carga) return alert("⚠️ El campo Carga / Mercancía es obligatorio (*)");
-    if (!f.tipoComprobante) return alert("⚠️ Debes seleccionar un Tipo de Comprobante. Si no se requiere, elige '— Sin comprobante —'.");
+    if (f.tipoComprobante === undefined || f.tipoComprobante === null || f.tipoComprobante === "") return alert("⚠️ Debes seleccionar un Tipo de Comprobante. Si no se requiere, elige '— Sin comprobante —'.");
     if (!f.unidadId) return alert("⚠️ La Unidad es obligatoria");
     // Save ruta to catalog if not already present
     if (onSaveRuta && f.origen && f.destino) {
@@ -1512,7 +1512,7 @@ function TripModal({ trip, units, drivers = [], clientes = [], rutasCatalogo = [
             <div className="field"><label>Gastos Extras ($)</label><input value={f.gastosExtras} onChange={ch("gastosExtras")} type="number" min="0"/></div>
           </div>
 
-          {Number(f.costoOfrecido) > 0 && <div style={{marginTop:6,marginBottom:10,padding:"12px 16px",background:utilidadPropio>=0?"#e8f8ee":"#fdecea",borderRadius:10,border:`1px solid ${utilidadPropio>=0?"var(--green)":"var(--red)"}`}}>
+          {(Number(f.costoOfrecido) > 0 || Number(f.combustibleViaje) > 0 || Number(f.comisionViaje) > 0 || Number(f.casetas) > 0 || Number(f.gastosExtras) > 0 || Number(f.costoEstadias) > 0 || Number(f.viaticos) > 0) && <div style={{marginTop:6,marginBottom:10,padding:"12px 16px",background:utilidadPropio>=0?"#e8f8ee":"#fdecea",borderRadius:10,border:`1px solid ${utilidadPropio>=0?"var(--green)":"var(--red)"}`}}>
             <span style={{fontSize:11,color:"var(--muted)",fontWeight:700}}>📊 UTILIDAD ESTIMADA: </span>
             <span style={{fontFamily:"var(--font-hd)",fontSize:24,fontWeight:700,color:utilidadPropio>=0?"var(--green)":"var(--red)"}}>{fmt$(utilidadPropio)}</span>
             <div style={{fontSize:10,color:"var(--muted)",marginTop:2}}>ℹ️ Informativo — precio menos costos capturados (no incluye mantenimientos ni depreciación)</div>
@@ -1532,8 +1532,8 @@ function TripModal({ trip, units, drivers = [], clientes = [], rutasCatalogo = [
 
             <div className="field s2">
               <label>Tipo de Comprobante * <span style={{fontSize:10,color:"var(--orange)",fontWeight:400}}>— Obligatorio</span></label>
-              <div style={{display:"flex",gap:8,flexWrap:"wrap",padding:"8px",borderRadius:8,border:`2px solid ${!f.tipoComprobante?"var(--orange)":"var(--border)"}`,background:"var(--bg0)"}}>
-                {[["","— Sin comprobante —"],["factura","🧾 Factura (con IVA)"],["remision","📋 Remisión (sin IVA)"]].map(([v,lbl])=>(
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",padding:"8px",borderRadius:8,border:`2px solid ${(f.tipoComprobante===undefined||f.tipoComprobante===null||f.tipoComprobante==="")?"var(--orange)":"var(--border)"}`,background:"var(--bg0)"}}>
+                {[["ninguno","— Sin comprobante —"],["factura","🧾 Factura (con IVA)"],["remision","📋 Remisión (sin IVA)"]].map(([v,lbl])=>(
                   <button key={v} type="button" onClick={()=>setF(p=>({...p,tipoComprobante:v}))}
                     style={{padding:"8px 14px",borderRadius:8,border:`2px solid ${f.tipoComprobante===v?"var(--cyan)":"var(--border)"}`,
                     background:f.tipoComprobante===v?"var(--cyan)":"var(--bg0)",
@@ -1542,8 +1542,8 @@ function TripModal({ trip, units, drivers = [], clientes = [], rutasCatalogo = [
                   </button>
                 ))}
               </div>
-              {!f.tipoComprobante && <div style={{fontSize:11,color:"var(--orange)",marginTop:4}}>⚠️ Selecciona una opción para continuar</div>}
-              {f.tipoComprobante && <div style={{fontSize:11,color:"var(--muted)",marginTop:4}}>
+              {(f.tipoComprobante===undefined||f.tipoComprobante===null||f.tipoComprobante==="") && <div style={{fontSize:11,color:"var(--orange)",marginTop:4}}>⚠️ Selecciona una opción para continuar</div>}
+              {(f.tipoComprobante&&f.tipoComprobante!=="") && <div style={{fontSize:11,color:"var(--muted)",marginTop:4}}>
                 💡 Se recordará para viajes futuros en esta ruta con este cliente
               </div>}
             </div>
@@ -1570,7 +1570,7 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
     if (!f.destino) return alert("⚠️ El campo Destino es obligatorio (*)");
     if (!f.fecha) return alert("⚠️ El campo Fecha es obligatorio (*)");
     if (!f.carga) return alert("⚠️ El campo Carga / Mercancía es obligatorio (*)");
-    if (!f.tipoComprobante) return alert("⚠️ Debes seleccionar un Tipo de Comprobante. Si no se requiere, elige '— Sin comprobante —'.");
+    if (f.tipoComprobante === undefined || f.tipoComprobante === null || f.tipoComprobante === "") return alert("⚠️ Debes seleccionar un Tipo de Comprobante. Si no se requiere, elige '— Sin comprobante —'.");
     if (!f.empresa) return alert("⚠️ El campo Empresa Transportista es obligatorio");
     let finalForm = { ...f, id: f.id || uid(), pagoStatus: f.pagoStatus||"pendiente", pagoEvidencias: f.pagoEvidencias||[] };
     // Auto-create proveedor if new name entered
@@ -1656,7 +1656,7 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
             <div className="field"><label>Costo Estadías ($)</label><input value={f.costoEstadias} onChange={ch("costoEstadias")} type="number" min="0"/></div>
             <div className="field"><label>Gastos Extras ($)</label><input value={f.gastosExtrasExt||""} onChange={ch("gastosExtrasExt")} type="number" min="0"/></div>
           </div>
-          {(Number(f.precioCliente) > 0 || Number(f.costoPagar) > 0) && <div style={{ marginTop:6, marginBottom:10, padding:"12px 16px", background: utilidad >= 0 ? "#e8f8ee" : "#fdecea", borderRadius:10, border:`1px solid ${utilidad>=0?"var(--green)":"var(--red)"}` }}>
+          {(Number(f.precioCliente) > 0 || Number(f.costoPagar) > 0 || Number(f.costoEstadias) > 0 || Number(f.gastosExtrasExt) > 0) && <div style={{ marginTop:6, marginBottom:10, padding:"12px 16px", background: utilidad >= 0 ? "#e8f8ee" : "#fdecea", borderRadius:10, border:`1px solid ${utilidad>=0?"var(--green)":"var(--red)"}` }}>
             <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700 }}>📊 UTILIDAD ESTIMADA: </span>
             <span style={{ fontFamily: "var(--font-hd)", fontSize: 24, fontWeight: 700, color: utilidad >= 0 ? "var(--green)" : "var(--red)" }}>{fmt$(utilidad)}</span>
             <div style={{fontSize:10,color:"var(--muted)",marginTop:2}}>ℹ️ Informativo — precio al cliente menos costos del viaje (no incluye mantenimientos ni depreciación)</div>
@@ -1665,8 +1665,8 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
           {/* 5. TIPO COMPROBANTE Y NOTAS */}
           <div className="field s2">
             <label>Tipo de Comprobante * <span style={{fontSize:10,color:"var(--orange)",fontWeight:400}}>— Obligatorio</span></label>
-            <div style={{display:"flex",gap:8,flexWrap:"wrap",padding:"8px",borderRadius:8,border:`2px solid ${!f.tipoComprobante?"var(--orange)":"var(--border)"}`,background:"var(--bg0)"}}>
-              {[["","— Sin comprobante —"],["factura","🧾 Factura (con IVA)"],["remision","📋 Remisión (sin IVA)"]].map(([v,lbl])=>(
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",padding:"8px",borderRadius:8,border:`2px solid ${(f.tipoComprobante===undefined||f.tipoComprobante===null||f.tipoComprobante==="")?"var(--orange)":"var(--border)"}`,background:"var(--bg0)"}}>
+              {[["ninguno","— Sin comprobante —"],["factura","🧾 Factura (con IVA)"],["remision","📋 Remisión (sin IVA)"]].map(([v,lbl])=>(
                 <button key={v} type="button" onClick={()=>setF(p=>({...p,tipoComprobante:v}))}
                   style={{padding:"8px 14px",borderRadius:8,border:`2px solid ${f.tipoComprobante===v?"var(--cyan)":"var(--border)"}`,
                   background:f.tipoComprobante===v?"var(--cyan)":"var(--bg0)",
@@ -1675,7 +1675,7 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
                 </button>
               ))}
             </div>
-            {!f.tipoComprobante && <div style={{fontSize:11,color:"var(--orange)",marginTop:4}}>⚠️ Selecciona una opción para continuar</div>}
+            {(f.tipoComprobante===undefined||f.tipoComprobante===null||f.tipoComprobante==="") && <div style={{fontSize:11,color:"var(--orange)",marginTop:4}}>⚠️ Selecciona una opción para continuar</div>}
           </div>
           <div className="field s2" style={{marginBottom:12}}><label>Notas</label><textarea value={f.notas} onChange={ch("notas")} rows={2} style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg0)",color:"var(--text)",resize:"vertical"}}/></div>
 
@@ -6702,7 +6702,7 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
       <div className="card-body">
         {fil.length === 0 ? <div className="empty"><div className="empty-icon">🗺️</div><p>Sin viajes</p></div> :
           <table>
-            <thead><tr><th style={{width:32,textAlign:"center",color:"var(--muted)",fontSize:10}}>#</th><th>Tipo</th><th>Unidad/Empresa</th><th>Origen → Destino</th><th>Fecha</th><th>KM</th><th>Operador</th><th>Cliente</th><th>Facturación</th><th>Evid.</th>{isAdmin && <th title="Ver utilidad del viaje">💰</th>}<th>Acciones</th></tr></thead>
+            <thead><tr><th style={{width:32,textAlign:"center",color:"var(--muted)",fontSize:10}}>#</th><th>Tipo</th><th>Unidad/Empresa</th><th>Origen → Destino</th><th>Fecha</th><th>KM</th><th>Operador</th><th>Cliente</th><th>Tipo Comprobante</th><th>Evid.</th>{isAdmin && <th title="Ver utilidad del viaje">💰</th>}<th>Acciones</th></tr></thead>
             <tbody>{fil.map((t, idx) => {
               const u = t.tipo === "PROPIO" ? units.find(u => u.id === t.unidadId) : null;
               const drv = t.tipo === "PROPIO" ? (t.operadorViaje || u?.operador || "—") : (t._esExternoRec ? t.operador : "—");
@@ -6731,7 +6731,9 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
                            ? <span style={{background:"#E3F2FD",color:"#1565C0",padding:"2px 7px",borderRadius:20,fontWeight:700,fontSize:10}}>🧾 Req. Factura</span>
                            : t.tipoComprobante === "remision"
                              ? <span style={{background:"#FFF8E1",color:"#E65100",padding:"2px 7px",borderRadius:20,fontWeight:700,fontSize:10}}>📋 Req. Remisión</span>
-                             : <span style={{color:"var(--muted)",fontSize:10}}>—</span>}
+                             : t.tipoComprobante === "ninguno"
+                               ? <span style={{background:"var(--bg2)",color:"var(--muted)",padding:"2px 7px",borderRadius:20,fontWeight:700,fontSize:10}}>— Sin comprobante</span>
+                               : <span style={{color:"var(--muted)",fontSize:10}}>—</span>}
                    </td>
                    <td>{hasEvid ? <button className="btn btn-ghost btn-xs" onClick={() => setEvidModal({ trip: t, unit: u, ext: externos.find(e => e.id === t.unidadId) })} title="Ver y enviar evidencias">📸 {t.evidencias.length}</button> : <span style={{ color: "var(--muted)" }}>—</span>}</td>
                    {isAdmin && <td><button className="btn btn-ghost btn-xs" onClick={() => printTripProfit({ trip: t, unit: u, fuels, maints, externos, trips })} title="Ver utilidad del viaje">💰</button></td>}
