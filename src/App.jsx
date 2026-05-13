@@ -1404,7 +1404,6 @@ function TripModal({ trip, units, drivers = [], clientes = [], rutasCatalogo = [
     if (!f.origen) return alert("⚠️ El campo Origen es obligatorio (*)");
     if (!f.destino) return alert("⚠️ El campo Destino es obligatorio (*)");
     if (!f.fecha) return alert("⚠️ El campo Fecha es obligatorio (*)");
-    if (!f.carga) return alert("⚠️ El campo Carga / Mercancía es obligatorio (*)");
     if (f.tipoComprobante === undefined || f.tipoComprobante === null || f.tipoComprobante === "") return alert("⚠️ Debes seleccionar un Tipo de Comprobante. Si no se requiere, elige '— Sin comprobante —'.");
     if (!f.unidadId) return alert("⚠️ La Unidad es obligatoria");
     // Save ruta to catalog if not already present
@@ -1491,7 +1490,7 @@ function TripModal({ trip, units, drivers = [], clientes = [], rutasCatalogo = [
             <div className="field s2"><label>Fecha del Viaje *</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))}/></div>
             <div className="field"><label>KM de la Ruta</label><input value={f.kmRuta||""} onChange={ch("kmRuta")} type="number" min="0" placeholder="Km de origen a destino" title="Kilómetros totales de esta ruta"/></div>
             <div className="field"><label>KM Extra (desvíos)</label><input value={f.kmExtra||""} onChange={ch("kmExtra")} type="number" min="0" placeholder="" title="Km adicionales por desvíos o entregas extras"/></div>
-            <div className="field s2"><label>Carga / Mercancía *</label><input value={f.carga} onChange={ch("carga")}/></div>
+            <div className="field s2"><label>Carga / Mercancía</label><input value={f.carga} onChange={ch("carga")}/></div>
           </div>
 
           {dist && <div style={{marginTop:6,marginBottom:10,padding:"10px 16px",background:"var(--bg2)",borderRadius:10,display:"flex",gap:8,alignItems:"center"}}>
@@ -1518,17 +1517,7 @@ function TripModal({ trip, units, drivers = [], clientes = [], rutasCatalogo = [
             <div style={{fontSize:10,color:"var(--muted)",marginTop:2}}>ℹ️ Informativo — precio menos costos capturados (no incluye mantenimientos ni depreciación)</div>
           </div>}
 
-          {(Number(f.viaticos)||0)+(Number(f.combustibleViaje)||0)+(Number(f.casetas)||0)+(Number(f.gastosExtras)||0)+(Number(f.costoEstadias)||0) > 0 && (
-            <div style={{marginBottom:10,padding:"8px 14px",background:"var(--bg2)",borderRadius:8,display:"flex",gap:12,flexWrap:"wrap",fontSize:12}}>
-              <span style={{color:"var(--muted)",fontWeight:700}}>💰 Costos:</span>
-              {Number(f.gastosExtras)>0&&<span>Extras: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.gastosExtras).toLocaleString("es-MX")}</strong></span>}
-              {Number(f.costoEstadias)>0&&<span>Estadías: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.costoEstadias).toLocaleString("es-MX")}</strong></span>}
-              {Number(f.viaticos)>0&&<span>Viáticos: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.viaticos).toLocaleString("es-MX")}</strong></span>}
-              {Number(f.combustibleViaje)>0&&<span>Combustible: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.combustibleViaje).toLocaleString("es-MX")}</strong></span>}
-              {Number(f.casetas)>0&&<span>Casetas: <strong style={{color:"var(--orange)"}}>{"$"+Number(f.casetas).toLocaleString("es-MX")}</strong></span>}
-              <span style={{marginLeft:"auto",fontWeight:700}}>Total: <strong style={{color:"var(--red)"}}>{"$"+((Number(f.viaticos)||0)+(Number(f.combustibleViaje)||0)+(Number(f.casetas)||0)+(Number(f.gastosExtras)||0)+(Number(f.costoEstadias)||0)).toLocaleString("es-MX")}</strong></span>
-            </div>
-          )}
+
 
             <div className="field s2">
               <label>Tipo de Comprobante * <span style={{fontSize:10,color:"var(--orange)",fontWeight:400}}>— Obligatorio</span></label>
@@ -1569,7 +1558,6 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
     if (!f.origen) return alert("⚠️ El campo Origen es obligatorio (*)");
     if (!f.destino) return alert("⚠️ El campo Destino es obligatorio (*)");
     if (!f.fecha) return alert("⚠️ El campo Fecha es obligatorio (*)");
-    if (!f.carga) return alert("⚠️ El campo Carga / Mercancía es obligatorio (*)");
     if (f.tipoComprobante === undefined || f.tipoComprobante === null || f.tipoComprobante === "") return alert("⚠️ Debes seleccionar un Tipo de Comprobante. Si no se requiere, elige '— Sin comprobante —'.");
     if (!f.empresa) return alert("⚠️ El campo Empresa Transportista es obligatorio");
     let finalForm = { ...f, id: f.id || uid(), pagoStatus: f.pagoStatus||"pendiente", pagoEvidencias: f.pagoEvidencias||[] };
@@ -1592,7 +1580,7 @@ function ExternoModal({ externo, onSave, onClose, tiposPersonalizados = [], prov
             <div className="field"><label>Fecha *</label><DatePicker value={f.fecha} onChange={v=>setF(p=>({...p,fecha:v}))}/></div>
             <div className="field"><label>Origen *</label><input value={f.origen} onChange={ch("origen")} placeholder="Ej: Caterpillar Sta. Catarina / Av. Industrial 200" list="ext-origenes-list"/><datalist id="ext-origenes-list">{[...new Set((rutasCatalogo||[]).map(r=>r.origen).filter(Boolean))].map((o,i)=><option key={i} value={o}/>)}</datalist></div>
             <div className="field"><label>Destino *</label><input value={f.destino} onChange={ch("destino")} placeholder="Ej: RIASA Huinala / Carr. Monterrey-Laredo km 15" list="ext-destinos-list"/><datalist id="ext-destinos-list">{[...new Set((rutasCatalogo||[]).map(r=>r.destino).filter(Boolean))].map((d,i)=><option key={i} value={d}/>)}</datalist></div>
-            <div className="field s2"><label>Carga / Mercancía *</label><input value={f.carga} onChange={ch("carga")} placeholder="Descripción de la carga"/></div>
+            <div className="field s2"><label>Carga / Mercancía</label><input value={f.carga} onChange={ch("carga")} placeholder="Descripción de la carga"/></div>
           </div>
 
           {/* 2. EMPRESA TRANSPORTISTA */}
@@ -6712,7 +6700,7 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
               return (
                 <tr key={t.id} style={{background: t._esExternoRec ? "rgba(130,80,255,.04)" : ""}}>
                   <td style={{textAlign:"center",color:"var(--muted)",fontSize:11,fontWeight:600}}>{idx + 1}</td>
-                  <td><Bdg c={t.tipo === "PROPIO" ? "bb" : "bp"} t={t.tipo === "PROPIO" ? "INT" : "EXT"} /></td>
+                  <td><Bdg c={t.tipo === "PROPIO" ? "bb" : "bp"} t={t.tipo === "PROPIO" ? (t.tipoViaje === "foraneo" ? "FORÁNEO" : "LOCAL") : "EXT"} /></td>
                   <td style={{ fontSize: 12 }}>
                     <strong>{t.tipo === "PROPIO" ? u?.num : (t._esExternoRec ? t.empresa : ext?.empresa)}</strong>
                     <span style={{ color: "var(--muted)", fontSize: 11 }}>{t.tipo === "PROPIO" ? u?.placas : (t._esExternoRec ? t.placas : ext?.contacto)}</span>
