@@ -1505,10 +1505,10 @@ function TripModal({ trip, units, drivers = [], clientes = [], rutasCatalogo = [
             <div className="field"><label>Combustible del Viaje ($)</label><input value={f.combustibleViaje||""} onChange={ch("combustibleViaje")} type="number" min="0" placeholder="Costo combustible usado en este viaje"/></div>
             <div className="field"><label>Comisión Operador ($)</label><input value={f.comisionViaje||""} onChange={ch("comisionViaje")} type="number" min="0" step="0.01" placeholder="Se calcula en nómina si se deja vacío" title="Deja vacío para calcular automáticamente con el % del operador en nómina, o ingresa un monto fijo"/></div>
             <div className="field"><label>Casetas y Peajes ($)</label><input value={f.casetas||""} onChange={ch("casetas")} type="number" min="0" placeholder=""/></div>
+            {f.tipoViaje==="foraneo"
+              ? <div className="field"><label>Viáticos Operador ($) <span style={{fontSize:10,color:"var(--muted)"}}>comidas</span></label><input value={f.viaticos} onChange={ch("viaticos")} type="number" min="0" placeholder=""/></div>
+              : null}
             <div className="field"><label>Costo Estadías ($)</label><input value={f.costoEstadias||""} onChange={ch("costoEstadias")} type="number" min="0" placeholder=""/></div>
-            {f.tipoViaje==="foraneo" && (
-              <div className="field"><label>Viáticos Operador ($) <span style={{fontSize:10,color:"var(--muted)"}}>comidas</span></label><input value={f.viaticos} onChange={ch("viaticos")} type="number" min="0" placeholder=""/></div>
-            )}
             <div className="field"><label>Gastos Extras ($)</label><input value={f.gastosExtras} onChange={ch("gastosExtras")} type="number" min="0"/></div>
           </div>
 
