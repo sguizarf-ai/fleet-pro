@@ -6628,11 +6628,14 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
     const u   = t.tipo === "PROPIO" ? units.find(u => u.id === t.unidadId) : null;
     const searchStr = [t.origen||"", t.destino||"", t.carga||"", t.cliente||"",
                        t.empresa||"", u?.placas||"", u?.num||""].join(" ").toLowerCase();
-    const tipoMatch = tf === "TODOS" || t.tipo === tf || (tf === "EXTERNO" && t._esExternoRec);
+    const tipoMatch = tf === "TODOS" || t.tipo === tf || (tf === "EXTERNO" && t._esExternoRec) || (tf === "LOCAL" && t.tipo === "PROPIO" && t.tipoViaje !== "foraneo") || (tf === "FORANEO" && t.tipo === "PROPIO" && t.tipoViaje === "foraneo");
     return searchStr.includes(q.toLowerCase()) && (sf === "TODOS" || t.status === sf) && tipoMatch && enRangoTrip(t.fecha||t.fechaReg);
   });
   const totKm = fil.reduce((a, t) => a + ((Number(t.kmLlegada) || 0) - (Number(t.kmSalida) || 0)), 0);
   const totIng = fil.filter(t => t.status === "COMPLETADO" && !t._esExternoRec).reduce((a, t) => a + (Number(t.costoOfrecido) || 0), 0);
+  const cntLocal   = allTrips.filter(t => t.tipo === "PROPIO" && t.tipoViaje !== "foraneo").length;
+  const cntForaneo = allTrips.filter(t => t.tipo === "PROPIO" && t.tipoViaje === "foraneo").length;
+  const cntExterno = allTrips.filter(t => t._esExternoRec || t.tipo === "EXTERNO").length;
   
   return (
     <>
@@ -6678,12 +6681,15 @@ function TripsPage({ trips, units, externos, maints, fuels, clientes, remitentes
         <span style={{fontSize:11,color:"var(--muted)",marginLeft:4}}>{fil.length} viajes</span>
         {/* Filtro tipo viaje */}
         <span style={{borderLeft:"1px solid var(--border)",paddingLeft:8,marginLeft:4,fontSize:11,color:"var(--muted)",fontWeight:700}}>Tipo:</span>
-        {[["TODOS","Todos"],["PROPIO","Propios"],["EXTERNO","Externos"]].map(([v,l])=>(
+        {[["TODOS","Todos"],["PROPIO","Propios"],["LOCAL","Locales"],["FORANEO","Foráneos"],["EXTERNO","Externos"]].map(([v,l])=>(
           <button key={v} className={`ftab${tf===v?" on":""}`} onClick={()=>setTf(v)} style={{fontSize:11}}>{l}</button>
         ))}
       </div>
       <div className="sbar">
         <span>Registros: <strong>{fil.length}</strong></span>
+        <span style={{color:"var(--cyan)",fontSize:11}}>🏙️ Locales: <strong>{cntLocal}</strong></span>
+        <span style={{color:"var(--green)",fontSize:11}}>🛣️ Foráneos: <strong>{cntForaneo}</strong></span>
+        <span style={{color:"var(--purple)",fontSize:11}}>🚚 Externos: <strong>{cntExterno}</strong></span>
         <span>KM totales: <strong style={{ color: "var(--green)" }}>{fmtN(totKm)} km</strong></span>
         {isAdmin && <span>Ingresos: <strong style={{ color: "var(--green)" }}>{fmt$(totIng)}</strong> 🔒</span>}
       </div>
